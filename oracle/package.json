@@ -1,0 +1,14 @@
+{
+  "name": "star-destroyer-oracle",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "The arbiter: the original Star Destroyer disk in apple2js, drivable from a script.",
+  "scripts": {
+    "catalog": "node probe_catalog.mjs",
+    "suite": "node run_all.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.59.1"
+  }
+}

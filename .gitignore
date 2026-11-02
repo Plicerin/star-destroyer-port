@@ -1,0 +1,11 @@
+node_modules/
+*.log
+
+# Not tracked: the loose copy of the image at the repo root and an unrelated file that
+# was already in this folder. The image everything is measured against is disk/.
+/STAR_DESTROYER.dsk
+/appointment.ics
+
+# Captured output is the oracle's answers and IS committed - a golden.json nobody can
+# diff is not a golden. The pictures are committed too; they are small, and they are the
+# only record of what the machine drew.

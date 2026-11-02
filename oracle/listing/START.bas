@@ -1,0 +1,17 @@
+1 HGR:HOME
+2 HGR2:GOSUB 100: POKE 230,32
+3 PRINT CHR$(4);"BLOAD SD.PIC1,A$2000"
+6 POKE - 16300,0: POKE - 16303,0
+8 PRINT "^DBLOAD SD.PIC2,A$4000"
+10 PRINT CHR$(4);"RUNLOGO1"
+100 VTAB 7: POKE 32,3: INVERSE
+102 PRINT
+103 PRINT "                                   "
+110 PRINT " PREPARE YOURSELF FOR THE ULTIMATE "
+120 PRINT "         STARSHIP BATTLE!          "
+130 PRINT "                                   "
+140 PRINT "                                   "
+150 PRINT " PRESS ANY KEY TO SKIP TITLE PAGE. "
+160 PRINT "                                   "
+165 POKE 0,0
+170 NORMAL:POKE 32,0: RETURN

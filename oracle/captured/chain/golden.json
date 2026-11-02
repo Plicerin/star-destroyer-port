@@ -1,0 +1,132 @@
+{
+ "programs": [
+  {
+   "name": "START",
+   "lines": 17,
+   "dos": [
+    "BLOAD SD.PIC2,A$4000"
+   ]
+  },
+  {
+   "name": "DEMO",
+   "lines": 53,
+   "dos": []
+  },
+  {
+   "name": "SD",
+   "lines": 5,
+   "dos": []
+  },
+  {
+   "name": "SD START",
+   "lines": 24,
+   "dos": []
+  },
+  {
+   "name": "STARBASE",
+   "lines": 71,
+   "dos": []
+  },
+  {
+   "name": "SD PART2",
+   "lines": 7,
+   "dos": [
+    "BRUN PART1.OBJ0",
+    "BLOAD PART2,A$8BD8",
+    "BRUN STAR DESTROYER.OBJ0",
+    "RUN MONOLITH",
+    "RUN HYPERDRIVE 3",
+    "RUN HYPERDRIVE1"
+   ]
+  },
+  {
+   "name": "SD RET",
+   "lines": 11,
+   "dos": []
+  },
+  {
+   "name": "LOGO1",
+   "lines": 7,
+   "dos": [
+    "BLOAD TITLE.OBJ0",
+    "RUN SELECT",
+    "RUN DEMO"
+   ]
+  },
+  {
+   "name": "HYPERDRIVE1",
+   "lines": 4,
+   "dos": []
+  },
+  {
+   "name": "HYPERDRIVE2",
+   "lines": 4,
+   "dos": []
+  },
+  {
+   "name": "HYPERDRIVE0",
+   "lines": 4,
+   "dos": []
+  },
+  {
+   "name": "CLS DATA",
+   "lines": 29,
+   "dos": []
+  },
+  {
+   "name": "SELECT",
+   "lines": 15,
+   "dos": []
+  },
+  {
+   "name": "SD START2",
+   "lines": 21,
+   "dos": []
+  },
+  {
+   "name": "SD PART3",
+   "lines": 5,
+   "dos": [
+    "RUN MONOLITH"
+   ]
+  },
+  {
+   "name": "HYPERDRIVE 4",
+   "lines": 5,
+   "dos": []
+  },
+  {
+   "name": "HYPERDRIVE 3",
+   "lines": 5,
+   "dos": []
+  },
+  {
+   "name": "CLEAR SCORES",
+   "lines": 2,
+   "dos": []
+  },
+  {
+   "name": "MONOLITH",
+   "lines": 4,
+   "dos": [
+    "BLOAD MONOLITH.PIC,A$2000",
+    "RUN INITIALS"
+   ]
+  },
+  {
+   "name": "INITIALS",
+   "lines": 82,
+   "dos": [
+    "BLOAD HALL OF HEROES.PIC,A$4000"
+   ]
+  },
+  {
+   "name": "WIN",
+   "lines": 5,
+   "dos": [
+    "BLOAD SUCCESS.PIC,A$2000",
+    "RUN INITIALS"
+   ]
+  }
+ ]
+}

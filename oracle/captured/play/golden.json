@@ -1,0 +1,29 @@
+{
+ "results": [
+  {
+   "what": "the disk boots to START",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "a key reaches the difficulty screen",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "HARD writes difficulty 1",
+   "ok": true,
+   "detail": "$1FF6 = 1"
+  },
+  {
+   "what": "and an enemy count in 5-7",
+   "ok": true,
+   "detail": "$1FF8 = 7"
+  },
+  {
+   "what": "the game draws a screen of its own",
+   "ok": true,
+   "detail": "hires, not a stored picture"
+  }
+ ]
+}
