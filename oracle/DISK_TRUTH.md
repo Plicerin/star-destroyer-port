@@ -481,11 +481,23 @@ Several things the earlier passes had as addresses are now instructions:
   was the view-space frustum mistaken for the world-space one, and then "not a fixed
   angle", which was truncation noise mistaken for a varying ratio. It is fixed, and it is
   set by three bytes a scene can change.)
-- **The clipper is a bisection, not an intersection.** A line that straddles a plane is
-  walked inward by halving, at most **ten times**, counted down in `$B1`, which `$6118`
-  reloads with 10 for every command. Clipped endpoints are therefore approximate in a
-  specific, reproducible way, and a port that solves the intersection exactly will differ
-  from the original at every window edge.
+- **The clipper computes exact intersections.** ~~A bisection.~~ This file said the
+  opposite after the renderer pass - "walked inward by halving, at most ten times" - and
+  `parity_clip.mjs` shows a bisection reproduces the engine on **0 of 45** clips, so that
+  description would have been wrong at every clipped edge. What `$6AEE` does, for the one
+  plane it picks:
+
+  ```
+  t   = f(p2) / (f(p2) - f(p1))     a Q15 parameter, via the engine's DIV
+  p2' = p2 + t * (p1 - p2)          two axes through MULCORE
+  ```
+
+  with the plane's own axis forced equal, so the point lands exactly on it. `$6AD4` clips
+  the other endpoint by swapping the two slots, clipping, and swapping back.
+
+  The `DEC $B1` loop, with the **ten** that `$6118` reloads for every command, is a cap on
+  how many PLANES one line may be clipped against - clipping to one can leave the point
+  outside another - not a halving count.
 - **The projection** is at `$6367`, and it is now a formula rather than a shape - see
   below.
 
@@ -816,7 +828,7 @@ image.
 
 The engine is not synchronised to anything: it runs until it is done, 18.6 video frames
 later. Whatever the port does about frame rate, **3.2 Hz with a 90-degree frustum and a
-ten-step bisection clipper is what the original looks like**, and that is the baseline
+exact clipper is what the original looks like**, and that is the baseline
 fidelity has to be measured against before any smoothing is offered as an option.
 
 ### What is resident at `$6000`

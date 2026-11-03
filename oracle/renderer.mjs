@@ -69,12 +69,13 @@
  * not off Math.sin - and not off a true negation either, because the folding negates its
  * two bytes in the wrong order and cos(128) comes back as -32383 rather than -32767.
  *
- * The clipper is a bisection, not an intersection. $6A22 and $6A7B compute a four-bit
- * outcode per point by testing z+x, z-x, z+y, z-y for overflow - which is the frustum
- * |x| <= z, |y| <= z, so the field of view is exactly 90 degrees both ways. The drawing
- * code then rejects a line whose two outcodes share a bit (Cohen-Sutherland's trivial
- * reject), and otherwise walks the line inward by halving, at most ten times, counted down
- * in $B1. Ten is set at $6118 for every command.
+ * $6A22 and $6A7B compute a four-bit outcode per point by testing z+x, z-x, z+y, z-y for
+ * overflow, which is the frustum |x| <= z, |y| <= z in VIEW space. The drawing code
+ * rejects a line whose two outcodes share a bit (Cohen-Sutherland's trivial reject), and
+ * otherwise clips at $6AEE - which computes the exact intersection with one plane,
+ * t = f(p2)/(f(p2)-f(p1)) through the engine's DIV, not a bisection. The ten in $B1,
+ * reloaded at $6118 for every command, caps how many PLANES a line may be clipped
+ * against, since clipping to one can leave the point outside another.
  *
  * The perspective divide is at $6370-$63AF: divide, then scale by a constant and add a
  * centre. Both the scale and the centre are bytes INSIDE that code, patched by opcode 14 -

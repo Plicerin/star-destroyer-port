@@ -153,9 +153,10 @@ Build the interpreter loop (fetch, bound at 30, dispatch, each handler advances 
 pointer by its own length), the object instruction's recursion into shapes, and the
 clipper.
 
-The clipper is **a bisection, not an intersection**: a line straddling a plane is walked
-inward by halving, at most **ten times**, reloaded for every command. Solving for the
-intersection exactly will differ from the original at every window edge.
+The clipper computes **exact intersections** - `t = f(p2)/(f(p2)-f(p1))` through the
+engine's DIV, one plane at a time. This plan said "a bisection" until `parity_clip.mjs`
+measured it; halving matches on 0 of 45 clips. The **ten** in `$B1` caps how many planes
+one line may be clipped against, not how many halvings. Done: `port/src/a23d2/clip.js`.
 
 Keep the engine's statefulness — opcode 20's vectors, opcode 12's plot mode, opcode 29's
 capture mode and opcode 15's constants all survive a call. A frame inherits whatever the

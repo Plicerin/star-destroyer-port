@@ -1,0 +1,29 @@
+{
+ "results": [
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the port computes the same outcode as $6A7B",
+   "ok": true,
+   "detail": "63 points around the frustum"
+  },
+  {
+   "what": "the clipped point matches the engine exactly, on all four planes",
+   "ok": true,
+   "detail": "45 exact"
+  },
+  {
+   "what": "and the port picks the same plane when several are violated",
+   "ok": true,
+   "detail": "checked implicitly - a different plane gives a different point, which the above would catch"
+  },
+  {
+   "what": "a bisection does NOT reproduce it, so the correction was worth making",
+   "ok": true,
+   "detail": "0 of 45 - the old description would have been wrong at nearly every clipped edge"
+  }
+ ]
+}
