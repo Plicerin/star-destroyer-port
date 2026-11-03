@@ -1,0 +1,213 @@
+{
+ "frames": [
+  {
+   "instr": 204865,
+   "cycles": 594293,
+   "inGame": 11
+  },
+  {
+   "instr": 300374,
+   "cycles": 317974,
+   "inGame": 6
+  },
+  {
+   "instr": 422657,
+   "cycles": 411119,
+   "inGame": 479
+  },
+  {
+   "instr": 546928,
+   "cycles": 419469,
+   "inGame": 479
+  },
+  {
+   "instr": 670135,
+   "cycles": 415509,
+   "inGame": 487
+  },
+  {
+   "instr": 792236,
+   "cycles": 411260,
+   "inGame": 486
+  },
+  {
+   "instr": 912822,
+   "cycles": 406807,
+   "inGame": 469
+  }
+ ],
+ "changing": [
+  {
+   "at": "$8110",
+   "frames": 6,
+   "what": "display page"
+  },
+  {
+   "at": "$8112",
+   "frames": 6,
+   "what": "clear page"
+  },
+  {
+   "at": "$8114",
+   "frames": 6,
+   "what": "draw page"
+  },
+  {
+   "at": "$8136",
+   "frames": 5,
+   "what": "object  1 position"
+  },
+  {
+   "at": "$813A",
+   "frames": 5,
+   "what": "object  1 attitude"
+  },
+  {
+   "at": "$8143",
+   "frames": 5,
+   "what": "object  2 position"
+  },
+  {
+   "at": "$8147",
+   "frames": 5,
+   "what": "object  2 attitude"
+  },
+  {
+   "at": "$825A",
+   "frames": 5,
+   "what": "object 13 position"
+  },
+  {
+   "at": "$825E",
+   "frames": 5,
+   "what": "object 13 attitude"
+  },
+  {
+   "at": "$8267",
+   "frames": 5,
+   "what": "object 14 position"
+  },
+  {
+   "at": "$826B",
+   "frames": 5,
+   "what": "object 14 attitude"
+  },
+  {
+   "at": "$8132",
+   "frames": 4,
+   "what": "object  1 position"
+  },
+  {
+   "at": "$8256",
+   "frames": 4,
+   "what": "object 13 position"
+  },
+  {
+   "at": "$813F",
+   "frames": 3,
+   "what": "object  2 position"
+  },
+  {
+   "at": "$8263",
+   "frames": 3,
+   "what": "object 14 position"
+  },
+  {
+   "at": "$8137",
+   "frames": 2,
+   "what": "object  1 position"
+  },
+  {
+   "at": "$8140",
+   "frames": 2,
+   "what": "object  2 position"
+  },
+  {
+   "at": "$8144",
+   "frames": 2,
+   "what": "object  2 position"
+  },
+  {
+   "at": "$825B",
+   "frames": 2,
+   "what": "object 13 position"
+  },
+  {
+   "at": "$8264",
+   "frames": 2,
+   "what": "object 14 position"
+  },
+  {
+   "at": "$8268",
+   "frames": 2,
+   "what": "object 14 position"
+  },
+  {
+   "at": "$8116",
+   "frames": 1,
+   "what": "XI"
+  },
+  {
+   "at": "$8117",
+   "frames": 1,
+   "what": "XI+1"
+  },
+  {
+   "at": "$8133",
+   "frames": 1,
+   "what": "object  1 position"
+  },
+  {
+   "at": "$8249",
+   "frames": 1,
+   "what": "object 12 position"
+  },
+  {
+   "at": "$824A",
+   "frames": 1,
+   "what": "object 12 position"
+  },
+  {
+   "at": "$8257",
+   "frames": 1,
+   "what": "object 13 position"
+  }
+ ],
+ "results": [
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the trace caught the game calling the renderer",
+   "ok": true,
+   "detail": "7 renders"
+  },
+  {
+   "what": "the game settles into a loop with a steady period",
+   "ok": true,
+   "detail": "317974 to 419469 cycles"
+  },
+  {
+   "what": "the frame is mostly the renderer, not the game logic",
+   "ok": true,
+   "detail": "81270 cycles a frame outside the render"
+  },
+  {
+   "what": "every executed address is one the traverse also found",
+   "ok": true,
+   "detail": "624 addresses, all accounted for"
+  },
+  {
+   "what": "the game pokes the display list every frame",
+   "ok": true,
+   "detail": "27 bytes move, the busiest in 6 of 6 frames"
+  },
+  {
+   "what": "and what it pokes is the viewer, the objects and the gauges - nothing else",
+   "ok": true,
+   "detail": "every changing byte is accounted for"
+  }
+ ]
+}

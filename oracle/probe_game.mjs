@@ -140,7 +140,7 @@ console.log('\n=== what it reaches into ===');
       const base = (i < 12 ? 0x8123 + i * 13 : 0x8247 + (i - 12) * 13);
       if (t > base && t <= base + 12) {
         const off = t - base - 1;
-        const field = off === 0 ? 'count' : off < 6 ? 'position' : off < 9 ? 'attitude' : 'shape';
+        const field = off === 0 ? 'count' : off <= 6 ? 'position' : off <= 9 ? 'attitude' : 'shape';
         return `object ${i} ${field}`;
       }
     }

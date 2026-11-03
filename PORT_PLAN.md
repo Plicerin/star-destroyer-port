@@ -208,9 +208,13 @@ harness for the game logic compares **the display list after each frame**, not s
 and not internal state.
 
 Suggested order:
-1. Trace `STAR DESTROYER.OBJ0` in the oracle during flight, as `probe_renderer.mjs` traced
-   the engine, to find its frame loop and which of its 2,086 instructions actually run.
-2. Port the frame loop, and compare the display list each frame.
+1. ~~Trace `STAR DESTROYER.OBJ0` in the oracle during flight.~~ Done -
+   `probe_gameloop.mjs`. 624 of its 2,086 instructions run, in 17 regions; a frame is
+   397,000 cycles of which 80% is the renderer; 27 display-list bytes move per frame. The
+   controls are **paddle 0** through the ROM's PREAD, with a dead zone of 100..154 and
+   three units of heading a frame, and the keyboard is a pause.
+2. Port the frame loop, and compare the display list each frame. The five large code
+   regions are where to start.
 3. Then the Applesoft around it.
 
 ## Phase 5 notes — what the plan first said

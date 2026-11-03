@@ -72,12 +72,12 @@
   {
    "at": "$8137",
    "count": 3,
-   "what": "object 1 attitude"
+   "what": "object 1 position"
   },
   {
    "at": "$813A",
    "count": 15,
-   "what": "object 1 shape"
+   "what": "object 1 attitude"
   },
   {
    "at": "$813E",
@@ -102,12 +102,12 @@
   {
    "at": "$8144",
    "count": 3,
-   "what": "object 2 attitude"
+   "what": "object 2 position"
   },
   {
    "at": "$8147",
    "count": 13,
-   "what": "object 2 shape"
+   "what": "object 2 attitude"
   },
   {
    "at": "$814B",
@@ -132,12 +132,12 @@
   {
    "at": "$8151",
    "count": 3,
-   "what": "object 3 attitude"
+   "what": "object 3 position"
   },
   {
    "at": "$8154",
    "count": 13,
-   "what": "object 3 shape"
+   "what": "object 3 attitude"
   },
   {
    "at": "$8158",
@@ -172,12 +172,12 @@
   {
    "at": "$815E",
    "count": 1,
-   "what": "object 4 attitude"
+   "what": "object 4 position"
   },
   {
    "at": "$8161",
    "count": 1,
-   "what": "object 4 shape"
+   "what": "object 4 attitude"
   },
   {
    "at": "$8165",
@@ -212,12 +212,12 @@
   {
    "at": "$816B",
    "count": 2,
-   "what": "object 5 attitude"
+   "what": "object 5 position"
   },
   {
    "at": "$816E",
    "count": 2,
-   "what": "object 5 shape"
+   "what": "object 5 attitude"
   },
   {
    "at": "$8172",
@@ -242,12 +242,12 @@
   {
    "at": "$8178",
    "count": 1,
-   "what": "object 6 attitude"
+   "what": "object 6 position"
   },
   {
    "at": "$817B",
    "count": 3,
-   "what": "object 6 shape"
+   "what": "object 6 attitude"
   },
   {
    "at": "$817F",
@@ -272,12 +272,12 @@
   {
    "at": "$8185",
    "count": 1,
-   "what": "object 7 attitude"
+   "what": "object 7 position"
   },
   {
    "at": "$8188",
    "count": 3,
-   "what": "object 7 shape"
+   "what": "object 7 attitude"
   },
   {
    "at": "$818C",
@@ -302,12 +302,12 @@
   {
    "at": "$8192",
    "count": 3,
-   "what": "object 8 attitude"
+   "what": "object 8 position"
   },
   {
    "at": "$8195",
    "count": 2,
-   "what": "object 8 shape"
+   "what": "object 8 attitude"
   },
   {
    "at": "$8199",
@@ -332,12 +332,12 @@
   {
    "at": "$819F",
    "count": 3,
-   "what": "object 9 attitude"
+   "what": "object 9 position"
   },
   {
    "at": "$81A2",
    "count": 2,
-   "what": "object 9 shape"
+   "what": "object 9 attitude"
   },
   {
    "at": "$81A6",
@@ -362,12 +362,12 @@
   {
    "at": "$81AC",
    "count": 3,
-   "what": "object 10 attitude"
+   "what": "object 10 position"
   },
   {
    "at": "$81AF",
    "count": 2,
-   "what": "object 10 shape"
+   "what": "object 10 attitude"
   },
   {
    "at": "$81B4",
@@ -387,12 +387,12 @@
   {
    "at": "$81B9",
    "count": 3,
-   "what": "object 11 attitude"
+   "what": "object 11 position"
   },
   {
    "at": "$81BC",
    "count": 2,
-   "what": "object 11 shape"
+   "what": "object 11 attitude"
   },
   {
    "at": "$81DD",
@@ -462,12 +462,12 @@
   {
    "at": "$824E",
    "count": 1,
-   "what": "object 12 attitude"
+   "what": "object 12 position"
   },
   {
    "at": "$8251",
    "count": 2,
-   "what": "object 12 shape"
+   "what": "object 12 attitude"
   },
   {
    "at": "$8255",
@@ -492,12 +492,12 @@
   {
    "at": "$825B",
    "count": 2,
-   "what": "object 13 attitude"
+   "what": "object 13 position"
   },
   {
    "at": "$825E",
    "count": 2,
-   "what": "object 13 shape"
+   "what": "object 13 attitude"
   },
   {
    "at": "$8262",
@@ -522,12 +522,12 @@
   {
    "at": "$8268",
    "count": 2,
-   "what": "object 14 attitude"
+   "what": "object 14 position"
   },
   {
    "at": "$826B",
    "count": 2,
-   "what": "object 14 shape"
+   "what": "object 14 attitude"
   },
   {
    "at": "$826F",
@@ -552,12 +552,12 @@
   {
    "at": "$8275",
    "count": 2,
-   "what": "object 15 attitude"
+   "what": "object 15 position"
   },
   {
    "at": "$8278",
    "count": 2,
-   "what": "object 15 shape"
+   "what": "object 15 attitude"
   },
   {
    "at": "$827C",
@@ -582,7 +582,7 @@
   {
    "at": "$8282",
    "count": 1,
-   "what": "object 16 attitude"
+   "what": "object 16 position"
   },
   {
    "at": "$8289",
@@ -607,7 +607,7 @@
   {
    "at": "$828F",
    "count": 2,
-   "what": "object 17 attitude"
+   "what": "object 17 position"
   },
   {
    "at": "$8296",
@@ -632,7 +632,7 @@
   {
    "at": "$829C",
    "count": 1,
-   "what": "object 18 attitude"
+   "what": "object 18 position"
   },
   {
    "at": "$82A3",
@@ -657,7 +657,7 @@
   {
    "at": "$82A9",
    "count": 1,
-   "what": "object 19 attitude"
+   "what": "object 19 position"
   },
   {
    "at": "$82B0",
@@ -682,12 +682,12 @@
   {
    "at": "$82B6",
    "count": 3,
-   "what": "object 20 attitude"
+   "what": "object 20 position"
   },
   {
    "at": "$82B9",
    "count": 2,
-   "what": "object 20 shape"
+   "what": "object 20 attitude"
   },
   {
    "at": "$82BD",
@@ -712,12 +712,12 @@
   {
    "at": "$82C3",
    "count": 3,
-   "what": "object 21 attitude"
+   "what": "object 21 position"
   },
   {
    "at": "$82C6",
    "count": 2,
-   "what": "object 21 shape"
+   "what": "object 21 attitude"
   },
   {
    "at": "$82CA",
@@ -742,12 +742,12 @@
   {
    "at": "$82D0",
    "count": 3,
-   "what": "object 22 attitude"
+   "what": "object 22 position"
   },
   {
    "at": "$82D3",
    "count": 2,
-   "what": "object 22 shape"
+   "what": "object 22 attitude"
   },
   {
    "at": "$82D8",
@@ -767,12 +767,12 @@
   {
    "at": "$82DD",
    "count": 3,
-   "what": "object 23 attitude"
+   "what": "object 23 position"
   },
   {
    "at": "$82E0",
    "count": 2,
-   "what": "object 23 shape"
+   "what": "object 23 attitude"
   }
  ],
  "results": [

@@ -894,6 +894,71 @@ by poking the far end of three 2-D lines. There is no other channel.
 **That makes the arbiter for the game logic a byte comparison too.** The port does not
 have to match the original's internal state - it has to poke the same display list.
 
+### The game loop, traced
+
+`probe_gameloop.mjs`, 10 checks. The binary stepped instruction by instruction through
+seven frames of real flight.
+
+| | |
+| --- | --- |
+| one game frame | **397,000 cycles - 389 ms, 2.57 a second** |
+| of which the renderer | about 316,000, so **80%** of the frame is drawing |
+| the game's own code | **401 instructions** a frame |
+| of the binary's 2,086 instructions | **624 ran**; 1,462 were never reached in seven frames |
+
+The 2.57 frames a second is the game's real cadence, where the 3.23 in the renderer
+section is the renderer alone with nothing thinking in front of it.
+
+Every address the trace executed is one the static traverse also found, which is the same
+cross-check the renderer pass used.
+
+It executes in **17 separate regions**, the largest being `$0957`-`$0AE0`, `$0C04`-`$0DA2`,
+`$0E05`-`$0EF6`, `$1014`-`$11AC` and `$120F`-`$1300`.
+
+### What a frame pokes
+
+27 of the display list's 491 bytes move between frames, and every one of them is
+accounted for:
+
+- `$8110`, `$8112`, `$8114` - every frame. The display page and the two page selects: the
+  double buffering.
+- object 1, 2, 13 and 14's **position and attitude** - the enemies moving and turning.
+- the viewer's `XI`, `ZI` and `H1` when the ship is being flown.
+
+Nothing else changes. The binary's entire effect on the screen is those bytes.
+
+### The controls
+
+**Paddle 0 steers.** A scan of the soft switches the binary touches found the keyboard and
+button 0 and no paddle at all, which was misleading: the read goes through the monitor
+ROM.
+
+```
+$09A3  LDX #$00        ; paddle 0
+$09A5  JSR $FB1E       ; PREAD - the ROM's paddle read, returns Y
+$09A8  CPY #$9B        ; 155 or more: heading += 3
+$09BE  CPY #$64        ; under 100:   heading -= 3
+```
+
+So a **dead zone from 100 to 154** and **three units of heading a frame**. Measured by
+driving the paddle in the machine and watching `$811E`: hard over turns +3 a frame one way
+and -3 the other, and the centre does not move at all. The heading is written to the
+`VIEWER` instruction and to object 12's attitude at `$8251` at the same time.
+
+**The keyboard is a pause.** `$1929` reads `$C000`, and if a key is pending it clears the
+strobe and spins at `$1935` until another arrives. Measured: with the paddle held hard
+over, the heading advances 9; press a key and it advances 0; press another and it advances
+9 again.
+
+**Button 0** is read once a frame at `$0ADB`, in the main loop region.
+
+### The explosions
+
+`$1944` copies object 1's x and z into objects **8, 9, 10, 11 and 20, 21, 22, 23** - which
+are the four explosion starbursts of each block, the ones `render_shapes.mjs` drew as
+sixteen-point bursts at radius 21, 35, 63 and 84. The explosion is placed at the target it
+belongs to, and the four sizes are the animation.
+
 ---
 
 ## Open questions
