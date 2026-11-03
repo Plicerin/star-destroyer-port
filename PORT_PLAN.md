@@ -186,7 +186,34 @@ last one left.
 page, byte for byte**, against the engine for the same frame. That is the real test of the
 whole renderer, and it is achievable — every stage under it is exact.
 
-## Phase 5 — the game
+## Phase 5 — the game  (REFRAMED - see probe_game.mjs)
+
+This phase was written as "the 21 Applesoft programs and the chain between them". That is
+half of it and not the hard half.
+
+**The flight is not in BASIC.** `SD PART2` is 287 bytes and its real line is
+`BRUN STAR DESTROYER.OBJ0` - 5,890 bytes of 6502, 95.7% reachable code from its entry at
+`$08EF`. Porting the combat means disassembling that, the way A2-3D2 was disassembled.
+The other overlays (`BASE STAR.OBJ0`, `HYPERDRIVE.OBJ0`, `TITLE.OBJ0`, `PART1.OBJ0`) are
+another 15KB of the same.
+
+The 12KB of Applesoft is still real work - the title, the difficulty screen, the starbase,
+the hyperdrive sequences, the high scores, the demo - but it is chaining and presentation.
+
+**The arbiter is already built.** The binary's whole effect on what appears is the bytes
+it pokes into the display list: the VIEWER instruction's `XI`/`ZI`/`H1`, the object
+instructions' count/position/attitude/shape, and the far end of the three gauge lines.
+Nothing else. Since the display list is ported and verified byte-for-byte, a parity
+harness for the game logic compares **the display list after each frame**, not screenshots
+and not internal state.
+
+Suggested order:
+1. Trace `STAR DESTROYER.OBJ0` in the oracle during flight, as `probe_renderer.mjs` traced
+   the engine, to find its frame loop and which of its 2,086 instructions actually run.
+2. Port the frame loop, and compare the display list each frame.
+3. Then the Applesoft around it.
+
+## Phase 5 notes — what the plan first said
 
 The 21 Applesoft programs in `oracle/listing/*.bas`, and the chain between them:
 

@@ -837,6 +837,63 @@ Measured during flight: `A2-3D2`, byte-identical to the disk file apart from its
 patches. The character set and the music both BLOAD to `$6000` as well, but not while the
 game is flying.
 
+## The game is in the overlays
+
+`probe_game.mjs`, 12 checks. This had been assumed to be an Applesoft game with a 3-D
+library bolted on. It is not. The Applesoft chain reaches `SD PART2`, which is **287
+bytes** long, and its one real line is
+
+```
+164 PRINT CHR$(4);"BRUN PART1.OBJ0" : PRINT CHR$(4);"BLOAD PART2,A$8BD8"
+    : PRINT CHR$(4);"BRUN STAR DESTROYER.OBJ0"
+```
+
+`STAR DESTROYER.OBJ0` is **5,890 bytes of 6502**, and that is the flight game. Traversed
+from its entry at `$08EF` - a `JMP $0957` - **95.7% of it is reachable code**, 2,086
+instructions. The six overlays together are 20,995 bytes against 12,477 for all 21
+Applesoft programs.
+
+The Applesoft is not nothing: 12KB of it runs the title, the difficulty screen, the
+starbase, the hyperdrive sequences, the high-score entry and the demo, and all of that has
+to be ported. But the combat is a binary.
+
+### How a BRUN overwrites the program that issued it
+
+Open question 8 was how a BASIC program at `$0801` and an overlay at `$08EF` share that
+space, since `$08EF` is only 238 bytes above `$0801` and every program is longer than
+that. Measured in flight: **`SD PART2`'s text matches the disk for exactly its first 238
+bytes** - up to `$08EF` and not one byte further. The overlay really does overwrite the
+tail of the program that ran it.
+
+It works because of how the program is laid out. The lines that still have to run after
+the BRUN - 172, 175 and 180, which read the result bytes and decide what to chain next -
+all sit below `$08EF` and survive. The subroutine at 200, which line 10 calls *before* the
+BRUN, sits above it and is destroyed. Nothing needs it again.
+
+So `$08EF` is not an arbitrary address: it is as low as the overlays can start while
+leaving room for the part of each program that has to outlive them.
+
+### How the game drives the renderer
+
+This is what matters for the port, because the binary's entire effect on what appears is
+the bytes it writes into the display list - and that list is already ported and verified
+byte-for-byte. Every absolute reference the game makes into `$6000`-`$83FF`:
+
+| address | times | what |
+| --- | --- | --- |
+| `$6000` | 3 | `CALL 24576`, render a frame |
+| `$8110`, `$8112`, `$8114` | 3 each | the display page switch, and which page to clear and draw on |
+| `$8116`, `$811A`, `$811E` | 2, 1, 7 | `XI`, `ZI`, `H1` - the VIEWER instruction's operands |
+| `$81DD`, `$81F3`, `$8209` | 5, 4, 5 | the shield, warp and missile gauges |
+| 135 more | | fields of object instructions: count, position, attitude and shape |
+
+So the ship flies by poking two position axes and a heading into one `VIEWER` instruction;
+the enemies move by poking `OBJECT` instructions directly; and the instrument panel moves
+by poking the far end of three 2-D lines. There is no other channel.
+
+**That makes the arbiter for the game logic a byte comparison too.** The port does not
+have to match the original's internal state - it has to poke the same display list.
+
 ---
 
 ## Open questions
@@ -867,8 +924,7 @@ promoted to fact.
 6. ~~**`$81C0`-`$8247`.**~~ Answered: the instrument panel, as display-list instructions.
 7. ~~**What is resident at `$6000`.**~~ Answered for flight: A2-3D2. Not established for
    the title, the demo or the end sequence, where the music loads over the same address.
-8. **The `.OBJ0` overlays at `$08EF`**, which is 238 bytes above Applesoft's `$0801`. How a
-   BASIC program and a binary share that space is not understood.
+8. ~~**The `.OBJ0` overlays at `$08EF`.**~~ Answered, below.
 9. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
    measured about when or in what format.
 10. **The `DEMO` path**, never walked.

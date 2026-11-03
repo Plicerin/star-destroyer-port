@@ -1,0 +1,840 @@
+{
+ "entry": "$08EF",
+ "jumpsTo": "JMP $0957",
+ "instructions": 2086,
+ "codeBytes": 5637,
+ "references": [
+  {
+   "at": "$6000",
+   "count": 3,
+   "what": "CALL 24576 - render a frame"
+  },
+  {
+   "at": "$8110",
+   "count": 3,
+   "what": "display page switch"
+  },
+  {
+   "at": "$8112",
+   "count": 3,
+   "what": "which page to clear"
+  },
+  {
+   "at": "$8114",
+   "count": 3,
+   "what": "which page to draw on"
+  },
+  {
+   "at": "$8116",
+   "count": 2,
+   "what": "XI"
+  },
+  {
+   "at": "$8117",
+   "count": 2,
+   "what": "XI+1"
+  },
+  {
+   "at": "$811A",
+   "count": 1,
+   "what": "ZI"
+  },
+  {
+   "at": "$811B",
+   "count": 1,
+   "what": "ZI+1"
+  },
+  {
+   "at": "$811E",
+   "count": 7,
+   "what": "H1 heading"
+  },
+  {
+   "at": "$8131",
+   "count": 5,
+   "what": "object 1 count"
+  },
+  {
+   "at": "$8132",
+   "count": 2,
+   "what": "object 1 position"
+  },
+  {
+   "at": "$8133",
+   "count": 3,
+   "what": "object 1 position"
+  },
+  {
+   "at": "$8136",
+   "count": 2,
+   "what": "object 1 position"
+  },
+  {
+   "at": "$8137",
+   "count": 3,
+   "what": "object 1 attitude"
+  },
+  {
+   "at": "$813A",
+   "count": 15,
+   "what": "object 1 shape"
+  },
+  {
+   "at": "$813E",
+   "count": 5,
+   "what": "object 2 count"
+  },
+  {
+   "at": "$813F",
+   "count": 2,
+   "what": "object 2 position"
+  },
+  {
+   "at": "$8140",
+   "count": 3,
+   "what": "object 2 position"
+  },
+  {
+   "at": "$8143",
+   "count": 2,
+   "what": "object 2 position"
+  },
+  {
+   "at": "$8144",
+   "count": 3,
+   "what": "object 2 attitude"
+  },
+  {
+   "at": "$8147",
+   "count": 13,
+   "what": "object 2 shape"
+  },
+  {
+   "at": "$814B",
+   "count": 5,
+   "what": "object 3 count"
+  },
+  {
+   "at": "$814C",
+   "count": 2,
+   "what": "object 3 position"
+  },
+  {
+   "at": "$814D",
+   "count": 3,
+   "what": "object 3 position"
+  },
+  {
+   "at": "$8150",
+   "count": 2,
+   "what": "object 3 position"
+  },
+  {
+   "at": "$8151",
+   "count": 3,
+   "what": "object 3 attitude"
+  },
+  {
+   "at": "$8154",
+   "count": 13,
+   "what": "object 3 shape"
+  },
+  {
+   "at": "$8158",
+   "count": 4,
+   "what": "object 4 count"
+  },
+  {
+   "at": "$8159",
+   "count": 1,
+   "what": "object 4 position"
+  },
+  {
+   "at": "$815A",
+   "count": 1,
+   "what": "object 4 position"
+  },
+  {
+   "at": "$815B",
+   "count": 2,
+   "what": "object 4 position"
+  },
+  {
+   "at": "$815C",
+   "count": 2,
+   "what": "object 4 position"
+  },
+  {
+   "at": "$815D",
+   "count": 1,
+   "what": "object 4 position"
+  },
+  {
+   "at": "$815E",
+   "count": 1,
+   "what": "object 4 attitude"
+  },
+  {
+   "at": "$8161",
+   "count": 1,
+   "what": "object 4 shape"
+  },
+  {
+   "at": "$8165",
+   "count": 8,
+   "what": "object 5 count"
+  },
+  {
+   "at": "$8166",
+   "count": 2,
+   "what": "object 5 position"
+  },
+  {
+   "at": "$8167",
+   "count": 2,
+   "what": "object 5 position"
+  },
+  {
+   "at": "$8168",
+   "count": 3,
+   "what": "object 5 position"
+  },
+  {
+   "at": "$8169",
+   "count": 3,
+   "what": "object 5 position"
+  },
+  {
+   "at": "$816A",
+   "count": 2,
+   "what": "object 5 position"
+  },
+  {
+   "at": "$816B",
+   "count": 2,
+   "what": "object 5 attitude"
+  },
+  {
+   "at": "$816E",
+   "count": 2,
+   "what": "object 5 shape"
+  },
+  {
+   "at": "$8172",
+   "count": 8,
+   "what": "object 6 count"
+  },
+  {
+   "at": "$8173",
+   "count": 1,
+   "what": "object 6 position"
+  },
+  {
+   "at": "$8174",
+   "count": 1,
+   "what": "object 6 position"
+  },
+  {
+   "at": "$8177",
+   "count": 1,
+   "what": "object 6 position"
+  },
+  {
+   "at": "$8178",
+   "count": 1,
+   "what": "object 6 attitude"
+  },
+  {
+   "at": "$817B",
+   "count": 3,
+   "what": "object 6 shape"
+  },
+  {
+   "at": "$817F",
+   "count": 8,
+   "what": "object 7 count"
+  },
+  {
+   "at": "$8180",
+   "count": 1,
+   "what": "object 7 position"
+  },
+  {
+   "at": "$8181",
+   "count": 1,
+   "what": "object 7 position"
+  },
+  {
+   "at": "$8184",
+   "count": 1,
+   "what": "object 7 position"
+  },
+  {
+   "at": "$8185",
+   "count": 1,
+   "what": "object 7 attitude"
+  },
+  {
+   "at": "$8188",
+   "count": 3,
+   "what": "object 7 shape"
+  },
+  {
+   "at": "$818C",
+   "count": 1,
+   "what": "object 8 count"
+  },
+  {
+   "at": "$818D",
+   "count": 3,
+   "what": "object 8 position"
+  },
+  {
+   "at": "$818E",
+   "count": 3,
+   "what": "object 8 position"
+  },
+  {
+   "at": "$8191",
+   "count": 3,
+   "what": "object 8 position"
+  },
+  {
+   "at": "$8192",
+   "count": 3,
+   "what": "object 8 attitude"
+  },
+  {
+   "at": "$8195",
+   "count": 2,
+   "what": "object 8 shape"
+  },
+  {
+   "at": "$8199",
+   "count": 1,
+   "what": "object 9 count"
+  },
+  {
+   "at": "$819A",
+   "count": 3,
+   "what": "object 9 position"
+  },
+  {
+   "at": "$819B",
+   "count": 3,
+   "what": "object 9 position"
+  },
+  {
+   "at": "$819E",
+   "count": 3,
+   "what": "object 9 position"
+  },
+  {
+   "at": "$819F",
+   "count": 3,
+   "what": "object 9 attitude"
+  },
+  {
+   "at": "$81A2",
+   "count": 2,
+   "what": "object 9 shape"
+  },
+  {
+   "at": "$81A6",
+   "count": 1,
+   "what": "object 10 count"
+  },
+  {
+   "at": "$81A7",
+   "count": 3,
+   "what": "object 10 position"
+  },
+  {
+   "at": "$81A8",
+   "count": 3,
+   "what": "object 10 position"
+  },
+  {
+   "at": "$81AB",
+   "count": 3,
+   "what": "object 10 position"
+  },
+  {
+   "at": "$81AC",
+   "count": 3,
+   "what": "object 10 attitude"
+  },
+  {
+   "at": "$81AF",
+   "count": 2,
+   "what": "object 10 shape"
+  },
+  {
+   "at": "$81B4",
+   "count": 3,
+   "what": "object 11 position"
+  },
+  {
+   "at": "$81B5",
+   "count": 3,
+   "what": "object 11 position"
+  },
+  {
+   "at": "$81B8",
+   "count": 3,
+   "what": "object 11 position"
+  },
+  {
+   "at": "$81B9",
+   "count": 3,
+   "what": "object 11 attitude"
+  },
+  {
+   "at": "$81BC",
+   "count": 2,
+   "what": "object 11 shape"
+  },
+  {
+   "at": "$81DD",
+   "count": 5,
+   "what": "SHLD gauge"
+  },
+  {
+   "at": "$81F3",
+   "count": 4,
+   "what": "WARP gauge"
+  },
+  {
+   "at": "$8209",
+   "count": 5,
+   "what": "MSL gauge"
+  },
+  {
+   "at": "$8222",
+   "count": 4,
+   "what": null
+  },
+  {
+   "at": "$8225",
+   "count": 4,
+   "what": null
+  },
+  {
+   "at": "$8228",
+   "count": 4,
+   "what": null
+  },
+  {
+   "at": "$822B",
+   "count": 4,
+   "what": null
+  },
+  {
+   "at": "$822E",
+   "count": 4,
+   "what": null
+  },
+  {
+   "at": "$8231",
+   "count": 4,
+   "what": null
+  },
+  {
+   "at": "$8234",
+   "count": 4,
+   "what": null
+  },
+  {
+   "at": "$8249",
+   "count": 2,
+   "what": "object 12 position"
+  },
+  {
+   "at": "$824A",
+   "count": 2,
+   "what": "object 12 position"
+  },
+  {
+   "at": "$824D",
+   "count": 1,
+   "what": "object 12 position"
+  },
+  {
+   "at": "$824E",
+   "count": 1,
+   "what": "object 12 attitude"
+  },
+  {
+   "at": "$8251",
+   "count": 2,
+   "what": "object 12 shape"
+  },
+  {
+   "at": "$8255",
+   "count": 3,
+   "what": "object 13 count"
+  },
+  {
+   "at": "$8256",
+   "count": 1,
+   "what": "object 13 position"
+  },
+  {
+   "at": "$8257",
+   "count": 2,
+   "what": "object 13 position"
+  },
+  {
+   "at": "$825A",
+   "count": 1,
+   "what": "object 13 position"
+  },
+  {
+   "at": "$825B",
+   "count": 2,
+   "what": "object 13 attitude"
+  },
+  {
+   "at": "$825E",
+   "count": 2,
+   "what": "object 13 shape"
+  },
+  {
+   "at": "$8262",
+   "count": 3,
+   "what": "object 14 count"
+  },
+  {
+   "at": "$8263",
+   "count": 1,
+   "what": "object 14 position"
+  },
+  {
+   "at": "$8264",
+   "count": 2,
+   "what": "object 14 position"
+  },
+  {
+   "at": "$8267",
+   "count": 1,
+   "what": "object 14 position"
+  },
+  {
+   "at": "$8268",
+   "count": 2,
+   "what": "object 14 attitude"
+  },
+  {
+   "at": "$826B",
+   "count": 2,
+   "what": "object 14 shape"
+  },
+  {
+   "at": "$826F",
+   "count": 3,
+   "what": "object 15 count"
+  },
+  {
+   "at": "$8270",
+   "count": 1,
+   "what": "object 15 position"
+  },
+  {
+   "at": "$8271",
+   "count": 2,
+   "what": "object 15 position"
+  },
+  {
+   "at": "$8274",
+   "count": 1,
+   "what": "object 15 position"
+  },
+  {
+   "at": "$8275",
+   "count": 2,
+   "what": "object 15 attitude"
+  },
+  {
+   "at": "$8278",
+   "count": 2,
+   "what": "object 15 shape"
+  },
+  {
+   "at": "$827C",
+   "count": 2,
+   "what": "object 16 count"
+  },
+  {
+   "at": "$827D",
+   "count": 1,
+   "what": "object 16 position"
+  },
+  {
+   "at": "$827E",
+   "count": 1,
+   "what": "object 16 position"
+  },
+  {
+   "at": "$8281",
+   "count": 1,
+   "what": "object 16 position"
+  },
+  {
+   "at": "$8282",
+   "count": 1,
+   "what": "object 16 attitude"
+  },
+  {
+   "at": "$8289",
+   "count": 4,
+   "what": "object 17 count"
+  },
+  {
+   "at": "$828A",
+   "count": 2,
+   "what": "object 17 position"
+  },
+  {
+   "at": "$828B",
+   "count": 2,
+   "what": "object 17 position"
+  },
+  {
+   "at": "$828E",
+   "count": 2,
+   "what": "object 17 position"
+  },
+  {
+   "at": "$828F",
+   "count": 2,
+   "what": "object 17 attitude"
+  },
+  {
+   "at": "$8296",
+   "count": 2,
+   "what": "object 18 count"
+  },
+  {
+   "at": "$8297",
+   "count": 1,
+   "what": "object 18 position"
+  },
+  {
+   "at": "$8298",
+   "count": 1,
+   "what": "object 18 position"
+  },
+  {
+   "at": "$829B",
+   "count": 1,
+   "what": "object 18 position"
+  },
+  {
+   "at": "$829C",
+   "count": 1,
+   "what": "object 18 attitude"
+  },
+  {
+   "at": "$82A3",
+   "count": 2,
+   "what": "object 19 count"
+  },
+  {
+   "at": "$82A4",
+   "count": 1,
+   "what": "object 19 position"
+  },
+  {
+   "at": "$82A5",
+   "count": 1,
+   "what": "object 19 position"
+  },
+  {
+   "at": "$82A8",
+   "count": 1,
+   "what": "object 19 position"
+  },
+  {
+   "at": "$82A9",
+   "count": 1,
+   "what": "object 19 attitude"
+  },
+  {
+   "at": "$82B0",
+   "count": 1,
+   "what": "object 20 count"
+  },
+  {
+   "at": "$82B1",
+   "count": 3,
+   "what": "object 20 position"
+  },
+  {
+   "at": "$82B2",
+   "count": 3,
+   "what": "object 20 position"
+  },
+  {
+   "at": "$82B5",
+   "count": 3,
+   "what": "object 20 position"
+  },
+  {
+   "at": "$82B6",
+   "count": 3,
+   "what": "object 20 attitude"
+  },
+  {
+   "at": "$82B9",
+   "count": 2,
+   "what": "object 20 shape"
+  },
+  {
+   "at": "$82BD",
+   "count": 1,
+   "what": "object 21 count"
+  },
+  {
+   "at": "$82BE",
+   "count": 3,
+   "what": "object 21 position"
+  },
+  {
+   "at": "$82BF",
+   "count": 3,
+   "what": "object 21 position"
+  },
+  {
+   "at": "$82C2",
+   "count": 3,
+   "what": "object 21 position"
+  },
+  {
+   "at": "$82C3",
+   "count": 3,
+   "what": "object 21 attitude"
+  },
+  {
+   "at": "$82C6",
+   "count": 2,
+   "what": "object 21 shape"
+  },
+  {
+   "at": "$82CA",
+   "count": 1,
+   "what": "object 22 count"
+  },
+  {
+   "at": "$82CB",
+   "count": 3,
+   "what": "object 22 position"
+  },
+  {
+   "at": "$82CC",
+   "count": 3,
+   "what": "object 22 position"
+  },
+  {
+   "at": "$82CF",
+   "count": 3,
+   "what": "object 22 position"
+  },
+  {
+   "at": "$82D0",
+   "count": 3,
+   "what": "object 22 attitude"
+  },
+  {
+   "at": "$82D3",
+   "count": 2,
+   "what": "object 22 shape"
+  },
+  {
+   "at": "$82D8",
+   "count": 3,
+   "what": "object 23 position"
+  },
+  {
+   "at": "$82D9",
+   "count": 3,
+   "what": "object 23 position"
+  },
+  {
+   "at": "$82DC",
+   "count": 3,
+   "what": "object 23 position"
+  },
+  {
+   "at": "$82DD",
+   "count": 3,
+   "what": "object 23 attitude"
+  },
+  {
+   "at": "$82E0",
+   "count": 2,
+   "what": "object 23 shape"
+  }
+ ],
+ "results": [
+  {
+   "what": "the flight itself is a binary, not a BASIC program",
+   "ok": true,
+   "detail": "287 bytes of BASIC hand over to 5890 bytes of 6502"
+  },
+  {
+   "what": "and there is more 6502 in the overlays than there is Applesoft on the disk",
+   "ok": true,
+   "detail": "20995 bytes against 12477"
+  },
+  {
+   "what": "and every overlay loads at the same address",
+   "ok": true,
+   "detail": "$08EF"
+  },
+  {
+   "what": "the overlay really does overwrite the tail of the program that runs it",
+   "ok": true,
+   "detail": "49 bytes of SD PART2 are inside the overlay"
+  },
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the program survives exactly up to $08EF and no further",
+   "ok": true,
+   "detail": "intact to $08EF"
+  },
+  {
+   "what": "the lines that run after the BRUN are all below $08EF, and survive",
+   "ok": true,
+   "detail": "and the subroutine at 200, which only runs before it, is clobbered"
+  },
+  {
+   "what": "and the overlay is the thing that is running there",
+   "ok": true,
+   "detail": "3867 of 5890 bytes match the disk; the rest is its own state"
+  },
+  {
+   "what": "it is almost entirely code, reachable from one entry point",
+   "ok": true,
+   "detail": "95.7% covered"
+  },
+  {
+   "what": "the game calls the renderer",
+   "ok": true,
+   "detail": "3 call sites"
+  },
+  {
+   "what": "it flies the ship by poking the VIEWER instruction's operands",
+   "ok": true,
+   "detail": "XI, ZI and H1 - position along two axes and a heading"
+  },
+  {
+   "what": "and it moves the enemies by poking object instructions directly",
+   "ok": true,
+   "detail": "135 field references across the two object blocks"
+  }
+ ]
+}
