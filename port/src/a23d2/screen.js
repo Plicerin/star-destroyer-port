@@ -83,7 +83,27 @@ export class Screen {
    * which is why the row's low byte and the x byte offset are simply added: the sum is
    * the index, and it is allowed to carry into the high byte.
    */
-  point(x, y) {
+  /**
+   * One cell.
+   *
+   * `how` picks between three callers that treat a straddling cell differently. This is
+   * not tidiness - each was forced by a whole-page comparison that failed.
+   *
+   *   'point'  $771F. ORs the table's mask whole, so for a straddling cell that is $C0:
+   *            bit 6, the pixel, AND bit 7, the palette select. Its straddle half at
+   *            $7740 is NOT a COLOUR site, so that bit 0 is a plain ORA or EOR.
+   *   'run'    the shallow line at $7796. Combines a run of cells inside one byte into a
+   *            single mask, and those masks top out at $7F - the pixel without the
+   *            palette bit. The straddle half arrives as bit 0 of the next byte's run
+   *            mask, so it DOES go through the colour routine.
+   *   'cell'   the steep line at $7BFA. Never has a run to combine, so it uses the
+   *            table's mask whole like the point plotter - but $7C52 puts its straddle
+   *            half through the colour routine, unlike the point plotter.
+   *
+   * Each difference showed up as a byte: `01000000` against `11000000` for the first,
+   * `10000000` against `00000001` for the third.
+   */
+  point(x, y, how = 'point') {
     const page = this.pages[this.drawPage];
     const xi = x & 0xff, yi = y & 0xff;
     const mask = X_MASK[xi];
@@ -95,15 +115,18 @@ export class Screen {
     // halves of the pair equally.
     const at = ((ROW_HI[yi] << 8) | ((ROW_LO[yi] + X_BYTE[xi]) & 0xff)) - 0x2000;
 
-    this.write(page, at, mask);
+    // The engine gets to the second byte with INY, so it wraps inside the 256-byte window
+    // rather than carrying into the high byte.
+    const next = (at & 0xff00) | ((at + 1) & 0xff);
+    this.write(page, at, how === 'run' ? mask & 0x7f : mask);
     if (mask & 0x80) {
-      // The straddle: the cell's second bit is bit 0 of the next byte. That half ($7740)
-      // is patched by PLOTMODE but NOT by COLOUR - opcode 12's site list has it and
-      // opcode 18's does not - so it follows the plot mode and ignores the colour
-      // entirely. The engine gets there with INY, so it wraps inside the 256-byte window
-      // rather than carrying into the high byte.
-      const next = (at & 0xff00) | ((at + 1) & 0xff);
-      page[next] = this.eor ? (page[next] ^ 0x01) & 0xff : (page[next] | 0x01) & 0xff;
+      if (how === 'point') {
+        // $7740 is patched by PLOTMODE but NOT by COLOUR - opcode 12's site list has it
+        // and opcode 18's does not - so it follows the plot mode and ignores the colour.
+        page[next] = this.eor ? (page[next] ^ 0x01) & 0xff : (page[next] | 0x01) & 0xff;
+      } else {
+        this.write(page, next, 0x01);
+      }
     }
   }
 

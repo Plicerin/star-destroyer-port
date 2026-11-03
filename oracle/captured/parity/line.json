@@ -1,0 +1,24 @@
+{
+ "results": [
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "every line comparison is byte-for-byte identical across the whole page",
+   "ok": true,
+   "detail": "ten pages, no differences"
+  },
+  {
+   "what": "drawing a line backwards gives the identical cells, because the engine swaps on x",
+   "ok": true,
+   "detail": "81 cells each way"
+  },
+  {
+   "what": "the exact diagonal takes the steep path and steps both axes every cell",
+   "ok": true,
+   "detail": "21 cells, steep"
+  }
+ ]
+}

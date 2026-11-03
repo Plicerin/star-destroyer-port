@@ -82,10 +82,16 @@ off-screen wrap.
 see the note at the top of `screen.js`. The one combination the original corrupts, a
 colour other than 0 followed by PLOTMODE, the port refuses rather than guessing.
 
-Still to do in this phase: **the 2-D line routine at `$7748`.** Transliterate it; do not
-assume it is any particular Bresenham. Its stepping has not been looked at.
+The line routine is done too — `port/src/a23d2/line.js`, held by `oracle/parity_line.mjs`,
+ten whole-page comparisons all identical. It **is** Bresenham, but that was measured out
+of the engine rather than assumed, and the two halves are not symmetric: shallow adds then
+tests `e >= dx`, steep subtracts then steps on the borrow, and they land differently on
+ties. A straddling cell comes out three different ways depending on whether a point, a
+shallow line or a steep line drew it. All three were found by a byte that differed.
 
-## Phase 2 notes — the original plan
+**Phase 2 is complete.**
+
+## Phase 2 notes — what the plan said to build
 
 Everything downstream of a screen coordinate. All of it is established — see
 **"What a 2-D coordinate means"** in DISK_TRUTH.
