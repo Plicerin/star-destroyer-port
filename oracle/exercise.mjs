@@ -94,9 +94,10 @@ export async function arm(a2) {
      * The budget matters: an opcode nobody has run before can loop for ever, and an
      * experiment that hangs the machine costs the whole probe. It stops and says so.
      */
-    window.M.runList = (bytes, { page = 1, clear = true, budget = 20000000 } = {}) => {
+    window.M.runList = (bytes, { page = 1, clear = true, budget = 20000000,
+                                 watch = [], at = ${LIST} } = {}) => {
       if (bytes.length > ${LIST_LEN}) return { error: 'list longer than SV DATA' };
-      for (let i = 0; i < bytes.length; i++) wr(${LIST} + i, bytes[i]);
+      for (let i = 0; i < bytes.length; i++) wr(at + i, bytes[i]);
       const base = page === 2 ? 0x4000 : 0x2000;
       if (clear) for (let a = base; a < base + 0x2000; a++) wr(a, 0);
       const before = cpu.getState();
@@ -107,12 +108,20 @@ export async function arm(a2) {
       cpu.setState(st);
       const t0 = cpu.getCycles();
       let returned = false, instr = 0;
+      // The fetch at $611E is the interpreter reading an opcode, and $9B/$9C is where it
+      // read it from - so the distance between consecutive fetches is an instruction's
+      // length, measured rather than reasoned about.
+      const walk = [];
       cpu.stepCyclesDebug(budget, () => {
         instr++;
-        if (cpu.getPC() === ${SENTINEL}) { returned = true; return true; }
+        const pc = cpu.getPC();
+        if (pc === 0x611E) walk.push(rd(0x9B) | (rd(0x9C) << 8));
+        if (pc === ${SENTINEL}) { returned = true; return true; }
       });
       const cycles = cpu.getCycles() - t0;
-      const out = { returned, instr, cycles, page: window.M.range(base, base + 0x2000) };
+      const out = { returned, instr, cycles, walk,
+        page: window.M.range(base, base + 0x2000),
+        watched: watch.map(([a, n]) => window.M.range(a, a + n)) };
       cpu.setState(before);
       window.M.restoreList();
       return out;

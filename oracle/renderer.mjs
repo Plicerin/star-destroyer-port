@@ -132,47 +132,48 @@ export function handlers(mem) {
 /**
  * What each opcode is, and how long.
  *
- * `len` is the number of bytes the instruction occupies. `from` says where that number
- * came from: 'traced' means probe_renderer.mjs watched the list pointer move by it in the
- * running machine, 'handler' means it was read off the `LDA #n : JSR $621F` in the handler
- * because the scene on this disk never executes that opcode.
+ * `len` is the number of bytes the instruction occupies, and every one of them was
+ * measured in the running machine - the distance the list pointer moved between one fetch
+ * and the next. `from` says how the opcode's MEANING was established: 'traced' means the
+ * disk's own scene executes it and probe_renderer.mjs watched it; 'exercised' means the
+ * scene never runs it and probe_opcodes.mjs made the engine run it on inputs of our
+ * choosing.
  *
  * `what` is a description, not a name from a manual - no A2-3D2 documentation was used.
- * Where the description is a guess it says so. Opcode 11 has no length: it assigns the
- * list pointer instead of advancing it.
+ * Opcode 11 has no length: it assigns the list pointer instead of advancing it.
  */
 export const OPS = {
-  0:  { len: 7,  from: 'handler', what: 'POINT: plot one 3-D point' },
-  1:  { len: 14, from: 'traced',  what: 'LINE: two 3-D points, a move and a draw (7 + 7)' },
-  2:  { len: 7,  from: 'traced',  what: 'DRAW on: line from the previous point to this one' },
-  3:  { len: 7,  from: 'handler', what: 'DRAW back: line from this point to the previous one' },
-  4:  { len: 2,  from: 'handler', what: 'set the mode byte $7C, which suppresses clipped lines' },
-  5:  { len: 10, from: 'traced',  what: 'VIEWER: X, Y, Z (16-bit each) then pitch, bank, heading' },
-  6:  { len: 5,  from: 'traced',  what: '2-D LINE in screen coordinates: x1, y1, x2, y2' },
-  7:  { len: 2,  from: 'traced',  what: 'touch soft switch $C0nn (patches its own STA)' },
-  8:  { len: 2,  from: 'traced',  what: 'clear a hires page' },
-  9:  { len: 2,  from: 'traced',  what: 'select the page to draw on (patches the plotters)' },
-  10: { len: 3,  from: 'traced',  what: '2-D POINT in screen coordinates: x, y' },
-  11: { len: null, from: 'handler', what: 'JUMP: the list pointer becomes the operand' },
-  12: { len: 2,  from: 'handler', what: 'plot mode: 0 = draw (ORA), else erase (EOR)' },
-  13: { len: 3,  from: 'handler', what: 'COMPILE: emit 2-D commands to the operand address' },
-  14: { len: 5,  from: 'traced',  what: 'VIEWPORT: x scale, y scale, x centre, y centre' },
-  15: { len: 7,  from: 'traced',  what: 'six engine constants, into $6140-$6145' },
-  16: { len: 1,  from: 'handler', what: 'graphics mode: mixed, hires, graphics, page 1' },
-  17: { len: 1,  from: 'traced',  what: 'no-op (one byte, so it serves as patch space)' },
-  18: { len: 2,  from: 'traced',  what: 'COLOUR' },
-  19: { len: 13, from: 'traced',  what: 'OBJECT: count, X, Y, Z, pitch, bank, heading, shape' },
-  20: { len: 2,  from: 'handler', what: 'patches the 2-D line routine - unexplained' },
-  21: { len: 7,  from: 'handler', what: 'unexplained; never executed by this disk' },
-  22: { len: 4,  from: 'handler', what: 'unexplained; never executed by this disk' },
-  23: { len: 5,  from: 'handler', what: 'unexplained; never executed by this disk' },
-  24: { len: 4,  from: 'handler', what: 'unexplained; never executed by this disk' },
-  25: { len: 3,  from: 'handler', what: 'unexplained; never executed by this disk' },
-  26: { len: 3,  from: 'handler', what: 'unexplained; never executed by this disk' },
-  27: { len: 2,  from: 'handler', what: 'unexplained; never executed by this disk' },
-  28: { len: 3,  from: 'handler', what: 'unexplained; never executed by this disk' },
-  29: { len: 2,  from: 'handler', what: 'set the mode byte $621E' },
-  [END]: { len: 1, from: 'traced', what: 'END: return from this list' },
+  0:  { len: 7,  from: 'exercised', what: 'POINT: plot one 3-D point' },
+  1:  { len: 14, from: 'traced',    what: 'LINE: two 3-D points, a move and a draw (7 + 7)' },
+  2:  { len: 7,  from: 'traced',    what: 'DRAW on: line from the previous point to this one' },
+  3:  { len: 7,  from: 'exercised', what: 'DRAW back: line to the previous point, leaving it put - so a run of these is a hub with spokes' },
+  4:  { len: 2,  from: 'exercised', what: 'set the mode byte $7C, which suppresses clipped lines' },
+  5:  { len: 10, from: 'traced',    what: 'VIEWER: X, Y, Z (16-bit each) then pitch, bank, heading' },
+  6:  { len: 5,  from: 'traced',    what: '2-D LINE in screen coordinates: x1, y1, x2, y2' },
+  7:  { len: 2,  from: 'traced',    what: 'touch soft switch $C0nn (patches its own STA)' },
+  8:  { len: 2,  from: 'traced',    what: 'clear a hires page (0 = $2000, else $4000)' },
+  9:  { len: 2,  from: 'traced',    what: 'select the page to draw on (patches the plotters)' },
+  10: { len: 3,  from: 'traced',    what: '2-D POINT in screen coordinates: x, y' },
+  11: { len: null, from: 'exercised', what: 'JUMP: the list pointer becomes the operand' },
+  12: { len: 2,  from: 'exercised', what: 'PLOTMODE: 0 writes ORA into five sites, else EOR. Points erase; a line rewrites those bytes itself and is unaffected' },
+  13: { len: 3,  from: 'exercised', what: 'COMPILE: write the 2-D result to the operand address as a display list, instead of drawing' },
+  14: { len: 5,  from: 'traced',    what: 'VIEWPORT: x scale, y scale, x centre, y centre' },
+  15: { len: 7,  from: 'traced',    what: 'six engine constants, into $6140-$6145 - zeroing these wrecks the projection' },
+  16: { len: 1,  from: 'exercised', what: 'graphics mode in one byte: mixed, hires, graphics, page 1' },
+  17: { len: 1,  from: 'traced',    what: 'no-op (one byte, so it serves as patch space)' },
+  18: { len: 2,  from: 'traced',    what: 'COLOUR: 0 is white, 1-3 are the hires colours, 4-7 are all the same' },
+  19: { len: 13, from: 'traced',    what: 'OBJECT: count, X, Y, Z, pitch, bank, heading, shape' },
+  20: { len: 2,  from: 'exercised', what: 'VECTOR: 0 points the 2-D primitives at $771F/$7748, else at $7710/$7E3C' },
+  21: { len: 7,  from: 'exercised', what: '2-D LINE with x as 16-bit at twice the scale, through the second line routine' },
+  22: { len: 4,  from: 'exercised', what: 'ORIGIN for opcodes 23 and 25: x 16-bit (halved), y a byte' },
+  23: { len: 5,  from: 'exercised', what: '2-D LINE relative to the origin opcode 22 set' },
+  24: { len: 4,  from: 'exercised', what: '2-D POINT with x as 16-bit at twice the scale' },
+  25: { len: 3,  from: 'exercised', what: '2-D POINT relative to the origin opcode 22 set' },
+  26: { len: 3,  from: 'exercised', what: 'SKIP: if operand 2 is zero, skip operand 1 further bytes - the list has a conditional' },
+  27: { len: 2,  from: 'exercised', what: 'WAIT: a delay loop, about 200,000 cycles (0.2s) per unit' },
+  28: { len: 3,  from: 'exercised', what: 'CAPTURE TO: where opcode 29 appends transformed points, six bytes each' },
+  29: { len: 2,  from: 'exercised', what: 'CAPTURE: 0 off, non-zero appends every transformed point, 2 also stops it drawing' },
+  [END]: { len: 1, from: 'traced',  what: 'END: return from this list' },
 };
 
 const s16 = (lo, hi) => { const v = lo | (hi << 8); return v > 32767 ? v - 65536 : v; };

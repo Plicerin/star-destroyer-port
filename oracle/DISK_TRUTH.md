@@ -497,6 +497,91 @@ address of `$FFFE` pushed, steps until the PC reaches `$FFFF`, reads the page an
 This is how anything about the engine gets settled that the disk's own scene does not
 happen to exercise.
 
+### All thirty opcodes
+
+`probe_opcodes.mjs`, 22 checks. `SV DATA` uses sixteen. For the other fourteen the
+renderer pass could give a length and nothing else, because reading a handler says what it
+stores where, not what the instruction is for.
+
+So they were run. Every length in the table below was measured in the machine - the
+distance the list pointer moved between one fetch and the next - and every meaning marked
+*exercised* is something the engine was made to do on inputs of our choosing.
+
+| op | len | what |
+| --- | --- | --- |
+| 0 | 7 | POINT, 3-D |
+| 1 | 14 | LINE: two 3-D points, a move and a draw |
+| 2 | 7 | DRAW ON: line from the previous point to this one |
+| 3 | 7 | DRAW BACK: line **to** the previous point, leaving it put - a hub with spokes |
+| 4 | 2 | set the mode byte `$7C` |
+| 5 | 10 | VIEWER: x, y, z 16-bit, then pitch, bank, heading |
+| 6 | 5 | 2-D LINE: x1, y1, x2, y2 |
+| 7 | 2 | touch soft switch `$C0nn` |
+| 8 | 2 | clear a hires page (0 = `$2000`, else `$4000`) |
+| 9 | 2 | select the page to draw on |
+| 10 | 3 | 2-D POINT |
+| 11 | - | **JUMP**: the list pointer becomes the operand |
+| 12 | 2 | **PLOTMODE**: 0 writes `ORA` into five sites, non-zero writes `EOR` |
+| 13 | 3 | **COMPILE**: write the 2-D result to an address instead of drawing it |
+| 14 | 5 | VIEWPORT: x scale, y scale, x centre, y centre |
+| 15 | 7 | six engine constants into `$6140`-`$6145` |
+| 16 | 1 | the whole graphics-mode sequence in one byte |
+| 17 | 1 | no-op |
+| 18 | 2 | COLOUR |
+| 19 | 13 | OBJECT |
+| 20 | 2 | **VECTOR**: re-point the 2-D primitives at a second pair of routines |
+| 21 | 7 | **2-D LINE** with x 16-bit at twice the scale |
+| 22 | 4 | **ORIGIN** for 23 and 25: x 16-bit (halved), y a byte |
+| 23 | 5 | **2-D LINE** relative to that origin |
+| 24 | 4 | **2-D POINT** with x 16-bit at twice the scale |
+| 25 | 3 | **2-D POINT** relative to that origin |
+| 26 | 3 | **SKIP**: if operand 2 is zero, skip operand 1 further bytes |
+| 27 | 2 | **WAIT**: a delay, about 200,000 cycles - 0.2 s - per unit |
+| 28 | 3 | **CAPTURE TO**: where 29 appends points, six bytes each |
+| 29 | 2 | **CAPTURE**: 0 off, non-zero appends every transformed point, 2 also stops drawing |
+| 121 | 1 | END |
+
+Three of those change what A2-3D2 is.
+
+**It is a language with control flow.** Opcode 11 is a jump and opcode 26 is a conditional
+skip - "if this byte is zero, skip the next N bytes". A program can poke that byte and
+switch a whole block of the scene off without touching anything else. The game does not
+use either, but they are there.
+
+**It compiles.** Opcode 13 says "do not draw this, write it down", and what comes out is a
+display list in the same language holding the 2-D result of the 3-D work. Measured: a
+`COLOUR 7` and two 3-D points compiled to `$12 $07 | $0A $00 $22 | $0A $16 $22 | $79` -
+colour, two 2-D points, terminator - with nothing drawn. So a scene can be projected once
+and then redrawn cheaply, which matters a great deal to a port that wants a higher frame
+rate honestly.
+
+**It answers questions.** Opcodes 28 and 29 point the engine at a buffer and have it
+append every transformed point, six bytes each, with mode 2 suppressing the drawing
+entirely. Measured: with the viewer at the origin, `(11,22,33)` and `(-1,-2,-3)` came back
+as exactly those numbers. That is how a game asks "where on screen is this object" without
+drawing it.
+
+The rest is a second, higher-resolution 2-D layer: opcode 20 re-points the primitives at
+`$7710`/`$7E3C` instead of `$771F`/`$7748`, and opcodes 21 to 25 take x as a 16-bit value
+at twice the scale, optionally relative to an origin set by opcode 22. Those draw both
+bits of a cell, so they come out white.
+
+Three things this cost before it worked, all of them the kind that make a measurement
+quietly wrong rather than obviously broken:
+
+- **The engine remembers.** Opcode 20's vectors, opcode 12's plot mode and opcode 29's
+  capture mode all survive a call. An early run measured opcode 6 lighting 41 pixels where
+  it lights 21, because an earlier experiment had re-vectored the plotter and never put it
+  back. Every list now opens by setting all three.
+- **Opcode 15 with zero operands wrecks the engine.** Its six bytes go into `$6140`-`$6145`
+  and nothing resets them, so a sweep that runs every opcode with zero operands poisons
+  the projection for everything after it. The prologue restores `SV DATA`'s own values.
+- **Zero is not a neutral operand, and neither is zero padding.** A line from a point to
+  itself, or a 3-D point at the viewer's own position, is a degenerate case the clipper
+  does not return from - and padding after the instruction is itself executed, where zeros
+  decode as opcode 0 at the origin. The padding is opcode 17 now. The line routines also
+  do not survive being asked to draw in a colour that was never set.
+
 ### Opcode 3, and the shape format
 
 Opcode 3 was an open question. Its handler `$62C0` loads the **saved previous point** as
@@ -564,9 +649,11 @@ promoted to fact.
    honest way to answer it.
 3. ~~**Opcode 3.**~~ Answered: a line back to the saved previous point, which it leaves
    in place. Handler `$62C0`.
-4. ~~**What `CALL $6000` does with all this.**~~ Answered above. The 2-D screen mapping
-   that was still open under it is now answered too; what remains is the fourteen opcodes
-   this disk never executes, whose lengths are known and whose meanings are not.
+4. ~~**What `CALL $6000` does with all this.**~~ Answered above, and so are both things
+   that were still open under it: the 2-D screen mapping, and all thirty opcodes. What is
+   still not derived is the projection's arithmetic - `$6370`-`$63AF` divides, scales and
+   adds a centre, and the constants at `$6140`-`$6145` feed it, but the formula taking a
+   3-D point to an x and a y has not been written down.
 5. ~~**The 13-byte record's bytes +0 to +9.**~~ Answered: a frame counter, a 16-bit
    position and a three-byte attitude. The counter's decrement is read off the handler and
    was never seen to happen.

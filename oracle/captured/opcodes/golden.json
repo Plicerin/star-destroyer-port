@@ -1,0 +1,143 @@
+{
+ "measuredLengths": {
+  "0": 7,
+  "1": 14,
+  "2": 7,
+  "3": 7,
+  "4": 2,
+  "5": 10,
+  "6": 5,
+  "7": 2,
+  "8": 2,
+  "9": 2,
+  "10": 3,
+  "12": 2,
+  "14": 5,
+  "15": 7,
+  "16": 1,
+  "17": 1,
+  "18": 2,
+  "19": 13,
+  "20": 2,
+  "21": 7,
+  "22": 4,
+  "23": 5,
+  "24": 4,
+  "25": 3,
+  "26": 3,
+  "27": 2,
+  "29": 2
+ },
+ "results": [
+  {
+   "what": "the oracle reaches flight, where the engine is resident",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "every measured length is the one the handler advances by",
+   "ok": true,
+   "detail": "27 opcodes"
+  },
+  {
+   "what": "and every one of them handed control back",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "including all thirteen the disk never runs, which were read off the code only",
+   "ok": true,
+   "detail": "0=7 3=7 12=2 16=1 20=2 21=7 22=4 23=5 24=4 25=3 26=3 27=2 29=2"
+  },
+  {
+   "what": "opcode 0 plots one point, and +x moves it right",
+   "ok": true,
+   "detail": "bit 141 -> 185 on row 61"
+  },
+  {
+   "what": "opcode 1 draws a line between its two points",
+   "ok": true,
+   "detail": "rows 61-61, bits 95-185"
+  },
+  {
+   "what": "opcode 3 draws back to the previous point without moving it, so spokes share a hub",
+   "ok": true,
+   "detail": "124 lit for the line alone, 816 with two spokes"
+  },
+  {
+   "what": "opcode 11 is a jump: the instruction it jumps over does not run",
+   "ok": true,
+   "detail": "1 lit at bit 261 (the far point, not the near one)"
+  },
+  {
+   "what": "opcode 26 is a conditional skip: operand 2 zero skips operand 1 bytes",
+   "ok": true,
+   "detail": "flag 1 -> 1 lit, flag 0 -> 0 lit"
+  },
+  {
+   "what": "opcode 12 rewrites five instructions from ORA to EOR",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "and in EOR a point drawn twice erases itself",
+   "ok": true,
+   "detail": "ORA twice -> 1 lit, EOR twice -> 0 lit"
+  },
+  {
+   "what": "a line is not, and leaves those bytes holding its own value",
+   "ok": true,
+   "detail": "61 lit after drawing it twice in EOR; $7734 = $20"
+  },
+  {
+   "what": "opcode 20 re-vectors both 2-D primitives to a second pair of routines",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "opcode 16 is the whole graphics-mode sequence in one byte",
+   "ok": true,
+   "detail": "text false, hires true, mixed true"
+  },
+  {
+   "what": "opcode 21 is a 2-D line whose x is 16-bit at twice the scale",
+   "ok": true,
+   "detail": "same row and the same span to within a bit"
+  },
+  {
+   "what": "and it draws through the other routine, which lights both bits of a cell",
+   "ok": true,
+   "detail": "21 bits against 41"
+  },
+  {
+   "what": "opcode 22 sets an origin that opcode 23 draws relative to",
+   "ok": true,
+   "detail": "moved up 20 rows and right 40 bits for an origin of (40 halved, 20)"
+  },
+  {
+   "what": "opcode 25 is the point to opcode 23's line",
+   "ok": true,
+   "detail": "rows 85-85, bits 160-160"
+  },
+  {
+   "what": "opcode 24 is a point whose x is 16-bit at twice the scale",
+   "ok": true,
+   "detail": "rows 85-85, bits 180-180"
+  },
+  {
+   "what": "opcode 13 compiles 3-D into a 2-D display list instead of drawing it",
+   "ok": true,
+   "detail": "0 pixels drawn, and the buffer holds COLOUR, two POINT2D and the terminator"
+  },
+  {
+   "what": "opcodes 28 and 29 hand back transformed points instead of drawing them",
+   "ok": true,
+   "detail": "six bytes a point, and 0 pixels drawn"
+  },
+  {
+   "what": "opcode 27 is a delay, and it is a long one",
+   "ok": true,
+   "detail": "202554 cycles a unit, about 198 ms"
+  }
+ ]
+}
