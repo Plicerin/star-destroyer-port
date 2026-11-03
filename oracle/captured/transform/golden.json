@@ -1,0 +1,493 @@
+{
+ "formula": {
+  "transform": "v = (M . (p - viewer)) << 3",
+  "matrix": "zp $7E-$8F, Q15, a row per output axis: x at $7E/$84/$8A, y at $80/$86/$8C, z at $82/$88/$8E",
+  "built": "$666E, from pitch/bank/heading at $96-$98 - a real rotation, but its fixed-point rounding is not modelled",
+  "scales": "opcode 15 writes three 16-bit per-axis scales onto the diagonal",
+  "multiply": "$6480, a shift-add loop that truncates its partial sums - NOT (a * b) >> 15"
+ },
+ "multiplyGolden": [
+  {
+   "a": 1,
+   "b": 16123,
+   "result": 0
+  },
+  {
+   "a": 2,
+   "b": 16123,
+   "result": 0
+  },
+  {
+   "a": 5,
+   "b": 16123,
+   "result": 2
+  },
+  {
+   "a": 17,
+   "b": 16123,
+   "result": 8
+  },
+  {
+   "a": 40,
+   "b": 16123,
+   "result": 19
+  },
+  {
+   "a": 61,
+   "b": 16123,
+   "result": 29
+  },
+  {
+   "a": 100,
+   "b": 16123,
+   "result": 48
+  },
+  {
+   "a": 137,
+   "b": 16123,
+   "result": 66
+  },
+  {
+   "a": 224,
+   "b": 16123,
+   "result": 109
+  },
+  {
+   "a": 696,
+   "b": 16123,
+   "result": 341
+  },
+  {
+   "a": 1000,
+   "b": 16123,
+   "result": 491
+  },
+  {
+   "a": -40,
+   "b": 16123,
+   "result": -19
+  },
+  {
+   "a": -100,
+   "b": 16123,
+   "result": -48
+  },
+  {
+   "a": -224,
+   "b": 16123,
+   "result": -109
+  },
+  {
+   "a": 1,
+   "b": 32765,
+   "result": 0
+  },
+  {
+   "a": 2,
+   "b": 32765,
+   "result": 1
+  },
+  {
+   "a": 5,
+   "b": 32765,
+   "result": 4
+  },
+  {
+   "a": 17,
+   "b": 32765,
+   "result": 16
+  },
+  {
+   "a": 40,
+   "b": 32765,
+   "result": 39
+  },
+  {
+   "a": 61,
+   "b": 32765,
+   "result": 60
+  },
+  {
+   "a": 100,
+   "b": 32765,
+   "result": 99
+  },
+  {
+   "a": 137,
+   "b": 32765,
+   "result": 136
+  },
+  {
+   "a": 224,
+   "b": 32765,
+   "result": 223
+  },
+  {
+   "a": 696,
+   "b": 32765,
+   "result": 695
+  },
+  {
+   "a": 1000,
+   "b": 32765,
+   "result": 999
+  },
+  {
+   "a": -40,
+   "b": 32765,
+   "result": -39
+  },
+  {
+   "a": -100,
+   "b": 32765,
+   "result": -99
+  },
+  {
+   "a": -224,
+   "b": 32765,
+   "result": -223
+  },
+  {
+   "a": 1,
+   "b": 9539,
+   "result": 0
+  },
+  {
+   "a": 2,
+   "b": 9539,
+   "result": 0
+  },
+  {
+   "a": 5,
+   "b": 9539,
+   "result": 1
+  },
+  {
+   "a": 17,
+   "b": 9539,
+   "result": 4
+  },
+  {
+   "a": 40,
+   "b": 9539,
+   "result": 11
+  },
+  {
+   "a": 61,
+   "b": 9539,
+   "result": 17
+  },
+  {
+   "a": 100,
+   "b": 9539,
+   "result": 28
+  },
+  {
+   "a": 137,
+   "b": 9539,
+   "result": 39
+  },
+  {
+   "a": 224,
+   "b": 9539,
+   "result": 64
+  },
+  {
+   "a": 696,
+   "b": 9539,
+   "result": 202
+  },
+  {
+   "a": 1000,
+   "b": 9539,
+   "result": 290
+  },
+  {
+   "a": -40,
+   "b": 9539,
+   "result": -11
+  },
+  {
+   "a": -100,
+   "b": 9539,
+   "result": -28
+  },
+  {
+   "a": -224,
+   "b": 9539,
+   "result": -64
+  },
+  {
+   "a": 1,
+   "b": 23167,
+   "result": 0
+  },
+  {
+   "a": 2,
+   "b": 23167,
+   "result": 1
+  },
+  {
+   "a": 5,
+   "b": 23167,
+   "result": 3
+  },
+  {
+   "a": 17,
+   "b": 23167,
+   "result": 11
+  },
+  {
+   "a": 40,
+   "b": 23167,
+   "result": 28
+  },
+  {
+   "a": 61,
+   "b": 23167,
+   "result": 42
+  },
+  {
+   "a": 100,
+   "b": 23167,
+   "result": 70
+  },
+  {
+   "a": 137,
+   "b": 23167,
+   "result": 96
+  },
+  {
+   "a": 224,
+   "b": 23167,
+   "result": 158
+  },
+  {
+   "a": 696,
+   "b": 23167,
+   "result": 491
+  },
+  {
+   "a": 1000,
+   "b": 23167,
+   "result": 706
+  },
+  {
+   "a": -40,
+   "b": 23167,
+   "result": -28
+  },
+  {
+   "a": -100,
+   "b": 23167,
+   "result": -70
+  },
+  {
+   "a": -224,
+   "b": 23167,
+   "result": -158
+  },
+  {
+   "a": 1,
+   "b": -9540,
+   "result": 0
+  },
+  {
+   "a": 2,
+   "b": -9540,
+   "result": 0
+  },
+  {
+   "a": 5,
+   "b": -9540,
+   "result": -1
+  },
+  {
+   "a": 17,
+   "b": -9540,
+   "result": -4
+  },
+  {
+   "a": 40,
+   "b": -9540,
+   "result": -11
+  },
+  {
+   "a": 61,
+   "b": -9540,
+   "result": -17
+  },
+  {
+   "a": 100,
+   "b": -9540,
+   "result": -28
+  },
+  {
+   "a": 137,
+   "b": -9540,
+   "result": -39
+  },
+  {
+   "a": 224,
+   "b": -9540,
+   "result": -64
+  },
+  {
+   "a": 696,
+   "b": -9540,
+   "result": -202
+  },
+  {
+   "a": 1000,
+   "b": -9540,
+   "result": -290
+  },
+  {
+   "a": -40,
+   "b": -9540,
+   "result": 11
+  },
+  {
+   "a": -100,
+   "b": -9540,
+   "result": 28
+  },
+  {
+   "a": -224,
+   "b": -9540,
+   "result": 64
+  },
+  {
+   "a": 1,
+   "b": 11310,
+   "result": 0
+  },
+  {
+   "a": 2,
+   "b": 11310,
+   "result": 0
+  },
+  {
+   "a": 5,
+   "b": 11310,
+   "result": 1
+  },
+  {
+   "a": 17,
+   "b": 11310,
+   "result": 5
+  },
+  {
+   "a": 40,
+   "b": 11310,
+   "result": 13
+  },
+  {
+   "a": 61,
+   "b": 11310,
+   "result": 20
+  },
+  {
+   "a": 100,
+   "b": 11310,
+   "result": 34
+  },
+  {
+   "a": 137,
+   "b": 11310,
+   "result": 47
+  },
+  {
+   "a": 224,
+   "b": 11310,
+   "result": 77
+  },
+  {
+   "a": 696,
+   "b": 11310,
+   "result": 239
+  },
+  {
+   "a": 1000,
+   "b": 11310,
+   "result": 344
+  },
+  {
+   "a": -40,
+   "b": 11310,
+   "result": -13
+  },
+  {
+   "a": -100,
+   "b": 11310,
+   "result": -34
+  },
+  {
+   "a": -224,
+   "b": 11310,
+   "result": -77
+  }
+ ],
+ "results": [
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "with no rotation the matrix is diagonal",
+   "ok": true,
+   "detail": "diagonal (16123, 32765, 9539)"
+  },
+  {
+   "what": "pitch leaves the x row alone, bank the z row, heading the y row",
+   "ok": true,
+   "detail": "which is the layout: a row per output axis"
+  },
+  {
+   "what": "and the rotated rows keep their length, so it is a rotation times a scale",
+   "ok": true,
+   "detail": "pitched row lengths 0.9998, 0.2911 against 1.0000, 0.2912"
+  },
+  {
+   "what": "each of opcode 15's three values moves its own diagonal entry and no other",
+   "ok": true,
+   "detail": "so they are per-axis scales, not a shared one"
+  },
+  {
+   "what": "the y and z scales land on the diagonal exactly, give or take truncation",
+   "ok": true,
+   "detail": "32765/32767 32765/32767 15998/16000 32765/32767"
+  },
+  {
+   "what": "and the x scale lands within a few percent, high, by an amount that is not derived",
+   "ok": true,
+   "detail": "16123/16000 8187/8000 16123/16000 16123/16000"
+  },
+  {
+   "what": "$666E's rounding is real and bounded - the x row wanders by under 2% with pitch",
+   "ok": true,
+   "detail": "253 out of ~16000, so the builder is not modelled but the error is small and measured"
+  },
+  {
+   "what": "the viewer position is simply subtracted, and it is the three 16-bit words at $90",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the transform is the matrix product, shifted left by three, exactly",
+   "ok": true,
+   "detail": "10 cases, three axes each"
+  },
+  {
+   "what": "the engine's multiply is not (a * b) >> 15 - it truncates its partial sums",
+   "ok": true,
+   "detail": "70% agreement, so a native multiply is close enough to look right and wrong often enough to drift"
+  },
+  {
+   "what": "transform then projection predicts the exact pixel, from world coordinates",
+   "ok": true,
+   "detail": "every unclipped case"
+  }
+ ]
+}

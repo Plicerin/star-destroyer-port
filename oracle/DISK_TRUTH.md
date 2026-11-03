@@ -455,10 +455,22 @@ Several things the earlier passes had as addresses are now instructions:
 - **The clip frustum is `|x| <= z`, `|y| <= z` in view space.** `$6A22` and `$6A7B` build a
   four-bit outcode per point by testing `z+x`, `z-x`, `z+y`, `z-y` for overflow. The
   drawing code rejects a line whose two outcodes share a bit - Cohen-Sutherland's trivial
-  reject. (An earlier version of this file called that "a 90 degree field of view". In
-  view space it is, but the transform that produces view space magnifies x and y against
-  z by about 1.4 to 1.7, so the cone visible in *world* space is narrower than 90 degrees
-  and is not a fixed angle. See the projection below.)
+  reject.
+
+  That test runs on the point **after** the transform, and the transform scales each axis
+  by one of opcode 15's constants, so the cone visible in *world* space is
+  `|x| <= (sz/sx) z` and `|y| <= (sz/sy) z`. With the shipped constants
+  (16000, 32767, 9541) that is:
+
+  | | |
+  | --- | --- |
+  | horizontal field of view | `2 atan(9541/16000)` = **about 62 degrees** |
+  | vertical field of view | `2 atan(9541/32767)` = **about 32 degrees** |
+
+  (This file said "the field of view is exactly 90 degrees" after the renderer pass, which
+  was the view-space frustum mistaken for the world-space one, and then "not a fixed
+  angle", which was truncation noise mistaken for a varying ratio. It is fixed, and it is
+  set by three bytes a scene can change.)
 - **The clipper is a bisection, not an intersection.** A line that straddles a plane is
   walked inward by halving, at most **ten times**, counted down in `$B1`, which `$6118`
   reloads with 10 for every command. Clipped endpoints are therefore approximate in a
@@ -654,19 +666,60 @@ Two edges worth having:
   the formula says 69. A port copying the formula without that clamp will differ on points
   sitting exactly on the edge.
 
-### What feeds it, which is not derived
+### What feeds it: the transform, derived
 
-The stage before the projection - subtract the viewer, rotate, and a fixed-point scaling -
-is measured but **not** reduced to a formula, and it should not be guessed at. What is
-established is that the two stages compose: the view-space point the transform leaves in
-`$60`-`$65`, put through the formula above, gives the **exact pixel** the engine lights,
-on every point tried.
+`probe_transform.mjs`, 12 checks. This had been recorded as "an anisotropic fixed-point
+scaling that multiplies x and y by about 3.8 and z by about 2.3, at a ratio that is not
+even constant" - true, and useless. It is:
 
-It is not a rigid transform. With the viewer at the origin and no rotation, world
-`(40,10,100)` arrives as `(152,72,224)` - x multiplied by about 3.8 and z by about 2.3,
-and the ratio between those is not constant either (1.43 to 1.70 over the points tried).
-So the magnification of x and y against z is part of the transform rather than of the
-projection, and it is where the real field of view is set.
+```
+d = p - viewer                  per axis, 16-bit
+v = (M . d) << 3                M a 3x3 matrix; the shift applies to the sum
+```
+
+`M` is nine 16-bit Q15 entries in zero page, laid out **by output axis**:
+
+| | x term | y term | z term |
+| --- | --- | --- | --- |
+| out x | `$7E` | `$84` | `$8A` |
+| out y | `$80` | `$86` | `$8C` |
+| out z | `$82` | `$88` | `$8E` |
+
+`$6090` sets `$7E`, `$86` and `$8E` to `$7FFD` at startup, which is the identity - and is
+why those three addresses looked like "three 16-bit values set to $7FFD" in the first
+pass over the engine. `$666E` rebuilds the whole thing from pitch, bank and heading at
+`$96`-`$98` whenever a VIEWER instruction runs; which entries move with which angle
+confirms the layout, and the rows keep their length as the angles change, so it is a
+rotation.
+
+**The shift of three is what made the old description look strange.** The multiply returns
+a Q15 product, so `M` alone scales a point *down* - at zero angles its diagonal is
+(16123, 32765, 9539), which is (0.49, 1.00, 0.29). The `<< 3` multiplies by eight, giving
+3.9, 8.0 and 2.3. That is the whole of the "anisotropic scaling": a per-axis constant
+times eight.
+
+**And the per-axis constants are opcode 15's operands** - the instruction whose six bytes
+had been recorded as "six engine constants, into `$6140`-`$6145`" with no idea what they
+were for. They are three 16-bit scales, one per axis, and each moves its own diagonal
+entry and no other. `SV DATA` ships (16000, 32767, 9541). This is also why zeroing opcode
+15 wrecks the projection, which probe_opcodes.mjs had to work around before knowing why.
+
+Verified end to end: **from world coordinates, through the transform and the projection,
+to the exact pixel**, on every unclipped case - which is the thing no earlier probe could
+do.
+
+Two pieces are deliberately not reduced to arithmetic, and a port has to reimplement them
+from the listing rather than replace them:
+
+- **`$6480`, the multiply.** A shift-add loop that truncates its partial sums, so it is
+  *not* `(a * b) >> 15`: it agrees with that about 70% of the time and is one low
+  otherwise. Close enough to look right, wrong often enough to drift. The probe uses the
+  engine's own multiply to predict the engine's transform, and pins a golden table of 84
+  products to check a reimplementation against.
+- **`$666E`, the matrix builder.** The rotation is real and the y and z scales land on the
+  diagonal within a few units, but the x entry comes out high by 0.2% to 2.3% and moves
+  with pitch although nothing in the geometry says it should. That is rounding inside the
+  builder, and it is bounded - under 2% - but not modelled.
 
 
 ### Opcode 3, and the shape format
@@ -757,12 +810,10 @@ promoted to fact.
 9. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
    measured about when or in what format.
 10. **The `DEMO` path**, never walked.
-11. **The world-to-view transform.** The projection it feeds is derived; this is not.
-    It subtracts the viewer, rotates, and applies an anisotropic fixed-point scaling - x
-    and y by about 3.8, z by about 2.3, and not at a constant ratio - with truncation that
-    loses precision on small values and something saturating on large ones. The six
-    constants `op 15` writes to `$6140`-`$6145` and the matrix builder at `$666E` are
-    where to start. Until this is done, the port cannot place a point from world
-    coordinates, only from view coordinates.
+11. ~~**The world-to-view transform.**~~ Derived, above. What is left under it is two
+    routines that have to be reimplemented rather than re-derived: the multiply at
+    `$6480`, which truncates its partial sums and so is not `(a*b) >> 15`, and the matrix
+    builder at `$666E`, whose rounding puts the x scale up to 2.3% high. Both are pinned
+    by goldens; neither is modelled.
 12. **`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).** `SD` BLOADs `MATH` before chaining
     `SD START`, and nothing in the renderer trace reads either of them.
