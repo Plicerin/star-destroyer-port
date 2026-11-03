@@ -130,6 +130,35 @@ export async function arm(a2) {
   })()`);
 }
 
+/**
+ * Call one subroutine inside the engine, with zero page and the registers set.
+ *
+ * The same trick as runList - push a return address of $FFFE, set the PC, step until the
+ * PC reaches $FFFF - but aimed at a single routine rather than the whole renderer. It is
+ * how a routine whose arithmetic is not obvious from reading it can simply be tabulated:
+ * put the inputs in, take the outputs out, and the function is whatever the table says.
+ */
+export async function callSub(a2, addr, { zp = {}, a = 0, x = 0, y = 0, read = [], budget = 2000000 } = {}) {
+  return JSON.parse(await a2.ev(`JSON.stringify((() => {
+    const cpu = window.M.cpu, wr = window.M.wr, rd = window.M.rd;
+    const before = cpu.getState();
+    const zp = ${JSON.stringify(zp)};
+    for (const k of Object.keys(zp)) wr(Number(k), zp[k] & 0xff);
+    const st = cpu.getState();
+    wr(0x100 + st.sp, 0xFF); st.sp = (st.sp - 1) & 0xff;
+    wr(0x100 + st.sp, 0xFE); st.sp = (st.sp - 1) & 0xff;
+    st.pc = ${addr}; st.a = ${a} & 0xff; st.x = ${x} & 0xff; st.y = ${y} & 0xff;
+    cpu.setState(st);
+    let returned = false;
+    cpu.stepCyclesDebug(${budget}, () => { if (cpu.getPC() === ${SENTINEL}) { returned = true; return true; } });
+    const end = cpu.getState();
+    const out = { returned, a: end.a, x: end.x, y: end.y,
+      zp: ${JSON.stringify(read)}.map((addr) => rd(addr)) };
+    cpu.setState(before);
+    return out;
+  })())`));
+}
+
 /** Run one list. Returns the page plus the pixels that came on. */
 export async function runList(a2, bytes, opts = {}) {
   const r = JSON.parse(await a2.ev(

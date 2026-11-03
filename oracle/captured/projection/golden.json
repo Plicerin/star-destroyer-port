@@ -1,0 +1,191 @@
+{
+ "formula": {
+  "div": "sign * floor(|n| * 16384 / |d|) * 2, for |n| < |d| only",
+  "scale": "(signed8(a) * m) >> 7",
+  "projection": "screen = ((DIV(v, z) >> 8) * scale >> 7) + signed8(centre)",
+  "viewport": "scale = (operand >> 1) - 1, centre = operand"
+ },
+ "constants": {
+  "xscale": 69,
+  "xcentre": 0,
+  "yscale": 62,
+  "ycentre": 34
+ },
+ "transform": [
+  {
+   "world": [
+    40,
+    10,
+    100
+   ],
+   "view": [
+    152,
+    72,
+    224
+   ],
+   "screen": [
+    46,
+    53
+   ]
+  },
+  {
+   "world": [
+    20,
+    0,
+    100
+   ],
+   "view": [
+    72,
+    0,
+    224
+   ],
+   "screen": [
+    22,
+    34
+   ]
+  },
+  {
+   "world": [
+    10,
+    5,
+    100
+   ],
+   "view": [
+    32,
+    32,
+    224
+   ],
+   "screen": [
+    9,
+    42
+   ]
+  },
+  {
+   "world": [
+    40,
+    0,
+    200
+   ],
+   "view": [
+    152,
+    0,
+    456
+   ],
+   "screen": [
+    22,
+    34
+   ]
+  },
+  {
+   "world": [
+    -30,
+    20,
+    150
+   ],
+   "view": [
+    -112,
+    152,
+    344
+   ],
+   "screen": [
+    -23,
+    61
+   ]
+  },
+  {
+   "world": [
+    5,
+    -5,
+    50
+   ],
+   "view": [
+    16,
+    -32,
+    112
+   ],
+   "screen": [
+    9,
+    16
+   ]
+  },
+  {
+   "world": [
+    60,
+    -40,
+    300
+   ],
+   "view": [
+    232,
+    -312,
+    696
+   ],
+   "screen": [
+    22,
+    5
+   ]
+  },
+  {
+   "world": [
+    0,
+    0,
+    100
+   ],
+   "view": [
+    0,
+    0,
+    224
+   ],
+   "screen": [
+    0,
+    34
+   ]
+  }
+ ],
+ "results": [
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the divide is floor(|n| * 16384 / |d|) doubled and signed, for |n| < |d|",
+   "ok": true,
+   "detail": "94 cases"
+  },
+  {
+   "what": "and outside that domain it does not - so the domain is real, not a convenience",
+   "ok": true,
+   "detail": "23 out-of-range cases, none of which the formula fits"
+  },
+  {
+   "what": "the scale is (signed byte * multiplier) >> 7, rounding downwards, for a multiplier under 128",
+   "ok": true,
+   "detail": "688 cases"
+  },
+  {
+   "what": "scale is (operand >> 1) - 1 and centre is the operand, for each axis",
+   "ok": true,
+   "detail": "4 viewports"
+  },
+  {
+   "what": "the projection is exactly DIV then SCALE then the centre, everywhere strictly inside the frustum",
+   "ok": true,
+   "detail": "308 coordinates"
+  },
+  {
+   "what": "on the frustum edge, where the quotient is exactly 1, it comes back one short",
+   "ok": true,
+   "detail": "v = z = 40 gives 68, the formula says 69"
+  },
+  {
+   "what": "the pipeline composes - the formula applied to the view-space point gives the pixel",
+   "ok": true,
+   "detail": "8 points, x and y"
+  },
+  {
+   "what": "the transform is not a rigid one - it magnifies x and y against z",
+   "ok": true,
+   "detail": "so the frustum is not the 90 degrees the clip test alone suggests"
+  }
+ ]
+}

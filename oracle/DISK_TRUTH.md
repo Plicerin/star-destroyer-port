@@ -452,19 +452,20 @@ Several things the earlier passes had as addresses are now instructions:
   and `$61CB` folds the quadrants onto it; `$61C8` is the same table entered 64 units
   earlier, which is the cosine. Both are exposed as engine entry points. A port that uses
   `Math.sin` will not land on the same pixels.
-- **The field of view is exactly 90 degrees.** `$6A22` and `$6A7B` build a four-bit outcode
-  per point by testing `z+x`, `z-x`, `z+y`, `z-y` for overflow, which is the frustum
-  `|x| <= z`, `|y| <= z`. The drawing code rejects a line whose two outcodes share a bit -
-  Cohen-Sutherland's trivial reject.
+- **The clip frustum is `|x| <= z`, `|y| <= z` in view space.** `$6A22` and `$6A7B` build a
+  four-bit outcode per point by testing `z+x`, `z-x`, `z+y`, `z-y` for overflow. The
+  drawing code rejects a line whose two outcodes share a bit - Cohen-Sutherland's trivial
+  reject. (An earlier version of this file called that "a 90 degree field of view". In
+  view space it is, but the transform that produces view space magnifies x and y against
+  z by about 1.4 to 1.7, so the cone visible in *world* space is narrower than 90 degrees
+  and is not a fixed angle. See the projection below.)
 - **The clipper is a bisection, not an intersection.** A line that straddles a plane is
   walked inward by halving, at most **ten times**, counted down in `$B1`, which `$6118`
   reloads with 10 for every command. Clipped endpoints are therefore approximate in a
   specific, reproducible way, and a port that solves the intersection exactly will differ
   from the original at every window edge.
-- **The projection** is at `$6370`-`$63AF`: divide, scale by a constant, add a centre. Both
-  constants for both axes are **bytes inside that code** (`$6380`, `$6386`, `$63A3`,
-  `$63A9`), patched by the `VIEWPORT` instruction. x and y are scaled separately, which is
-  where the aspect correction lives.
+- **The projection** is at `$6367`, and it is now a formula rather than a shape - see
+  below.
 
 ### What a 2-D coordinate means
 
@@ -616,6 +617,58 @@ quietly wrong rather than obviously broken:
   decode as opcode 0 at the origin. The padding is opcode 17 now. The line routines also
   do not survive being asked to draw in a colour that was never set.
 
+### The projection, derived
+
+`probe_projection.mjs`, 9 checks. `$6367` turns one view-space point into two screen
+bytes. It is built from two routines whose arithmetic is not obvious from reading them, so
+rather than decode them by eye each was **tabulated**: `exercise.mjs` can call a single
+routine with the registers and zero page set, so the function is whatever the table says.
+
+| routine | what it computes |
+| --- | --- |
+| `$65DE` DIV | `sign * floor(abs(n) * 16384 / abs(d)) * 2`, dividend in A:X, divisor in `$7A`/`$7B` |
+| `$659D` SCALE | `(signed8(a) * m) >> 7`, truncating downwards |
+
+The doubled fourteen-bit quotient is why `40/100` comes back as **13106** and not the
+13107 that `0.4 * 32768` would give: the bottom bit is not computed, it is shifted in.
+
+Composed, per axis:
+
+```
+h      = DIV(v, z) >> 8                  v/z in seven fractional bits, a signed byte
+screen = ((h * scale) >> 7) + centre     both signed, both truncating downwards
+```
+
+**Exact on 308 of 308 coordinates** swept across seven depths, strictly inside the
+frustum. `scale` and `centre` are bytes inside the projection code that `VIEWPORT`
+patches: `scale = (operand >> 1) - 1` and `centre = the operand`, separately for x and y -
+measured over four viewports.
+
+Two edges worth having:
+
+- **DIV is only defined for `|n| < |d|`**, because a quotient of 1 does not fit in fifteen
+  fractional bits. That is exactly the frustum, which the outcode test enforces before
+  anything is projected. Outside it the routine returns numbers that fit no formula, which
+  the probe checks - the domain is real, not a convenience.
+- **On the frustum edge itself**, `v = z`, the engine comes back **one short**: 68 where
+  the formula says 69. A port copying the formula without that clamp will differ on points
+  sitting exactly on the edge.
+
+### What feeds it, which is not derived
+
+The stage before the projection - subtract the viewer, rotate, and a fixed-point scaling -
+is measured but **not** reduced to a formula, and it should not be guessed at. What is
+established is that the two stages compose: the view-space point the transform leaves in
+`$60`-`$65`, put through the formula above, gives the **exact pixel** the engine lights,
+on every point tried.
+
+It is not a rigid transform. With the viewer at the origin and no rotation, world
+`(40,10,100)` arrives as `(152,72,224)` - x multiplied by about 3.8 and z by about 2.3,
+and the ratio between those is not constant either (1.43 to 1.70 over the points tried).
+So the magnification of x and y against z is part of the transform rather than of the
+projection, and it is where the real field of view is set.
+
+
 ### Opcode 3, and the shape format
 
 Opcode 3 was an open question. Its handler `$62C0` loads the **saved previous point** as
@@ -690,11 +743,9 @@ promoted to fact.
    repository, so this is not a reproducible probe and is not one.)
 3. ~~**Opcode 3.**~~ Answered: a line back to the saved previous point, which it leaves
    in place. Handler `$62C0`.
-4. ~~**What `CALL $6000` does with all this.**~~ Answered above, and so are both things
-   that were still open under it: the 2-D screen mapping, and all thirty opcodes. What is
-   still not derived is the projection's arithmetic - `$6370`-`$63AF` divides, scales and
-   adds a centre, and the constants at `$6140`-`$6145` feed it, but the formula taking a
-   3-D point to an x and a y has not been written down.
+4. ~~**What `CALL $6000` does with all this.**~~ Answered above, and so is everything that
+   was open under it: the 2-D screen mapping, all thirty opcodes, and the projection's
+   arithmetic.
 5. ~~**The 13-byte record's bytes +0 to +9.**~~ Answered: a frame counter, a 16-bit
    position and a three-byte attitude. The counter's decrement is read off the handler and
    was never seen to happen.
@@ -706,5 +757,12 @@ promoted to fact.
 9. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
    measured about when or in what format.
 10. **The `DEMO` path**, never walked.
-11. **`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).** `SD` BLOADs `MATH` before chaining
+11. **The world-to-view transform.** The projection it feeds is derived; this is not.
+    It subtracts the viewer, rotates, and applies an anisotropic fixed-point scaling - x
+    and y by about 3.8, z by about 2.3, and not at a constant ratio - with truncation that
+    loses precision on small values and something saturating on large ones. The six
+    constants `op 15` writes to `$6140`-`$6145` and the matrix builder at `$666E` are
+    where to start. Until this is done, the port cannot place a point from world
+    coordinates, only from view coordinates.
+12. **`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).** `SD` BLOADs `MATH` before chaining
     `SD START`, and nothing in the renderer trace reads either of them.
