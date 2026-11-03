@@ -111,9 +111,9 @@ $618E                .byte $33, $51, $BF, $4E, $3F, $4C, $B3, $49, $1C, $47, $7A
 $619E                .byte $56, $3C, $8C, $39, $B9, $36, $DE, $33, $FB, $30, $10, $2E, $1F, $2B, $26, $28
 $61AE                .byte $27, $25, $23, $22, $19, $1F, $0B, $1C, $F9, $18, $E1, $15, $C7, $12, $AB, $0F
 $61BE                .byte $8C, $0C, $6A, $09, $47, $06, $24, $03, $00, $00
-$61C8  COS.A:        38         SEC
+$61C8  SIN.A:        38         SEC
 $61C9                E9 40      SBC #$40
-$61CB  SIN.A:        AA         TAX
+$61CB  COS.A:        AA         TAX
 $61CC                30 1F      BMI $61ED
 $61CE                C9 40      CMP #$40
 $61D0                30 12      BMI $61E4
@@ -145,7 +145,7 @@ $61F9                48         PHA
 $61FA                98         TYA
 $61FB                48         PHA
 $61FC                AD 3E 61   LDA ANGLE
-$61FF                20 C8 61   JSR COS.A
+$61FF                20 C8 61   JSR SIN.A
 $6202                8E 3F 61   STX $613F
 $6205                8D 3E 61   STA ANGLE
 $6208                68         PLA
@@ -162,7 +162,7 @@ $6212                48         PHA
 $6213                98         TYA
 $6214                48         PHA
 $6215                AD 3E 61   LDA ANGLE
-$6218                20 CB 61   JSR SIN.A
+$6218                20 CB 61   JSR COS.A
 $621B                4C 02 62   JMP $6202
 $621E  MODE29:       .byte $00
 $621F  ADVANCE:      18         CLC
@@ -737,27 +737,27 @@ $6669                C6 78      DEC $78
 $666B                C6 79      DEC $79
 $666D                60         RTS
 $666E  SETVIEW:      A5 96      LDA $96
-$6670                20 C8 61   JSR COS.A
+$6670                20 C8 61   JSR SIN.A
 $6673                85 60      STA $60
 $6675                86 61      STX $61
 $6677                A5 97      LDA $97
-$6679                20 C8 61   JSR COS.A
+$6679                20 C8 61   JSR SIN.A
 $667C                85 62      STA $62
 $667E                86 63      STX $63
 $6680                A5 98      LDA $98
-$6682                20 C8 61   JSR COS.A
+$6682                20 C8 61   JSR SIN.A
 $6685                85 64      STA $64
 $6687                86 65      STX $65
 $6689                A5 96      LDA $96
-$668B                20 CB 61   JSR SIN.A
+$668B                20 CB 61   JSR COS.A
 $668E                85 66      STA $66
 $6690                86 67      STX $67
 $6692                A5 97      LDA $97
-$6694                20 CB 61   JSR SIN.A
+$6694                20 CB 61   JSR COS.A
 $6697                85 68      STA $68
 $6699                86 69      STX $69
 $669B                A5 98      LDA $98
-$669D                20 CB 61   JSR SIN.A
+$669D                20 CB 61   JSR COS.A
 $66A0                85 6A      STA $6A
 $66A2                86 6B      STX $6B
 $66A4                A2 6A      LDX #$6A
@@ -1639,27 +1639,27 @@ $6D41                85 9C      STA $9C
 $6D43                68         PLA
 $6D44                85 9B      STA $9B
 $6D46                A5 96      LDA $96
-$6D48                20 C8 61   JSR COS.A
+$6D48                20 C8 61   JSR SIN.A
 $6D4B                85 60      STA $60
 $6D4D                86 61      STX $61
 $6D4F                A5 97      LDA $97
-$6D51                20 C8 61   JSR COS.A
+$6D51                20 C8 61   JSR SIN.A
 $6D54                85 64      STA $64
 $6D56                86 65      STX $65
 $6D58                A5 98      LDA $98
-$6D5A                20 C8 61   JSR COS.A
+$6D5A                20 C8 61   JSR SIN.A
 $6D5D                85 68      STA $68
 $6D5F                86 69      STX $69
 $6D61                A5 96      LDA $96
-$6D63                20 CB 61   JSR SIN.A
+$6D63                20 CB 61   JSR COS.A
 $6D66                85 62      STA $62
 $6D68                86 63      STX $63
 $6D6A                A5 97      LDA $97
-$6D6C                20 CB 61   JSR SIN.A
+$6D6C                20 CB 61   JSR COS.A
 $6D6F                85 66      STA $66
 $6D71                86 67      STX $67
 $6D73                A5 98      LDA $98
-$6D75                20 CB 61   JSR SIN.A
+$6D75                20 CB 61   JSR COS.A
 $6D78                85 6A      STA $6A
 $6D7A                86 6B      STX $6B
 $6D7C                A2 90      LDX #$90

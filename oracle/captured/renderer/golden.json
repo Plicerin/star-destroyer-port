@@ -2,8 +2,8 @@
  "entries": {
   "render": 24576,
   "renderNoSave": 24579,
-  "cos": 24582,
-  "sin": 24585
+  "sin": 24582,
+  "cos": 24585
  },
  "dispatch": 24796,
  "handlers": [

@@ -453,10 +453,15 @@ Several things the earlier passes had as addresses are now instructions:
 
 ### The geometry
 
-- **Angles are one byte to the turn.** `$6147` holds a 64-entry 16-bit quarter sine table
-  and `$61CB` folds the quadrants onto it; `$61C8` is the same table entered 64 units
-  earlier, which is the cosine. Both are exposed as engine entry points. A port that uses
-  `Math.sin` will not land on the same pixels.
+- **Angles are one byte to the turn.** The 16-bit quarter-turn table starts at `$6146`,
+  `$61CB` folds the quadrants onto it, and `$61C8` is the same table entered 64 units
+  earlier. **`$61CB` is the COSINE and `$61C8` is the SINE** - this file had them the
+  other way round until `parity_view.mjs` measured all 256 angles of each: at angle 0,
+  `$61CB` returns 32767 and `$61C8` returns 0.
+
+  A port that uses `Math.sin` will not land on the same pixels, and neither will one that
+  mirrors the table into the negative quadrants. The folding negates its two bytes in the
+  wrong order, so `cos(128)` comes back as **-32383** where a true -1.0 would be -32767.
 - **The clip frustum is `|x| <= z`, `|y| <= z` in view space.** `$6A22` and `$6A7B` build a
   four-bit outcode per point by testing `z+x`, `z-x`, `z+y`, `z-y` for overflow. The
   drawing code rejects a line whose two outcodes share a bit - Cohen-Sutherland's trivial
@@ -721,11 +726,51 @@ from the listing rather than replace them:
   otherwise. Close enough to look right, wrong often enough to drift. The probe uses the
   engine's own multiply to predict the engine's transform, and pins a golden table of 84
   products to check a reimplementation against.
-- **`$666E`, the matrix builder.** The rotation is real and the y and z scales land on the
-  diagonal within a few units, but the x entry comes out high by 0.2% to 2.3% and moves
-  with pitch although nothing in the geometry says it should. That is rounding inside the
-  builder, and it is bounded - under 2% - but not modelled.
+- **`$666E`, the matrix builder.** ~~Rounding.~~ It is a **bug**, and it is now
+  transliterated - see below.
 
+
+### $666E has a bug, and it is load-bearing
+
+`parity_view.mjs`. The matrix builder scales each row by one of opcode 15's three
+constants, and for the **first entry of each row** it reads only the constant's high byte:
+
+```
+LDX $6141        ; the high byte
+CPX #$7F         ; "is this row's scale 1.0, so we can skip it?"
+BNE $675F        ; ...and this branch jumps PAST the LDA below
+LDA $6140
+CMP #$FF
+BEQ skip
+STA $78          ; <- A is stale when we arrived by the branch
+```
+
+So whenever a scale's high byte is not `$7F`, the multiplier becomes
+`(high << 8) | whatever the accumulator happened to hold`, which is the low byte of the
+previous multiply's result. The second and third entries of each row reload it properly.
+
+At all angles zero the previous product is `mul(cosH, cosP)` = 32763, low byte `$FB`, so
+the x scale is `$3EFB` = **16123** rather than the 16000 the scene asked for. That is
+exactly what the engine's matrix holds, and it is why the x row appeared to "wander with
+pitch": change the pitch, change the previous product, change the scale.
+
+This is why the earlier pass could only call it "rounding, bounded but not modelled". It
+is not rounding and it is not bounded by anything meaningful - it is a missing `LDA`. A
+port that uses the constant is 0.8% out at the origin and differently out at every
+attitude.
+
+Two more things the transliteration needed, neither of them visible from the formula:
+
+- **The operand order is not consistent.** `MULCORE` complements its first operand and
+  adds its second, so it is not symmetric. Every scaling block puts the constant in `$78`
+  except the x row's second and third entries (`$6772`, `$678B`), which put the value
+  there instead. That difference is worth exactly one unit, and it showed up as
+  `engine 11311, port 11312`.
+- **Only the first entry of each row is affected by the stale accumulator**, because the
+  other two reload the constant.
+
+`parity_view.mjs` reproduces the matrix exactly over 96 attitudes and five settings of
+opcode 15, including the settings where a row is skipped entirely.
 
 ### Opcode 3, and the shape format
 
@@ -815,10 +860,7 @@ promoted to fact.
 9. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
    measured about when or in what format.
 10. **The `DEMO` path**, never walked.
-11. ~~**The world-to-view transform.**~~ Derived, above. What is left under it is two
-    routines that have to be reimplemented rather than re-derived: the multiply at
-    `$6480`, which truncates its partial sums and so is not `(a*b) >> 15`, and the matrix
-    builder at `$666E`, whose rounding puts the x scale up to 2.3% high. Both are pinned
-    by goldens; neither is modelled.
+11. ~~**The world-to-view transform.**~~ Derived, above, and both routines under it are
+    now transliterated and held by `parity_math.mjs` and `parity_view.mjs`.
 12. **`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).** `SD` BLOADs `MATH` before chaining
     `SD START`, and nothing in the renderer trace reads either of them.

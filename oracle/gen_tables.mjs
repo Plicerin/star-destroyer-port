@@ -36,6 +36,11 @@ const out = [
   '',
   'export const X_MASK = [', fmt(grab(0x7523)), '];',
   '',
+  '// The trig table. $61CB indexes it as 16-bit entries starting at $6146 - the low byte',
+  '// at $6146 + 2a and the high at $6147 + 2a - for a quarter turn, and folds the other',
+  '// three quadrants onto it. SINTAB[i] is the byte at $6146 + i.',
+  'export const SINTAB = [', fmt([...mem.slice(0x6146, 0x6146 + 256)]), '];',
+  '',
 ].join(String.fromCharCode(10));
 
 fs.mkdirSync('../port/src/a23d2', { recursive: true });

@@ -108,7 +108,18 @@ out.
 byte across the whole 8 KB page**. Include lines that straddle byte boundaries, lines at
 every slope sign, and both plot modes.
 
-## Phase 3 — transform and projection
+## Phase 3 — transform and projection ✅ done
+
+`port/src/a23d2/view.js`, held by `oracle/parity_view.mjs`. Trig exact over all 256
+angles of each function; the matrix exact over 96 attitudes and five settings of opcode
+15; the transform and projection exact to the pixel.
+
+`$666E` turned out to have a **bug** rather than rounding - it skips its own `LDA` and
+scales the first entry of each row by a stale accumulator byte. See "$666E has a bug" in
+DISK_TRUTH. The trig folding also is not a true negation, and `$61C8`/`$61CB` are sine
+and cosine the other way round from how DISK_TRUTH first had them.
+
+## Phase 3 notes — what the plan said to build
 
 Both derived — see **"The projection, derived"** and **"What feeds it"** in DISK_TRUTH.
 

@@ -173,10 +173,14 @@ console.log('\n=== what opcode 15 is for ===');
     rows.map((r) => `${r.diag[0]}/${r.scales[0]}`).join(' '));
 }
 
-// How far from derived the matrix BUILDER is, stated as a number rather than a worry.
 // With bank and heading at zero the x row is mathematically [scale, 0, 0] whatever the
-// pitch - the pitch rotation does not touch it. It moves anyway, by up to 1.6%, which is
-// the fixed-point rounding inside $666E. $666E is not modelled here.
+// pitch - the pitch rotation does not touch it. It moves anyway, by up to 1.6%.
+//
+// This probe called that "rounding inside $666E", which was wrong. It is a BUG: $666E
+// loads only the high byte of opcode 15's constant before testing it, and when the test
+// fails it branches past the `LDA` that would have loaded the low byte, so the first
+// entry of each row is scaled by the high byte joined to whatever the accumulator was
+// left holding. See parity_view.mjs, which transliterates it and matches.
 {
   const xs = [];
   for (const pitch of [0, 16, 32, 48, 64, 96, 128]) {

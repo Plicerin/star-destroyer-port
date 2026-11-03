@@ -1,0 +1,49 @@
+{
+ "results": [
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "$61C8 is sine and $61CB is cosine, over all 256 angles",
+   "ok": true,
+   "detail": "512 values exact"
+  },
+  {
+   "what": "and the folding is not a true negation, which is why it is transliterated",
+   "ok": true,
+   "detail": "cos(128) = -32383, where negating cos(0) would give -32767"
+  },
+  {
+   "what": "the matrix matches the engine at every attitude tried",
+   "ok": true,
+   "detail": "96 attitudes, nine entries each"
+  },
+  {
+   "what": "and the x entry is not the constant, which is what the bug costs",
+   "ok": true,
+   "detail": "16123 rather than 16000, a difference of 123"
+  },
+  {
+   "what": "and at every setting of opcode 15, including when a row is skipped",
+   "ok": true,
+   "detail": "five settings"
+  },
+  {
+   "what": "the transform reproduces the engine's view-space point exactly",
+   "ok": true,
+   "detail": "11 cases"
+  },
+  {
+   "what": "and the projection lands on the engine's pixel",
+   "ok": true,
+   "detail": "every unclipped case"
+  },
+  {
+   "what": "the clip outcode matches, so the port rejects the same lines",
+   "ok": true,
+   "detail": "eight points around the frustum"
+  }
+ ]
+}

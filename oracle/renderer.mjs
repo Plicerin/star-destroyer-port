@@ -63,10 +63,11 @@
  *   | $B3-$B6 | a 2-D line's x1, y1, x2, y2 |
  *   | $BB/$BC/$BD | $00, $20, $40 - the hires page bases |
  *
- * Angles are one byte for a whole turn. $6147 holds a 64-entry 16-bit quarter sine table,
- * and $61CB folds the quadrants onto it; $61C8 is the same table entered 64 units earlier,
- * which is the cosine. The port's rotations have to come off this table, not off Math.sin,
- * or nothing will land on the same pixel.
+ * Angles are one byte for a whole turn. The 16-bit quarter-turn table starts at $6146,
+ * $61CB folds the quadrants onto it and IS THE COSINE, and $61C8 is the same table entered
+ * 64 units earlier, which is the sine. The port's rotations have to come off this table,
+ * not off Math.sin - and not off a true negation either, because the folding negates its
+ * two bytes in the wrong order and cos(128) comes back as -32383 rather than -32767.
  *
  * The clipper is a bisection, not an intersection. $6A22 and $6A7B compute a four-bit
  * outcode per point by testing z+x, z-x, z+y, z-y for overflow - which is the frustum
@@ -92,7 +93,11 @@
 import { openDisk, DISK } from './dsk.mjs';
 import { disasm1, traverse, hx } from './disasm6502.mjs';
 
-export const ENTRY = { render: 0x6000, renderNoSave: 0x6003, cos: 0x6006, sin: 0x6009 };
+// $6006 and $6009 are the engine's two exposed trig entries. They land on $61F6 and
+// $620F, which wrap $61C8 and $61CB respectively - and $61C8 is SINE, $61CB is COSINE.
+// An earlier version of this file had those the other way round; parity_view.mjs
+// measured all 256 angles of each and settled it.
+export const ENTRY = { render: 0x6000, renderNoSave: 0x6003, sin: 0x6006, cos: 0x6009 };
 export const ZP_SAVE = [0x600C, 0x606B];
 export const DISPATCH = 0x60DC;          // 30 entries of 2 bytes, ending at $6117
 export const OPCODES = 30;
@@ -285,7 +290,7 @@ export function symbols(mem) {
   const sym = {
     0x6000: 'RENDER', 0x6003: 'RENDER.NOSAVE', 0x6006: 'COS', 0x6009: 'SIN',
     0x6090: 'FRAME', 0x6118: 'NEXTOP', 0x611C: 'NEXTOP.Y0', 0x621F: 'ADVANCE',
-    0x63B5: 'ADV2', 0x63B7: 'ADV.A', 0x61C8: 'COS.A', 0x61CB: 'SIN.A',
+    0x63B5: 'ADV2', 0x63B7: 'ADV.A', 0x61C8: 'SIN.A', 0x61CB: 'COS.A',
     0x6461: 'MUL16', 0x6480: 'MULCORE', 0x65DE: 'DIV', 0x659D: 'SCALE',
     0x684D: 'FETCHPT', 0x6A22: 'OUTCODE1', 0x6A7B: 'OUTCODE2',
     0x6AD4: 'CLIP1', 0x6AEE: 'CLIP2', 0x666E: 'SETVIEW',
