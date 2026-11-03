@@ -148,6 +148,46 @@ check('the trace caught the game calling the renderer', t.renders === 7, `${t.re
   check('the game pokes the display list every frame',
     rows.length > 0 && rows[0][1] >= t.snaps.length - 2,
     `${rows.length} bytes move, the busiest in ${rows[0][1]} of ${t.snaps.length - 1} frames`);
+  // Objects i and i+12 are the same thing twice: the scene draws the first block through
+  // the main viewport and the second through the scope inset, so an enemy has an
+  // instruction in each. $1E98 switches OBJ1 and OBJ13 on in the same breath, and if they
+  // are really one entity they must move in exactly the same frames.
+  {
+    const fieldOf = (at) => {
+      for (let i = 0; i < 24; i++) {
+        const base = (i < 12 ? 0x8123 + i * 13 : 0x8247 + (i - 12) * 13);
+        if (at > base && at <= base + 12) return { obj: i, off: at - base - 1 };
+      }
+      return null;
+    };
+    // frames[obj][off] = the set of frames in which that field moved
+    const when = new Map();
+    for (let i = 1; i < t.snaps.length; i++) {
+      for (let k = 0; k < LIST_LEN; k++) {
+        if (t.snaps[i][k] === t.snaps[i - 1][k]) continue;
+        const f = fieldOf(LIST + k);
+        if (!f) continue;
+        const key = f.obj + ':' + f.off;
+        if (!when.has(key)) when.set(key, []);
+        when.get(key).push(i);
+      }
+    }
+    const mismatched = [];
+    let paired = 0;
+    for (const [key, frames] of when) {
+      const [obj, off] = key.split(':').map(Number);
+      if (obj >= 12) continue;
+      const twin = when.get((obj + 12) + ':' + off);
+      if (!twin) { mismatched.push(`object ${obj} field ${off} moved but object ${obj + 12} did not`); continue; }
+      if (twin.join() !== frames.join()) mismatched.push(`object ${obj} and ${obj + 12} field ${off} moved in different frames`);
+      else paired++;
+    }
+    console.log(`  ${paired} fields moved identically in object i and object i+12`);
+    check('an enemy is one entity with two instructions - the main view and the scope',
+      paired > 0 && mismatched.length === 0,
+      mismatched.slice(0, 2).join('; ') || `${paired} paired fields, none out of step`);
+  }
+
   check('and what it pokes is the viewer, the objects and the gauges - nothing else',
     rows.every(([at]) => named[at] || objectField(at)),
     rows.filter(([at]) => !named[at] && !objectField(at)).slice(0, 4)

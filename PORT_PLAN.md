@@ -222,6 +222,24 @@ Suggested order:
    That is a dozen instructions of about 401 a frame. The rest of the loop is next, and
    the five large regions ($0957-$0AE0, $0C04-$0DA2, $0E05-$0EF6, $1014-$11AC,
    $120F-$1300) are where it lives.
+
+   **Three things block the rest of it**, and they should be settled before more code is
+   written, because everything in the loop runs through them:
+
+   - **`MATH` at `$98F3`.** The loop moves the ship by calling `$999B`, `$99D2`, `$9A65`,
+     `$9C4B` and `$9C7A`. Tabulate them with `exercise.mjs`'s `callSub`, the way `$6480`
+     and `$65DE` were tabulated - inputs in, outputs out, no reading required.
+   - **The table at `$9801`.** The ship's position is an index into it, and nothing seen
+     so far writes it. Find out what does; it may be built at startup or loaded by a file
+     this plan has not looked at.
+   - **The state at `$0900`-`$0950`.** `$0901`/`$0903` are the position indices,
+     `$090D`-`$0910` index the enemy store, `$0948` gates a block. Mapping it is what
+     makes the rest of the loop readable rather than transliterable.
+
+   Useful structure already established: an enemy is ONE entity with TWO object
+   instructions, *i* in the main view and *i+12* in the scope, switched on and moved
+   together. And the spawn counters at `$1FF9`-`$1FFB` are the interface between the
+   BASIC's difficulty and the binary's waves.
 3. Then the Applesoft around it.
 
 ## Phase 5 notes — what the plan first said

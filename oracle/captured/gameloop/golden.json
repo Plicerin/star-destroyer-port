@@ -205,6 +205,11 @@
    "detail": "27 bytes move, the busiest in 6 of 6 frames"
   },
   {
+   "what": "an enemy is one entity with two instructions - the main view and the scope",
+   "ok": true,
+   "detail": "10 paired fields, none out of step"
+  },
+  {
    "what": "and what it pokes is the viewer, the objects and the gauges - nothing else",
    "ok": true,
    "detail": "every changing byte is accounted for"
