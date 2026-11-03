@@ -95,9 +95,17 @@ export async function arm(a2) {
      * experiment that hangs the machine costs the whole probe. It stops and says so.
      */
     window.M.runList = (bytes, { page = 1, clear = true, budget = 20000000,
-                                 watch = [], at = ${LIST} } = {}) => {
-      if (bytes.length > ${LIST_LEN}) return { error: 'list longer than SV DATA' };
-      for (let i = 0; i < bytes.length; i++) wr(at + i, bytes[i]);
+                                 watch = [], at = ${LIST}, spill = 0x9000, spillMax = 0x1800 } = {}) => {
+      // A list longer than SV DATA goes somewhere with room, reached by a three-byte
+      // opcode 11 - the engine's own JUMP - written where $6090 points. $9000 is clear:
+      // HEADING DATA ends at $8BD3 and MATH starts at $98F3.
+      if (bytes.length > ${LIST_LEN}) {
+        if (bytes.length > spillMax) return { error: 'list longer than the spill area' };
+        for (let i = 0; i < bytes.length; i++) wr(spill + i, bytes[i]);
+        wr(at, 11); wr(at + 1, spill & 0xff); wr(at + 2, (spill >> 8) & 0xff);
+      } else {
+        for (let i = 0; i < bytes.length; i++) wr(at + i, bytes[i]);
+      }
       const base = page === 2 ? 0x4000 : 0x2000;
       if (clear) for (let a = base; a < base + 0x2000; a++) wr(a, 0);
       const before = cpu.getState();

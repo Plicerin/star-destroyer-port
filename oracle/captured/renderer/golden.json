@@ -102,7 +102,7 @@
   "12": {
    "len": 2,
    "from": "exercised",
-   "what": "PLOTMODE: 0 writes ORA into five sites, else EOR. Points erase; a line rewrites those bytes itself and is unaffected"
+   "what": "PLOTMODE: 0 writes ORA into the plot sites, else EOR. Only meaningful with COLOUR 0; any other colour patches the same sites with a JSR and opcode 12 then corrupts it"
   },
   "13": {
    "len": 3,
@@ -132,7 +132,7 @@
   "18": {
    "len": 2,
    "from": "traced",
-   "what": "COLOUR: 0 is white, 1-3 are the hires colours, 4-7 are all the same"
+   "what": "COLOUR: patches 26 sites in the plotting code. 0 is white (a plain ORA), 1-3 are the hires colours, 4-7 are all the same"
   },
   "19": {
    "len": 13,

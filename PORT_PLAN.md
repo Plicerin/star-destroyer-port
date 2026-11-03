@@ -68,7 +68,24 @@ and 11,008 scalings, all exact.
 - **`div`** and **`scale`** are formulas, verified over their whole domains. `div` is
   defined only for `|n| < |d|` and returns `null` outside it rather than inventing a value.
 
-## Phase 2 — the 2-D layer
+## Phase 2 — the 2-D layer (part done)
+
+`port/src/a23d2/screen.js` and `tables.js`, held by `oracle/parity_screen.mjs`. Thirteen
+whole-page comparisons, every one byte-for-byte identical.
+
+Done: the coordinate system, the four tables (copied from the disk by
+`oracle/gen_tables.mjs`, with the derived formulas checked against the copies), the point
+plotter, the five colours, both plot modes, both pages, the straddling cells and the
+off-screen wrap.
+
+**Colour is modelled as patched code, not as a parameter**, because that is what it is -
+see the note at the top of `screen.js`. The one combination the original corrupts, a
+colour other than 0 followed by PLOTMODE, the port refuses rather than guessing.
+
+Still to do in this phase: **the 2-D line routine at `$7748`.** Transliterate it; do not
+assume it is any particular Bresenham. Its stepping has not been looked at.
+
+## Phase 2 notes — the original plan
 
 Everything downstream of a screen coordinate. All of it is established — see
 **"What a 2-D coordinate means"** in DISK_TRUTH.

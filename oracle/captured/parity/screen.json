@@ -1,0 +1,57 @@
+{
+ "colours": {
+  "0": null,
+  "1": {
+   "even": 42,
+   "odd": 85,
+   "palette": "clear"
+  },
+  "2": {
+   "even": 85,
+   "odd": 42,
+   "palette": "clear"
+  },
+  "3": {
+   "even": 85,
+   "odd": 42,
+   "palette": "set"
+  },
+  "4": {
+   "even": 42,
+   "odd": 85,
+   "palette": "set"
+  }
+ },
+ "results": [
+  {
+   "what": "the embedded tables are byte-identical to $7223-$7622 on the disk",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "bit = 140 + 2x still describes the x tables, and nothing else plots",
+   "ok": true,
+   "detail": "0 disagreements over 256 values"
+  },
+  {
+   "what": "row = 95 - y still describes the y tables, for every y on the screen",
+   "ok": true,
+   "detail": "0 disagreements over 192 rows"
+  },
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "every comparison is byte-for-byte identical across the whole page",
+   "ok": true,
+   "detail": "nine pages, no differences"
+  },
+  {
+   "what": "the port refuses colour + EOR, which the original runs as corrupted code",
+   "ok": true,
+   "detail": "measured on the engine as 7 pixels left of 61, rather than 0"
+  }
+ ]
+}

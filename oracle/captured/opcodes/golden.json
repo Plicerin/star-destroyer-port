@@ -85,9 +85,14 @@
    "detail": "ORA twice -> 1 lit, EOR twice -> 0 lit"
   },
   {
-   "what": "a line is not, and leaves those bytes holding its own value",
+   "what": "erasing works in colour 0, where opcode 12 turns the ORA COLOUR wrote into an EOR",
    "ok": true,
-   "detail": "61 lit after drawing it twice in EOR; $7734 = $20"
+   "detail": "a line drawn twice leaves 0 lit"
+  },
+  {
+   "what": "and COLOUR overwrites opcode 12 entirely when it runs after it",
+   "ok": true,
+   "detail": "61 lit, and $7734 holds the JSR again"
   },
   {
    "what": "opcode 20 re-vectors both 2-D primitives to a second pair of routines",

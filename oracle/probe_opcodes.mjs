@@ -174,13 +174,24 @@ console.log('\n=== opcodes 12, 16 and 20: how the primitives are configured ==='
   check('and in EOR a point drawn twice erases itself',
     lit(twiceOra) === 1 && lit(twiceEor) === 0,
     `ORA twice -> ${lit(twiceOra)} lit, EOR twice -> ${lit(twiceEor)} lit`);
-  // The line routine rewrites the same five bytes as it draws, so it is not affected and
-  // it clobbers the mode for whatever comes after.
-  const ln = [...op.colour(7), ...op.line2d(-30, -20, 30, 20)];
-  const lineTwice = await run([12, 1, ...ln, ...ln, ...op.end()], { watch: [[0x7734, 1]] });
-  check('a line is not, and leaves those bytes holding its own value',
-    lit(lineTwice) > 20 && lineTwice.watched[0][0] === 0x20,
-    `${lit(lineTwice)} lit after drawing it twice in EOR; $7734 = ${hx(lineTwice.watched[0][0])}`);
+  // Opcode 18 patches the SAME sites, with four bytes where opcode 12 writes one, so the
+  // two collide and the order decides. An earlier version of this probe had the right
+  // observation and the wrong reason - it said the line routine rewrote the bytes as it
+  // drew. It does not; COLOUR does.
+  const ln = [...op.line2d(-30, -20, 30, 20)];
+  const colourThenMode = await run([...op.colour(0), 12, 1, ...ln, ...ln, ...op.end()],
+    { watch: [[0x7734, 4]] });
+  const modeThenColour = await run([12, 1, ...op.colour(7), ...ln, ...ln, ...op.end()],
+    { watch: [[0x7734, 4]] });
+  const bytes = (r) => r.watched[0].map((v) => hx(v)).join(' ');
+  console.log(`  COLOUR 0 then PLOTMODE 1: $7734 = ${bytes(colourThenMode)}, ${lit(colourThenMode)} lit`);
+  console.log(`  PLOTMODE 1 then COLOUR 7: $7734 = ${bytes(modeThenColour)}, ${lit(modeThenColour)} lit`);
+  check('erasing works in colour 0, where opcode 12 turns the ORA COLOUR wrote into an EOR',
+    lit(colourThenMode) === 0 && colourThenMode.watched[0][0] === 0x51,
+    `a line drawn twice leaves ${lit(colourThenMode)} lit`);
+  check('and COLOUR overwrites opcode 12 entirely when it runs after it',
+    lit(modeThenColour) > 20 && modeThenColour.watched[0][0] === 0x20,
+    `${lit(modeThenColour)} lit, and $7734 holds the JSR again`);
 }
 {
   const z = await run([20, 0, ...op.end()], { watch: [[0x771C, 3], [0x7745, 3]] });

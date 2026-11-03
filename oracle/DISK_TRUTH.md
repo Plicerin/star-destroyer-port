@@ -573,13 +573,13 @@ distance the list pointer moved between one fetch and the next - and every meani
 | 9 | 2 | select the page to draw on |
 | 10 | 3 | 2-D POINT |
 | 11 | - | **JUMP**: the list pointer becomes the operand |
-| 12 | 2 | **PLOTMODE**: 0 writes `ORA` into five sites, non-zero writes `EOR` |
+| 12 | 2 | **PLOTMODE**: `ORA` or `EOR` into the plot sites - only well defined with COLOUR 0 |
 | 13 | 3 | **COMPILE**: write the 2-D result to an address instead of drawing it |
 | 14 | 5 | VIEWPORT: x scale, y scale, x centre, y centre |
 | 15 | 7 | six engine constants into `$6140`-`$6145` |
 | 16 | 1 | the whole graphics-mode sequence in one byte |
 | 17 | 1 | no-op |
-| 18 | 2 | COLOUR |
+| 18 | 2 | COLOUR - patches 26 sites in the plotting code |
 | 19 | 13 | OBJECT |
 | 20 | 2 | **VECTOR**: re-point the 2-D primitives at a second pair of routines |
 | 21 | 7 | **2-D LINE** with x 16-bit at twice the scale |
