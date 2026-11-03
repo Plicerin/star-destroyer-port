@@ -177,3 +177,44 @@ export function outcode(v) {
   if (z - y < 0) code |= 0x08;
   return code;
 }
+
+/**
+ * $6D7C-$6F0x: putting the viewer into an object's frame.
+ *
+ * Opcode 19 does NOT replace the viewer's attitude and rebuild the matrix. It rotates the
+ * relative position into the object's frame, and COMPOSES the object's rotation into the
+ * matrix that is already there - which is what makes nesting work, and what makes an
+ * object's orientation relative to the viewer's rather than absolute.
+ *
+ * Three rotations in order: heading on (x, z), pitch on (y, z), bank on (x, y). The
+ * position and the matrix use the same pairs and the same signs, which is the check that
+ * this is one transform rather than two.
+ *
+ * The multiply's argument order differs between the two, and MULCORE is not symmetric, so
+ * it is kept: the position does mul(coordinate, trig) and the matrix does mul(trig, entry).
+ */
+export function objectFrame(M, pos, pitch, bank, heading) {
+  const sP = sin(pitch), cP = cos(pitch);
+  const sB = sin(bank), cB = cos(bank);
+  const sH = sin(heading), cH = cos(heading);
+
+  // $6D7C: the position, mul(coordinate, trig).
+  let [x, y, z] = pos;
+  [x, z] = [mul(x, cH) - mul(z, sH), mul(z, cH) + mul(x, sH)];      // heading
+  [y, z] = [mul(y, cP) + mul(z, sP), mul(z, cP) - mul(y, sP)];      // pitch
+  [x, y] = [mul(x, cB) + mul(y, sB), mul(y, cB) - mul(x, sB)];      // bank
+
+  // $6E36: the matrix, mul(trig, entry), one rotation at a time over all three rows.
+  const rot = (m, a, b, s, c, sign) => m.map((row) => {
+    const u = row[a], v = row[b];
+    const nu = mul(c, u) + mul(sign < 0 ? s16(0 - s) : s, v);
+    const nv = mul(sign < 0 ? s : s16(0 - s), u) + mul(c, v);
+    const out = row.slice();
+    out[a] = nu; out[b] = nv;
+    return out;
+  });
+  let m = rot(M, 0, 2, sH, cH, -1);        // heading: x' = cH*x - sH*z, z' = sH*x + cH*z
+  m = rot(m, 1, 2, sP, cP, +1);            // pitch:   y' = cP*y + sP*z, z' = -sP*y + cP*z
+  m = rot(m, 0, 1, sB, cB, +1);            // bank:    x' = cB*x + sB*y, y' = -sB*x + cB*y
+  return { M: m, pos: [x, y, z] };
+}

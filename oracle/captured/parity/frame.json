@@ -1,0 +1,19 @@
+{
+ "results": [
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "every frame is byte-for-byte identical across the whole page",
+   "ok": true,
+   "detail": "eight frames, no differences"
+  },
+  {
+   "what": "an object with a count of 3 decrements itself in the list",
+   "ok": true,
+   "detail": "the counter reads 2 after one frame"
+  }
+ ]
+}

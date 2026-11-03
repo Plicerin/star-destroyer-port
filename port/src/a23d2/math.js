@@ -116,14 +116,21 @@ export function mul(a, b) {
  * Fifteen fractional bits, but only fourteen of them are computed - the bottom one is
  * shifted in - so 40/100 comes back as 13106 where `0.4 * 32768` would give 13107.
  *
- * Defined only for |n| < |d|, because a quotient of 1 does not fit. That is exactly the
- * frustum the clipper enforces before anything is projected, so the engine never asks
- * outside it. Outside the domain the original returns numbers that fit no formula; this
- * returns null rather than inventing one.
+ * **The edge, |n| == |d|, is part of the domain and matters a great deal.** A quotient of
+ * exactly 1 does not fit in fifteen fractional bits, so the result saturates at 32767 -
+ * which is where probe_projection.mjs's "on the frustum edge it comes back one short"
+ * comes from. It is not a curiosity: the clipper puts points EXACTLY on a plane, so every
+ * clipped line projects through this case. Treating it as out of domain makes a port draw
+ * nothing at all for anything that needed clipping, which is what this one did until a
+ * whole-frame comparison showed shapes losing more than half their pixels whenever they
+ * came close enough to touch the frustum.
+ *
+ * Beyond the edge the original returns numbers that fit no formula, so that returns null
+ * rather than inventing one.
  */
 export function div(n, d) {
-  if (d === 0 || Math.abs(n) >= Math.abs(d)) return null;
-  const m = Math.floor(Math.abs(n) * 16384 / Math.abs(d)) * 2;
+  if (d === 0 || Math.abs(n) > Math.abs(d)) return null;
+  const m = Math.min(32767, Math.floor(Math.abs(n) * 16384 / Math.abs(d)) * 2);
   return (n < 0) !== (d < 0) ? -m : m;
 }
 

@@ -144,7 +144,27 @@ short** of the formula. Reproduce that.
 **Proves itself by:** a sweep of (point, viewer, pitch/bank/heading) where the port's
 view-space triple and screen pair both equal the engine's exactly.
 
-## Phase 4 — the display-list interpreter
+## Phase 4 — the display-list interpreter ✅ done
+
+`port/src/a23d2/engine.js` and `clip.js`, held by `oracle/parity_frame.mjs` and
+`parity_clip.mjs`. **Eight whole frames, every one byte-for-byte identical across all
+8,192 bytes** - the scene as shipped, objects at various attitudes, objects straddling the
+frustum, an explosion close up, eight objects at once, the second object block through the
+second viewport, and the other scene file against its own shapes.
+
+Two things this phase found that nothing earlier could:
+
+- **Opcode 19 does not set an attitude and rebuild the matrix.** It rotates the relative
+  position into the object's frame and COMPOSES the object's rotation into the matrix
+  already there - heading on (x,z), pitch on (y,z), bank on (x,y), the same pairs and
+  signs for the position and the matrix. Rebuilding instead draws nothing at all as soon
+  as an object has a pitch.
+- **`|n| == |d|` is inside DIV's domain, and the clipper depends on it.** Clipped points
+  land exactly on a plane, so every clipped line projects through the saturating case.
+  Treating the edge as out of domain made the port silently drop anything that needed
+  clipping.
+
+## Phase 4 notes — what the plan said to build
 
 Thirty opcodes, all exercised — the table is in `port`-ready form in
 `oracle/renderer.mjs` and documented in **"All thirty opcodes"**.
