@@ -18,7 +18,7 @@
 // instruction the static traverse also found, and every operand length the trace measured
 // must be the one the handler says. Where either fails, this probe names the address.
 import { openOracle } from './a2.mjs';
-import { identify } from './screens.mjs';
+import { toFlight } from './exercise.mjs';
 import {
   engineMemory, handlers, disasmList, engineCode, symbols, listing, object,
   OPS, ENTRY, DISPATCH, INTERP, FETCH, ZP_SAVE, OPCODES, END, hx,
@@ -94,33 +94,11 @@ check('and they sit on the two addresses the BASIC pokes',
 
 // --- now watch it run ------------------------------------------------------------------
 const a2 = await openOracle();
-// Not boot(), which waits for the Autostart ROM's KEYIN loop: this disk's first screen
-// is drawn by a running program, not by a prompt. coldStart() also fills RAM to a known
-// state, so the numbers below are the same on every run.
-await a2.coldStart();
-
 console.log('\n=== driving to flight ===');
-let started = false;
-for (let i = 0; i < 60 && !started; i++) {
-  await a2.waitMs(500);
-  started = (await a2.screen()).some((r) => r.includes('STARSHIP BATTLE'));
-}
-let atSelect = false;
-for (let i = 0; i < 60 && !atSelect; i++) {
-  await a2.key(' ');
-  await a2.waitMs(500);
-  const id = identify(Uint8Array.from(await a2.readRange(0x2000, 0x4000)));
-  atSelect = !!(id && id.name === 'DIFFICULTY.PIC');
-}
-let difficulty = 0;
-for (let i = 0; i < 40 && !(difficulty >= 1 && difficulty <= 3); i++) {
-  await a2.key('1');
-  await a2.waitMs(500);
-  difficulty = JSON.parse(await a2.ev('window.M.rd(0x1FF6)'));
-}
-check('the oracle reaches flight', started && atSelect && difficulty === 1,
-  `difficulty ${difficulty}`);
-await a2.waitMs(20000);
+// The route itself is probe_play.mjs's subject; here it is only the way to a machine with
+// the engine resident, so it comes from exercise.mjs rather than being spelt out again.
+const flight = await toFlight(a2);
+check('the oracle reaches flight', flight.difficulty === 1, `difficulty ${flight.difficulty}`);
 
 // One whole `CALL $6000`, instruction by instruction.
 //

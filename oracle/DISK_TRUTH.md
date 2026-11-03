@@ -432,6 +432,71 @@ Several things the earlier passes had as addresses are now instructions:
   `$63A9`), patched by the `VIEWPORT` instruction. x and y are scaled separately, which is
   where the aspect correction lives.
 
+### What a 2-D coordinate means
+
+`probe_screen2d.mjs`, 13 checks. The display list is full of 2-D coordinates - every panel
+line, every blip, and whatever the 3-D projection produces - and the panel's run past 192
+and 140, so they are plainly not pixels.
+
+The answer is the 1,024 bytes at `$7223`-`$7622` that the renderer pass could only call "a
+table". They are **four 256-byte tables**, and the point plotter at `$771F` indexes them
+directly, assembling the whole screen address out of them with `$99` held at zero:
+
+| table | indexed by | gives |
+| --- | --- | --- |
+| `$7223` | y | the row address, high byte (plus `$BB`, the page) |
+| `$7323` | y | the row address, low byte |
+| `$7423` | x | the byte offset within the row |
+| `$7523` | x | a two-bit mask |
+
+So the mapping can be read off exactly, and then made to happen:
+
+> **x is a signed byte, 0 at the centre of the screen, one unit = two hires bits.**
+> **y is a signed byte, `row = 95 - y`, so positive is up.**
+
+Both are exact, and both are exactly the size of the screen. The 140 x values from **-70 to
+69** cover all 280 bits once each with nothing left over; the 192 y values from **-96 to
+95** cover all 192 rows. Outside those the tables wrap, and the engine plots somewhere
+wrong rather than not at all.
+
+That makes the panel readable as a picture: `LINE2D 199,173 -> 244,173` is x -57 to -12 on
+row 178, which is the shield bar, left of centre, near the bottom.
+
+Measured, not just read: `exercise.mjs` writes a display list over `SV DATA`, calls the
+engine at `$6003`, and reads the page back. Eleven points predicted from the tables all
+landed on the predicted row and inside the predicted cell.
+
+**A cell is two bits and the colour chooses which one** - which is how hires carries
+colour at all. Measured by plotting eight cells in each colour and reading the bytes:
+
+| colour | pattern | |
+| --- | --- | --- |
+| 0 | `$FF $7F` | both bits of every cell: white |
+| 1 | `$2A $55` | one bit, palette 0 |
+| 2 | `$55 $2B` | the other bit, palette 0 |
+| 3 | `$D5 $AB` | palette 1 |
+| 4-7 | `$AA $D5` | palette 1, the other phase - **4, 5, 6 and 7 are the same colour** |
+
+There are five, not eight. The pattern alternates between even and odd bytes because seven
+bits to a byte is odd, which is the Apple II's usual arithmetic.
+
+And one artifact a port has to carry: **20 of the 140 cells straddle a byte boundary**
+(x = 3, 10, 17, 24 ...). Their mask has bit 7 set, so the engine ORs the mask into one byte
+and `$01` into the next - and bit 7 of a hires byte is not a pixel, it is the palette
+select. Plotting at one of those x values flips that byte's colour as a side effect. It is
+the engine's behaviour, not a misreading of it.
+
+### Calling the engine with a list of our own
+
+`exercise.mjs`. `$6090` does not take the list's address: it loads `$9B`/`$9C` with `$80FB`
+from two immediate operands in its own code, which is where DOS puts `SV DATA`. So an
+experiment saves those 491 bytes, writes its own list there, calls `$6003` with a return
+address of `$FFFE` pushed, steps until the PC reaches `$FFFF`, reads the page and puts
+`SV DATA` back.
+
+This is how anything about the engine gets settled that the disk's own scene does not
+happen to exercise.
+
 ### Opcode 3, and the shape format
 
 Opcode 3 was an open question. Its handler `$62C0` loads the **saved previous point** as
@@ -499,11 +564,9 @@ promoted to fact.
    honest way to answer it.
 3. ~~**Opcode 3.**~~ Answered: a line back to the saved previous point, which it leaves
    in place. Handler `$62C0`.
-4. ~~**What `CALL $6000` does with all this.**~~ Answered above, with two things still open
-   under it: the exact screen mapping of the 2-D coordinates (`$771C` and `$7745` hold it,
-   and the panel's y values run past 192, so they are not straight pixel coordinates), and
-   the fourteen opcodes this disk never executes, whose lengths are known and whose
-   meanings are not.
+4. ~~**What `CALL $6000` does with all this.**~~ Answered above. The 2-D screen mapping
+   that was still open under it is now answered too; what remains is the fourteen opcodes
+   this disk never executes, whose lengths are known and whose meanings are not.
 5. ~~**The 13-byte record's bytes +0 to +9.**~~ Answered: a frame counter, a 16-bit
    position and a three-byte attitude. The counter's decrement is read off the handler and
    was never seen to happen.

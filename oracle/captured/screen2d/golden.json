@@ -1,0 +1,1401 @@
+{
+ "mapping": {
+  "bitForX": "140 + 2x, for x in -70..69",
+  "rowForY": "95 - y, for y in -96..95"
+ },
+ "cells": [
+  {
+   "x": 0,
+   "byte": 20,
+   "mask": "$03",
+   "bits": [
+    140,
+    141
+   ]
+  },
+  {
+   "x": 1,
+   "byte": 20,
+   "mask": "$0C",
+   "bits": [
+    142,
+    143
+   ]
+  },
+  {
+   "x": 2,
+   "byte": 20,
+   "mask": "$30",
+   "bits": [
+    144,
+    145
+   ]
+  },
+  {
+   "x": 3,
+   "byte": 20,
+   "mask": "$C0",
+   "bits": [
+    146,
+    147
+   ]
+  },
+  {
+   "x": 4,
+   "byte": 21,
+   "mask": "$06",
+   "bits": [
+    148,
+    149
+   ]
+  },
+  {
+   "x": 5,
+   "byte": 21,
+   "mask": "$18",
+   "bits": [
+    150,
+    151
+   ]
+  },
+  {
+   "x": 6,
+   "byte": 21,
+   "mask": "$60",
+   "bits": [
+    152,
+    153
+   ]
+  },
+  {
+   "x": 7,
+   "byte": 22,
+   "mask": "$03",
+   "bits": [
+    154,
+    155
+   ]
+  },
+  {
+   "x": 8,
+   "byte": 22,
+   "mask": "$0C",
+   "bits": [
+    156,
+    157
+   ]
+  },
+  {
+   "x": 9,
+   "byte": 22,
+   "mask": "$30",
+   "bits": [
+    158,
+    159
+   ]
+  },
+  {
+   "x": 10,
+   "byte": 22,
+   "mask": "$C0",
+   "bits": [
+    160,
+    161
+   ]
+  },
+  {
+   "x": 11,
+   "byte": 23,
+   "mask": "$06",
+   "bits": [
+    162,
+    163
+   ]
+  },
+  {
+   "x": 12,
+   "byte": 23,
+   "mask": "$18",
+   "bits": [
+    164,
+    165
+   ]
+  },
+  {
+   "x": 13,
+   "byte": 23,
+   "mask": "$60",
+   "bits": [
+    166,
+    167
+   ]
+  },
+  {
+   "x": 14,
+   "byte": 24,
+   "mask": "$03",
+   "bits": [
+    168,
+    169
+   ]
+  },
+  {
+   "x": 15,
+   "byte": 24,
+   "mask": "$0C",
+   "bits": [
+    170,
+    171
+   ]
+  },
+  {
+   "x": 16,
+   "byte": 24,
+   "mask": "$30",
+   "bits": [
+    172,
+    173
+   ]
+  },
+  {
+   "x": 17,
+   "byte": 24,
+   "mask": "$C0",
+   "bits": [
+    174,
+    175
+   ]
+  },
+  {
+   "x": 18,
+   "byte": 25,
+   "mask": "$06",
+   "bits": [
+    176,
+    177
+   ]
+  },
+  {
+   "x": 19,
+   "byte": 25,
+   "mask": "$18",
+   "bits": [
+    178,
+    179
+   ]
+  },
+  {
+   "x": 20,
+   "byte": 25,
+   "mask": "$60",
+   "bits": [
+    180,
+    181
+   ]
+  },
+  {
+   "x": 21,
+   "byte": 26,
+   "mask": "$03",
+   "bits": [
+    182,
+    183
+   ]
+  },
+  {
+   "x": 22,
+   "byte": 26,
+   "mask": "$0C",
+   "bits": [
+    184,
+    185
+   ]
+  },
+  {
+   "x": 23,
+   "byte": 26,
+   "mask": "$30",
+   "bits": [
+    186,
+    187
+   ]
+  },
+  {
+   "x": 24,
+   "byte": 26,
+   "mask": "$C0",
+   "bits": [
+    188,
+    189
+   ]
+  },
+  {
+   "x": 25,
+   "byte": 27,
+   "mask": "$06",
+   "bits": [
+    190,
+    191
+   ]
+  },
+  {
+   "x": 26,
+   "byte": 27,
+   "mask": "$18",
+   "bits": [
+    192,
+    193
+   ]
+  },
+  {
+   "x": 27,
+   "byte": 27,
+   "mask": "$60",
+   "bits": [
+    194,
+    195
+   ]
+  },
+  {
+   "x": 28,
+   "byte": 28,
+   "mask": "$03",
+   "bits": [
+    196,
+    197
+   ]
+  },
+  {
+   "x": 29,
+   "byte": 28,
+   "mask": "$0C",
+   "bits": [
+    198,
+    199
+   ]
+  },
+  {
+   "x": 30,
+   "byte": 28,
+   "mask": "$30",
+   "bits": [
+    200,
+    201
+   ]
+  },
+  {
+   "x": 31,
+   "byte": 28,
+   "mask": "$C0",
+   "bits": [
+    202,
+    203
+   ]
+  },
+  {
+   "x": 32,
+   "byte": 29,
+   "mask": "$06",
+   "bits": [
+    204,
+    205
+   ]
+  },
+  {
+   "x": 33,
+   "byte": 29,
+   "mask": "$18",
+   "bits": [
+    206,
+    207
+   ]
+  },
+  {
+   "x": 34,
+   "byte": 29,
+   "mask": "$60",
+   "bits": [
+    208,
+    209
+   ]
+  },
+  {
+   "x": 35,
+   "byte": 30,
+   "mask": "$03",
+   "bits": [
+    210,
+    211
+   ]
+  },
+  {
+   "x": 36,
+   "byte": 30,
+   "mask": "$0C",
+   "bits": [
+    212,
+    213
+   ]
+  },
+  {
+   "x": 37,
+   "byte": 30,
+   "mask": "$30",
+   "bits": [
+    214,
+    215
+   ]
+  },
+  {
+   "x": 38,
+   "byte": 30,
+   "mask": "$C0",
+   "bits": [
+    216,
+    217
+   ]
+  },
+  {
+   "x": 39,
+   "byte": 31,
+   "mask": "$06",
+   "bits": [
+    218,
+    219
+   ]
+  },
+  {
+   "x": 40,
+   "byte": 31,
+   "mask": "$18",
+   "bits": [
+    220,
+    221
+   ]
+  },
+  {
+   "x": 41,
+   "byte": 31,
+   "mask": "$60",
+   "bits": [
+    222,
+    223
+   ]
+  },
+  {
+   "x": 42,
+   "byte": 32,
+   "mask": "$03",
+   "bits": [
+    224,
+    225
+   ]
+  },
+  {
+   "x": 43,
+   "byte": 32,
+   "mask": "$0C",
+   "bits": [
+    226,
+    227
+   ]
+  },
+  {
+   "x": 44,
+   "byte": 32,
+   "mask": "$30",
+   "bits": [
+    228,
+    229
+   ]
+  },
+  {
+   "x": 45,
+   "byte": 32,
+   "mask": "$C0",
+   "bits": [
+    230,
+    231
+   ]
+  },
+  {
+   "x": 46,
+   "byte": 33,
+   "mask": "$06",
+   "bits": [
+    232,
+    233
+   ]
+  },
+  {
+   "x": 47,
+   "byte": 33,
+   "mask": "$18",
+   "bits": [
+    234,
+    235
+   ]
+  },
+  {
+   "x": 48,
+   "byte": 33,
+   "mask": "$60",
+   "bits": [
+    236,
+    237
+   ]
+  },
+  {
+   "x": 49,
+   "byte": 34,
+   "mask": "$03",
+   "bits": [
+    238,
+    239
+   ]
+  },
+  {
+   "x": 50,
+   "byte": 34,
+   "mask": "$0C",
+   "bits": [
+    240,
+    241
+   ]
+  },
+  {
+   "x": 51,
+   "byte": 34,
+   "mask": "$30",
+   "bits": [
+    242,
+    243
+   ]
+  },
+  {
+   "x": 52,
+   "byte": 34,
+   "mask": "$C0",
+   "bits": [
+    244,
+    245
+   ]
+  },
+  {
+   "x": 53,
+   "byte": 35,
+   "mask": "$06",
+   "bits": [
+    246,
+    247
+   ]
+  },
+  {
+   "x": 54,
+   "byte": 35,
+   "mask": "$18",
+   "bits": [
+    248,
+    249
+   ]
+  },
+  {
+   "x": 55,
+   "byte": 35,
+   "mask": "$60",
+   "bits": [
+    250,
+    251
+   ]
+  },
+  {
+   "x": 56,
+   "byte": 36,
+   "mask": "$03",
+   "bits": [
+    252,
+    253
+   ]
+  },
+  {
+   "x": 57,
+   "byte": 36,
+   "mask": "$0C",
+   "bits": [
+    254,
+    255
+   ]
+  },
+  {
+   "x": 58,
+   "byte": 36,
+   "mask": "$30",
+   "bits": [
+    256,
+    257
+   ]
+  },
+  {
+   "x": 59,
+   "byte": 36,
+   "mask": "$C0",
+   "bits": [
+    258,
+    259
+   ]
+  },
+  {
+   "x": 60,
+   "byte": 37,
+   "mask": "$06",
+   "bits": [
+    260,
+    261
+   ]
+  },
+  {
+   "x": 61,
+   "byte": 37,
+   "mask": "$18",
+   "bits": [
+    262,
+    263
+   ]
+  },
+  {
+   "x": 62,
+   "byte": 37,
+   "mask": "$60",
+   "bits": [
+    264,
+    265
+   ]
+  },
+  {
+   "x": 63,
+   "byte": 38,
+   "mask": "$03",
+   "bits": [
+    266,
+    267
+   ]
+  },
+  {
+   "x": 64,
+   "byte": 38,
+   "mask": "$0C",
+   "bits": [
+    268,
+    269
+   ]
+  },
+  {
+   "x": 65,
+   "byte": 38,
+   "mask": "$30",
+   "bits": [
+    270,
+    271
+   ]
+  },
+  {
+   "x": 66,
+   "byte": 38,
+   "mask": "$C0",
+   "bits": [
+    272,
+    273
+   ]
+  },
+  {
+   "x": 67,
+   "byte": 39,
+   "mask": "$06",
+   "bits": [
+    274,
+    275
+   ]
+  },
+  {
+   "x": 68,
+   "byte": 39,
+   "mask": "$18",
+   "bits": [
+    276,
+    277
+   ]
+  },
+  {
+   "x": 69,
+   "byte": 39,
+   "mask": "$60",
+   "bits": [
+    278,
+    279
+   ]
+  },
+  {
+   "x": -70,
+   "byte": 0,
+   "mask": "$03",
+   "bits": [
+    0,
+    1
+   ]
+  },
+  {
+   "x": -69,
+   "byte": 0,
+   "mask": "$0C",
+   "bits": [
+    2,
+    3
+   ]
+  },
+  {
+   "x": -68,
+   "byte": 0,
+   "mask": "$30",
+   "bits": [
+    4,
+    5
+   ]
+  },
+  {
+   "x": -67,
+   "byte": 0,
+   "mask": "$C0",
+   "bits": [
+    6,
+    7
+   ]
+  },
+  {
+   "x": -66,
+   "byte": 1,
+   "mask": "$06",
+   "bits": [
+    8,
+    9
+   ]
+  },
+  {
+   "x": -65,
+   "byte": 1,
+   "mask": "$18",
+   "bits": [
+    10,
+    11
+   ]
+  },
+  {
+   "x": -64,
+   "byte": 1,
+   "mask": "$60",
+   "bits": [
+    12,
+    13
+   ]
+  },
+  {
+   "x": -63,
+   "byte": 2,
+   "mask": "$03",
+   "bits": [
+    14,
+    15
+   ]
+  },
+  {
+   "x": -62,
+   "byte": 2,
+   "mask": "$0C",
+   "bits": [
+    16,
+    17
+   ]
+  },
+  {
+   "x": -61,
+   "byte": 2,
+   "mask": "$30",
+   "bits": [
+    18,
+    19
+   ]
+  },
+  {
+   "x": -60,
+   "byte": 2,
+   "mask": "$C0",
+   "bits": [
+    20,
+    21
+   ]
+  },
+  {
+   "x": -59,
+   "byte": 3,
+   "mask": "$06",
+   "bits": [
+    22,
+    23
+   ]
+  },
+  {
+   "x": -58,
+   "byte": 3,
+   "mask": "$18",
+   "bits": [
+    24,
+    25
+   ]
+  },
+  {
+   "x": -57,
+   "byte": 3,
+   "mask": "$60",
+   "bits": [
+    26,
+    27
+   ]
+  },
+  {
+   "x": -56,
+   "byte": 4,
+   "mask": "$03",
+   "bits": [
+    28,
+    29
+   ]
+  },
+  {
+   "x": -55,
+   "byte": 4,
+   "mask": "$0C",
+   "bits": [
+    30,
+    31
+   ]
+  },
+  {
+   "x": -54,
+   "byte": 4,
+   "mask": "$30",
+   "bits": [
+    32,
+    33
+   ]
+  },
+  {
+   "x": -53,
+   "byte": 4,
+   "mask": "$C0",
+   "bits": [
+    34,
+    35
+   ]
+  },
+  {
+   "x": -52,
+   "byte": 5,
+   "mask": "$06",
+   "bits": [
+    36,
+    37
+   ]
+  },
+  {
+   "x": -51,
+   "byte": 5,
+   "mask": "$18",
+   "bits": [
+    38,
+    39
+   ]
+  },
+  {
+   "x": -50,
+   "byte": 5,
+   "mask": "$60",
+   "bits": [
+    40,
+    41
+   ]
+  },
+  {
+   "x": -49,
+   "byte": 6,
+   "mask": "$03",
+   "bits": [
+    42,
+    43
+   ]
+  },
+  {
+   "x": -48,
+   "byte": 6,
+   "mask": "$0C",
+   "bits": [
+    44,
+    45
+   ]
+  },
+  {
+   "x": -47,
+   "byte": 6,
+   "mask": "$30",
+   "bits": [
+    46,
+    47
+   ]
+  },
+  {
+   "x": -46,
+   "byte": 6,
+   "mask": "$C0",
+   "bits": [
+    48,
+    49
+   ]
+  },
+  {
+   "x": -45,
+   "byte": 7,
+   "mask": "$06",
+   "bits": [
+    50,
+    51
+   ]
+  },
+  {
+   "x": -44,
+   "byte": 7,
+   "mask": "$18",
+   "bits": [
+    52,
+    53
+   ]
+  },
+  {
+   "x": -43,
+   "byte": 7,
+   "mask": "$60",
+   "bits": [
+    54,
+    55
+   ]
+  },
+  {
+   "x": -42,
+   "byte": 8,
+   "mask": "$03",
+   "bits": [
+    56,
+    57
+   ]
+  },
+  {
+   "x": -41,
+   "byte": 8,
+   "mask": "$0C",
+   "bits": [
+    58,
+    59
+   ]
+  },
+  {
+   "x": -40,
+   "byte": 8,
+   "mask": "$30",
+   "bits": [
+    60,
+    61
+   ]
+  },
+  {
+   "x": -39,
+   "byte": 8,
+   "mask": "$C0",
+   "bits": [
+    62,
+    63
+   ]
+  },
+  {
+   "x": -38,
+   "byte": 9,
+   "mask": "$06",
+   "bits": [
+    64,
+    65
+   ]
+  },
+  {
+   "x": -37,
+   "byte": 9,
+   "mask": "$18",
+   "bits": [
+    66,
+    67
+   ]
+  },
+  {
+   "x": -36,
+   "byte": 9,
+   "mask": "$60",
+   "bits": [
+    68,
+    69
+   ]
+  },
+  {
+   "x": -35,
+   "byte": 10,
+   "mask": "$03",
+   "bits": [
+    70,
+    71
+   ]
+  },
+  {
+   "x": -34,
+   "byte": 10,
+   "mask": "$0C",
+   "bits": [
+    72,
+    73
+   ]
+  },
+  {
+   "x": -33,
+   "byte": 10,
+   "mask": "$30",
+   "bits": [
+    74,
+    75
+   ]
+  },
+  {
+   "x": -32,
+   "byte": 10,
+   "mask": "$C0",
+   "bits": [
+    76,
+    77
+   ]
+  },
+  {
+   "x": -31,
+   "byte": 11,
+   "mask": "$06",
+   "bits": [
+    78,
+    79
+   ]
+  },
+  {
+   "x": -30,
+   "byte": 11,
+   "mask": "$18",
+   "bits": [
+    80,
+    81
+   ]
+  },
+  {
+   "x": -29,
+   "byte": 11,
+   "mask": "$60",
+   "bits": [
+    82,
+    83
+   ]
+  },
+  {
+   "x": -28,
+   "byte": 12,
+   "mask": "$03",
+   "bits": [
+    84,
+    85
+   ]
+  },
+  {
+   "x": -27,
+   "byte": 12,
+   "mask": "$0C",
+   "bits": [
+    86,
+    87
+   ]
+  },
+  {
+   "x": -26,
+   "byte": 12,
+   "mask": "$30",
+   "bits": [
+    88,
+    89
+   ]
+  },
+  {
+   "x": -25,
+   "byte": 12,
+   "mask": "$C0",
+   "bits": [
+    90,
+    91
+   ]
+  },
+  {
+   "x": -24,
+   "byte": 13,
+   "mask": "$06",
+   "bits": [
+    92,
+    93
+   ]
+  },
+  {
+   "x": -23,
+   "byte": 13,
+   "mask": "$18",
+   "bits": [
+    94,
+    95
+   ]
+  },
+  {
+   "x": -22,
+   "byte": 13,
+   "mask": "$60",
+   "bits": [
+    96,
+    97
+   ]
+  },
+  {
+   "x": -21,
+   "byte": 14,
+   "mask": "$03",
+   "bits": [
+    98,
+    99
+   ]
+  },
+  {
+   "x": -20,
+   "byte": 14,
+   "mask": "$0C",
+   "bits": [
+    100,
+    101
+   ]
+  },
+  {
+   "x": -19,
+   "byte": 14,
+   "mask": "$30",
+   "bits": [
+    102,
+    103
+   ]
+  },
+  {
+   "x": -18,
+   "byte": 14,
+   "mask": "$C0",
+   "bits": [
+    104,
+    105
+   ]
+  },
+  {
+   "x": -17,
+   "byte": 15,
+   "mask": "$06",
+   "bits": [
+    106,
+    107
+   ]
+  },
+  {
+   "x": -16,
+   "byte": 15,
+   "mask": "$18",
+   "bits": [
+    108,
+    109
+   ]
+  },
+  {
+   "x": -15,
+   "byte": 15,
+   "mask": "$60",
+   "bits": [
+    110,
+    111
+   ]
+  },
+  {
+   "x": -14,
+   "byte": 16,
+   "mask": "$03",
+   "bits": [
+    112,
+    113
+   ]
+  },
+  {
+   "x": -13,
+   "byte": 16,
+   "mask": "$0C",
+   "bits": [
+    114,
+    115
+   ]
+  },
+  {
+   "x": -12,
+   "byte": 16,
+   "mask": "$30",
+   "bits": [
+    116,
+    117
+   ]
+  },
+  {
+   "x": -11,
+   "byte": 16,
+   "mask": "$C0",
+   "bits": [
+    118,
+    119
+   ]
+  },
+  {
+   "x": -10,
+   "byte": 17,
+   "mask": "$06",
+   "bits": [
+    120,
+    121
+   ]
+  },
+  {
+   "x": -9,
+   "byte": 17,
+   "mask": "$18",
+   "bits": [
+    122,
+    123
+   ]
+  },
+  {
+   "x": -8,
+   "byte": 17,
+   "mask": "$60",
+   "bits": [
+    124,
+    125
+   ]
+  },
+  {
+   "x": -7,
+   "byte": 18,
+   "mask": "$03",
+   "bits": [
+    126,
+    127
+   ]
+  },
+  {
+   "x": -6,
+   "byte": 18,
+   "mask": "$0C",
+   "bits": [
+    128,
+    129
+   ]
+  },
+  {
+   "x": -5,
+   "byte": 18,
+   "mask": "$30",
+   "bits": [
+    130,
+    131
+   ]
+  },
+  {
+   "x": -4,
+   "byte": 18,
+   "mask": "$C0",
+   "bits": [
+    132,
+    133
+   ]
+  },
+  {
+   "x": -3,
+   "byte": 19,
+   "mask": "$06",
+   "bits": [
+    134,
+    135
+   ]
+  },
+  {
+   "x": -2,
+   "byte": 19,
+   "mask": "$18",
+   "bits": [
+    136,
+    137
+   ]
+  },
+  {
+   "x": -1,
+   "byte": 19,
+   "mask": "$60",
+   "bits": [
+    138,
+    139
+   ]
+  }
+ ],
+ "colours": [
+  {
+   "colour": 0,
+   "pattern": [
+    "$FF",
+    "$7F"
+   ],
+   "bitsLit": 16
+  },
+  {
+   "colour": 1,
+   "pattern": [
+    "$2A",
+    "$55"
+   ],
+   "bitsLit": 8
+  },
+  {
+   "colour": 2,
+   "pattern": [
+    "$55",
+    "$2B"
+   ],
+   "bitsLit": 9
+  },
+  {
+   "colour": 3,
+   "pattern": [
+    "$D5",
+    "$AB"
+   ],
+   "bitsLit": 9
+  },
+  {
+   "colour": 4,
+   "pattern": [
+    "$AA",
+    "$D5"
+   ],
+   "bitsLit": 8
+  },
+  {
+   "colour": 5,
+   "pattern": [
+    "$AA",
+    "$D5"
+   ],
+   "bitsLit": 8
+  },
+  {
+   "colour": 6,
+   "pattern": [
+    "$AA",
+    "$D5"
+   ],
+   "bitsLit": 8
+  },
+  {
+   "colour": 7,
+   "pattern": [
+    "$AA",
+    "$D5"
+   ],
+   "bitsLit": 8
+  }
+ ],
+ "results": [
+  {
+   "what": "one x unit is two hires bits, and x = 0 is the centre of the 280",
+   "ok": true,
+   "detail": "x=0 -> bit 140, x=1 -> 142, x=-1 -> 138"
+  },
+  {
+   "what": "the plottable x values cover the screen exactly once, with nothing left over",
+   "ok": true,
+   "detail": "140 cells, 280 distinct bits, -70..69"
+  },
+  {
+   "what": "row = 95 - y, exactly, for every y from -96 to 95",
+   "ok": true,
+   "detail": "y=0 -> row 95, y=95 -> 0, y=-96 -> 191"
+  },
+  {
+   "what": "and that is all 192 rows, so y is a signed byte with 0 three-quarters up",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the oracle reaches flight and the engine can be called directly",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "every point lands on the row and inside the cell the tables predict",
+   "ok": true,
+   "detail": "11 points"
+  },
+  {
+   "what": "colour 0 lights both bits of every cell - it is white",
+   "ok": true,
+   "detail": "16 bits for 8 cells"
+  },
+  {
+   "what": "colours 1 to 7 light one bit of each cell, which is how hires carries colour",
+   "ok": true,
+   "detail": "8,9,9,8,8,8,8"
+  },
+  {
+   "what": "the palette bit tracks the colour: 1 and 2 leave it clear, 3 upwards set it",
+   "ok": 128,
+   "detail": ""
+  },
+  {
+   "what": "there are five distinct colours, not eight - 4, 5, 6 and 7 are the same",
+   "ok": true,
+   "detail": "5 distinct patterns"
+  },
+  {
+   "what": "a horizontal line is one row and includes both endpoints",
+   "ok": true,
+   "detail": "row 85, 21 cells for x -10..10"
+  },
+  {
+   "what": "a vertical line is one column and includes both endpoints",
+   "ok": true,
+   "detail": "bit 151, 41 rows for y -20..20"
+  },
+  {
+   "what": "the three gauge bars from SV DATA land where 95 - y puts them, low on the screen",
+   "ok": true,
+   "detail": "rows 140, 159, 178"
+  }
+ ]
+}
