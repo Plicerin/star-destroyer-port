@@ -18,8 +18,13 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 
 const filter = process.argv[2] || '';
-const all = fs.readdirSync('.').filter((f) => f.startsWith('probe_') && f.endsWith('.mjs')).sort();
-if (!all.length) {
+// Two kinds of harness. A probe establishes what the original disk does; a parity
+// harness holds the port to it. Both have to pass, and they run in that order because a
+// parity failure means nothing if the probe it rests on is also failing.
+const probes = fs.readdirSync('.').filter((f) => f.startsWith('probe_') && f.endsWith('.mjs')).sort();
+const parity = fs.readdirSync('.').filter((f) => f.startsWith('parity_') && f.endsWith('.mjs')).sort();
+const all = [...probes, ...parity];
+if (!probes.length) {
   console.log('no probe_*.mjs here - refusing to report success on an empty suite');
   process.exit(1);
 }
@@ -39,7 +44,8 @@ const run = (file) => new Promise((resolve) => {
   child.on('close', (code) => resolve({ file, code, seconds: (Date.now() - started) / 1000, tail }));
 });
 
-console.log(`${files.length} harnesses`);
+console.log(`${files.length} harnesses (${files.filter((f) => f.startsWith('probe_')).length} probes, `
+  + `${files.filter((f) => f.startsWith('parity_')).length} parity)`);
 console.log('');
 const failed = [];
 for (const file of files) {

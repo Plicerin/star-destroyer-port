@@ -6,8 +6,13 @@ obtained and can be re-derived by running the probe named against it.
 
 The rule: **the disk is the only source.** If something is not in here, it is not known.
 
-Status: **prep only.** Nothing has been ported yet. This file holds what the first pass over
-the disk established, and the list of what it did not.
+Status: **the port has started.** See `PORT_PLAN.md` at the repo root for the phases. This
+file remains the findings document: it records what the original disk does, and the port
+is held to it by the `parity_*.mjs` harnesses alongside the probes.
+
+**Owner's decision, 2026-11-03: the port does not reproduce the replacement art.** The two title
+pages are built as a missing asset rather than a removed feature, so a clean dump can
+restore them without a code change. The owner is looking for one; nothing else waits on it.
 
 ---
 

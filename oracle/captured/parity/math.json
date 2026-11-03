@@ -1,0 +1,34 @@
+{
+ "results": [
+  {
+   "what": "the oracle reaches flight, with the engine resident",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the transliteration of $6480 matches the engine on every product",
+   "ok": true,
+   "detail": "3000 exact"
+  },
+  {
+   "what": "and a native (a * b) >> 15 would not - which is why it is transliterated",
+   "ok": true,
+   "detail": "877 of 3000 products differ from the arithmetic shortcut"
+  },
+  {
+   "what": "the divide formula matches the engine everywhere in its domain",
+   "ok": true,
+   "detail": "589 exact"
+  },
+  {
+   "what": "and the port refuses outside that domain rather than inventing a value",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the scale formula matches the engine over the whole byte range",
+   "ok": true,
+   "detail": "11008 exact"
+  }
+ ]
+}
