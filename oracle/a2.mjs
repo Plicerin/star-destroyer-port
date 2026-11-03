@@ -130,36 +130,73 @@ export async function openOracle({ headless = true } = {}) {
   const api = {
     page, ev, errors, port,
     /**
-     * Put the disk in drive 1, then reset and run.
+     * Fill RAM the way the machine wakes up, but the same way every time.
      *
-     * The UI's doLoadHTTP() fetches in the background, so resetting a fixed delay later
-     * raced it: the first attempt reset an empty drive and the Autostart ROM dropped
-     * straight to a `]` prompt in half a second. This goes at the Disk II card directly
-     * and REFUSES TO RESET until the drive reports a disk.
+     * apple2js models an Apple II's power-on RAM as `s & 2 ? 0 : 255` with FOUR RANDOM
+     * BYTES every 512 - `Math.random() & 255` at offsets 40, 41, 104 and 105 - which is
+     * faithful, and which makes every reading taken before the disk has overwritten that
+     * address different on every run. probe_boot.mjs's golden drifted at 0.5s, 1s, 2s and
+     * 5s for exactly this reason: a golden that cannot be reproduced is not a golden.
+     *
+     * Real power-on RAM is arbitrary, so a fixed choice is as true as a random one. What
+     * matters is that the game must not DEPEND on it, and that is now a check rather than
+     * a hope: probe_boot.mjs cold-starts twice with different fills and requires the
+     * machine to arrive at the same place.
      */
-    async boot({ timeoutMs = 20000 } = {}) {
+    async powerOnRam(fill = 0x00) {
+      return ev(`(() => {
+        const cpu = window.M.cpu;
+        for (let a = 0; a < 0xC000; a++) cpu.write(a, (a & 2) ? 0 : 255);
+        for (let a = 0; a < 0xC000; a += 512)
+          for (const o of [40, 41, 104, 105]) cpu.write(a + o, ${fill});
+        return 'ram filled with ' + ${fill};
+      })()`);
+    },
+    /**
+     * Disk in drive 1, RAM to a known state, and the 6502 in the slot 6 boot ROM.
+     *
+     * Four probes had copied this sequence out of boot() so they could watch the machine
+     * from the first frame instead of waiting for a prompt. It lives here now, so the
+     * power-on fill cannot be remembered in one of them and forgotten in the other three.
+     *
+     * Entering the Disk II ROM at $C600 is what boots the disk: apple2js's reset() does
+     * not run the Autostart ROM's slot scan, so a bare reset leaves the machine at a `]`
+     * prompt for ever, and unlike typing PR#6 this needs no keyboard timing.
+     */
+    async coldStart({ fill = 0x00 } = {}) {
       const loaded = JSON.parse(await ev(`(async () => {
         const io = window.M.a2.getIO();
         const disk2 = io._slot ? io._slot[6] : null;
-        if (!disk2 || typeof disk2.setBinary !== 'function') return JSON.stringify({ ok: false, why: 'no Disk II card in slot 6' });
+        if (!disk2 || typeof disk2.setBinary !== 'function')
+          return JSON.stringify({ ok: false, why: 'no Disk II card in slot 6' });
         const data = await (await fetch('/disk.dsk')).arrayBuffer();
         await disk2.setBinary(1, 'stardestroyer', 'dsk', data);
         window.M.disk2 = disk2;
         const meta = disk2.getMetadata(1);
-        return JSON.stringify({ ok: !!meta, why: meta ? '' : 'setBinary left the drive empty', bytes: data.byteLength });
+        return JSON.stringify({ ok: !!meta, why: meta ? '' : 'setBinary left the drive empty',
+          bytes: data.byteLength });
       })()`));
       if (!loaded.ok) throw new Error('could not load the disk: ' + loaded.why);
-      // reset alone lands in the monitor: apple2js's reset() does not run the Autostart
-      // ROM's slot scan, so the machine sits in KEYIN at a ] prompt for ever with
-      // VARTAB = $803 (no program). Entering the Disk II boot ROM at $C600 is what
-      // actually boots the disk, and unlike typing PR#6 it needs no keyboard timing.
+      await ev('window.M.a2.reset()');
+      await this.powerOnRam(fill);
       await ev(`(() => {
-        window.M.a2.reset();
         const cpu = window.M.cpu, st = cpu.getState();
         st.pc = 0xC600;
         cpu.setState(st);
         return 'booting slot 6';
       })()`);
+      return loaded;
+    },
+    /**
+     * Cold start, then wait for the game's first question.
+     *
+     * The UI's doLoadHTTP() fetches in the background, so resetting a fixed delay later
+     * raced it: the first attempt reset an empty drive and the Autostart ROM dropped
+     * straight to a `]` prompt in half a second. coldStart() goes at the Disk II card
+     * directly and refuses to continue until the drive reports a disk.
+     */
+    async boot({ timeoutMs = 20000, fill = 0x00 } = {}) {
+      const loaded = await this.coldStart({ fill });
       // Stepped by us, never by a2.run(): same input, same result, every time.
       //
       // "Booted" cannot be "PC left ROM": a running Applesoft program spends most of its

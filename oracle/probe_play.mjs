@@ -17,13 +17,10 @@ import fs from 'fs';
 const a2 = await openOracle();
 fs.mkdirSync('captured/play', { recursive: true });
 
-await a2.ev(`(async () => {
-  const disk2 = window.M.a2.getIO()._slot[6];
-  await disk2.setBinary(1, 'stardestroyer', 'dsk', await (await fetch('/disk.dsk')).arrayBuffer());
-  window.M.a2.reset();
-  const cpu = window.M.cpu, st = cpu.getState(); st.pc = 0xC600; cpu.setState(st);
-  return 'booting';
-})()`);
+// Not boot(), which waits for the Autostart ROM's KEYIN loop: this disk's first screen
+// is drawn by a running program, not by a prompt. coldStart() also fills RAM to a known
+// state, so the numbers below are the same on every run.
+await a2.coldStart();
 
 const vm = () => a2.ev(`JSON.stringify((() => {
   const v = window.M.a2.vm.getState();

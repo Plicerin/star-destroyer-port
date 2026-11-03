@@ -145,7 +145,7 @@ player running.
 ## The oracle
 
 `a2.mjs` runs the `.dsk` in apple2js (vendored under `emu/`) in headless Chromium. It is the
-Space Vikings harness with three changes, all forced by this disk:
+Space Vikings harness with four changes, all forced by this disk:
 
 ### WebGL has to be asked for by name
 
@@ -177,6 +177,33 @@ path by luck.
 
 The first `probe_boot.mjs` used the first of those and reported `TEXT` for sixty seconds
 while the hires pages were visibly churning.
+
+### Power-on RAM has to be fixed, or nothing is reproducible
+
+apple2js fills RAM the way a real Apple II wakes up: `s & 2 ? 0 : 255`, with **four random
+bytes every 512** at offsets 40, 41, 104 and 105. That is faithful, and it means any
+reading taken before the disk has overwritten that address is different on every run.
+
+`probe_boot.mjs` had been writing a golden with samples at 0.5s, 1s, 2s and 5s, and those
+four changed every single time it ran. A golden that cannot be reproduced records the
+random number generator, not the disk.
+
+`a2.mjs`'s `coldStart()` now fills RAM deterministically before entering the boot ROM, and
+every probe goes through it. Two complete runs of the suite produce byte-identical
+captures.
+
+A fixed choice is as true as a random one — real power-on RAM is arbitrary — but only if
+the disk does not *depend* on it, so that is a check rather than a hope. `probe_boot.mjs`
+cold-starts with `$00` and with `$A5` and compares:
+
+| at | |
+| --- | --- |
+| 0.5s, 1s, 2s | differ — most of what is being hashed is still the fill itself |
+| 5s | differ only in hires page 2 |
+| 10s | **identical** |
+
+So **the game seeds nothing from power-on RAM.** No random number, no timing, nothing.
+Wherever its randomness comes from, it is not there.
 
 ### Identifying a screen
 

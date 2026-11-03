@@ -94,13 +94,10 @@ check('and they sit on the two addresses the BASIC pokes',
 
 // --- now watch it run ------------------------------------------------------------------
 const a2 = await openOracle();
-await a2.ev(`(async () => {
-  const disk2 = window.M.a2.getIO()._slot[6];
-  await disk2.setBinary(1, 'stardestroyer', 'dsk', await (await fetch('/disk.dsk')).arrayBuffer());
-  window.M.a2.reset();
-  const cpu = window.M.cpu, st = cpu.getState(); st.pc = 0xC600; cpu.setState(st);
-  return 'booting';
-})()`);
+// Not boot(), which waits for the Autostart ROM's KEYIN loop: this disk's first screen
+// is drawn by a running program, not by a prompt. coldStart() also fills RAM to a known
+// state, so the numbers below are the same on every run.
+await a2.coldStart();
 
 console.log('\n=== driving to flight ===');
 let started = false;
