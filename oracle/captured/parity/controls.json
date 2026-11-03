@@ -1,0 +1,34 @@
+{
+ "results": [
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the port produces the same heading on every frame, not just at the end",
+   "ok": true,
+   "detail": "six scripts"
+  },
+  {
+   "what": "the dead zone is 100 to 154 inclusive",
+   "ok": true,
+   "detail": "99 turns, 100..154 does not, 155 turns"
+  },
+  {
+   "what": "the turn is a flat three a frame, not proportional to the stick",
+   "ok": true,
+   "detail": "just over the threshold and hard over give the same turn"
+  },
+  {
+   "what": "the heading wraps as a byte, because angles are one byte to the turn",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "and it is written to both the viewer and object 12",
+   "ok": true,
+   "detail": "the same value to $811E and $8251"
+  }
+ ]
+}

@@ -213,8 +213,15 @@ Suggested order:
    397,000 cycles of which 80% is the renderer; 27 display-list bytes move per frame. The
    controls are **paddle 0** through the ROM's PREAD, with a dead zone of 100..154 and
    three units of heading a frame, and the keyboard is a pause.
-2. Port the frame loop, and compare the display list each frame. The five large code
-   regions are where to start.
+2. Port the frame loop, and compare the display list each frame. **Started**:
+   `port/src/game/controls.js` holds the steering from $09A3, and
+   `oracle/parity_controls.mjs` drives the real paddle through six scripts and requires
+   the port to produce the same heading on **every frame**, not just the same endpoint.
+   `listing/STAR_DESTROYER.asm` is the annotated disassembly to work from - every
+   reference into $6000-$83FF is named by the display-list field it writes.
+   That is a dozen instructions of about 401 a frame. The rest of the loop is next, and
+   the five large regions ($0957-$0AE0, $0C04-$0DA2, $0E05-$0EF6, $1014-$11AC,
+   $120F-$1300) are where it lives.
 3. Then the Applesoft around it.
 
 ## Phase 5 notes — what the plan first said
