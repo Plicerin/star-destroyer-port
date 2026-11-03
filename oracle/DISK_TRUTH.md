@@ -34,10 +34,44 @@ bolt an intro on the front: they overwrote the originals in place.
 **The original Star Destroyer title screens are not on this disk.** No probe can recover
 them, because they are not there to read.
 
+`probe_salvage.mjs` settles the "are you sure?" part, because deleting a file on a DOS 3.3
+disk frees its sectors without erasing them, so there was a chance the old pages were
+still lying in free space. They are not, and they cannot be: **the disk has ten free
+sectors — 2,560 bytes — and a hi-res page is 8,192.** There is nowhere for them to hide.
+The VTOC's own free map agrees with walking all 48 files sector by sector, so that is the
+whole of the unused disk.
+
 What this does *not* appear to have touched: the other four pictures are game art, all 21
 Applesoft programs detokenise cleanly, and the game plays through to flight. The change is
 visible in two files and the boot. Whether it changed anything else is **not established** —
 see the open questions.
+
+## Four files were deleted from this disk
+
+`probe_salvage.mjs`, 9 checks. DOS 3.3 keeps a deleted file's catalog entry — it writes
+`$FF` over the first byte of the track/sector pointer and moves the original track number
+into byte 32, the last of the thirty name bytes. So the names survive:
+
+| name | sectors | |
+| --- | --- | --- |
+| `STAR DESTROYER.ASM` | 25 | **the game's own assembly source** |
+| `DEMO` | 19 | superseded — a live `DEMO` exists |
+| `CLEAR SCORES` | 2 | superseded — a live `CLEAR SCORES` exists |
+| `STARBASE II` | 1 | **exists nowhere on this disk** |
+
+None of the four is recoverable: every one of their track/sector lists has been written
+over by a live file. The ten free sectors hold fragments of whatever went last — readable
+strings in them include `RUN SELECT` and `BLOAD MAIN DATA`, and the assembler's own
+`FORWARD REFERENCES:` — which is kept at `captured/salvage/free_sectors.bin` rather than
+described.
+
+**The game still hangs together.** Every DOS command in all 21 Applesoft programs was read
+out and checked against the catalog: 32 distinct file names are referenced and all 32 are
+present. Neither of the two files that were deleted and never replaced is wanted by
+anything. So apart from the title pages, this disk is complete.
+
+That `STAR DESTROYER.ASM` was ever here is the most interesting thing in this section: the
+author's source was on the game disk, and a clean dump might still carry it.
 
 ---
 
@@ -642,11 +676,18 @@ game is flying.
 Things this pass did **not** establish. None of them should be guessed at later and quietly
 promoted to fact.
 
-1. **What the original title screens looked like.** Gone from this image. Only a clean dump
-   can answer it.
+1. **What the original title screens looked like.** Gone from this image, and now
+   demonstrably so: there is not enough free space on the disk for them to be hiding in.
+   Only a clean dump can answer it.
 2. **Whether the change changed anything else** — the RWTS, a protection check inside a
    binary, the contents of `INITIALS.DAT`. Comparing against a second image is the only
-   honest way to answer it.
+   honest way to answer it, and that has not changed. One thing was tried and is recorded
+   here as *not* an answer: tracks 0-2, which hold the DOS image, differ from a stock
+   DOS 3.3 in 5,682 of 12,288 bytes. That sounds damning and proves nothing. DOS 3.3 ships
+   in several releases, commercial disks routinely carry a patched or trimmed DOS, and the
+   author had every reason to modify his own. It is not evidence about whoever modified it. (The
+   reference image used was `dos33.dsk` from the Space Vikings tree, which is not in this
+   repository, so this is not a reproducible probe and is not one.)
 3. ~~**Opcode 3.**~~ Answered: a line back to the saved previous point, which it leaves
    in place. Handler `$62C0`.
 4. ~~**What `CALL $6000` does with all this.**~~ Answered above, and so are both things

@@ -1,0 +1,135 @@
+{
+ "freeSectors": [
+  "T19S1",
+  "T22S0",
+  "T22S1",
+  "T22S2",
+  "T22S7",
+  "T22S8",
+  "T31S0",
+  "T31S1",
+  "T31S2",
+  "T31S3"
+ ],
+ "freeBytes": 2560,
+ "deleted": [
+  {
+   "name": "DEMO",
+   "sectors": 19,
+   "list": [
+    31,
+    7
+   ],
+   "recoverable": false
+  },
+  {
+   "name": "STAR DESTROYER.ASM",
+   "sectors": 25,
+   "list": [
+    19,
+    0
+   ],
+   "recoverable": false
+  },
+  {
+   "name": "CLEAR SCORES",
+   "sectors": 2,
+   "list": [
+    33,
+    1
+   ],
+   "recoverable": false
+  },
+  {
+   "name": "STARBASE II",
+   "sectors": 1,
+   "list": [
+    34,
+    0
+   ],
+   "recoverable": false
+  }
+ ],
+ "referencedNames": [
+  "A2-3D2",
+  "BASE STAR DATA",
+  "BASE STAR.OBJ0",
+  "CHR$.A24576.L148",
+  "CLS",
+  "DEMO",
+  "DIFFICULTY.PIC",
+  "HEADING DATA",
+  "HYPERDRIVE 4",
+  "HYPERDRIVE.OBJ0",
+  "HYPERDRIVE2",
+  "INITIALS.DAT",
+  "LOGO1",
+  "M.END",
+  "M.STAR DESTROYER",
+  "MAIN DATA",
+  "MATH",
+  "PART1.OBJ0",
+  "PLAYER.MODULE",
+  "SD",
+  "SD PART2",
+  "SD PART3",
+  "SD START",
+  "SD START2",
+  "SD.PIC1",
+  "SELECT",
+  "STARBASE",
+  "STARBASE MAIN DATA",
+  "START",
+  "SV DATA",
+  "SV DATA2",
+  "WIN"
+ ],
+ "missing": [],
+ "results": [
+  {
+   "what": "the VTOC free map agrees with walking every file sector by sector",
+   "ok": true,
+   "detail": "bitmap says 10, the walk says 10"
+  },
+  {
+   "what": "there is nowhere on this disk a hi-res page could be hiding",
+   "ok": true,
+   "detail": "10 free sectors = 2560 bytes, and a page is 8192"
+  },
+  {
+   "what": "four files were deleted from this disk and their names survive",
+   "ok": true,
+   "detail": "\"DEMO\", \"STAR DESTROYER.ASM\", \"CLEAR SCORES\", \"STARBASE II\""
+  },
+  {
+   "what": "the author's own assembly source was one of them",
+   "ok": true,
+   "detail": "STAR DESTROYER.ASM, 25 sectors"
+  },
+  {
+   "what": "none of the four can be recovered - every chain has been written over",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the programs were actually read - DOS commands were found in them",
+   "ok": true,
+   "detail": "32 distinct names referenced"
+  },
+  {
+   "what": "no live program names a file that is not on the disk",
+   "ok": true,
+   "detail": "32 names, all present"
+  },
+  {
+   "what": "the files that were deleted and never replaced are wanted by nothing",
+   "ok": true,
+   "detail": "\"STAR DESTROYER.ASM\" and \"STARBASE II\" exist nowhere and nothing asks for them"
+  },
+  {
+   "what": "the free sectors still hold data rather than being wiped",
+   "ok": true,
+   "detail": "2306 of 2560 bytes are non-zero"
+  }
+ ]
+}
