@@ -1,0 +1,1060 @@
+{
+ "out": {
+  "tables": {
+   "SV DATA": {
+    "$8124": [
+     {
+      "at": 33060,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       174,
+       131,
+       19
+      ],
+      "ptr": 33710,
+      "inside": true
+     },
+     {
+      "at": 33073,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       81,
+       132,
+       19
+      ],
+      "ptr": 33873,
+      "inside": true
+     },
+     {
+      "at": 33086,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       209,
+       132,
+       19
+      ],
+      "ptr": 34001,
+      "inside": true
+     },
+     {
+      "at": 33099,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       102,
+       133,
+       19
+      ],
+      "ptr": 34150,
+      "inside": true
+     },
+     {
+      "at": 33112,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       220,
+       133,
+       19
+      ],
+      "ptr": 34268,
+      "inside": true
+     },
+     {
+      "at": 33125,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       250,
+       133,
+       19
+      ],
+      "ptr": 34298,
+      "inside": true
+     },
+     {
+      "at": 33138,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       24,
+       134,
+       19
+      ],
+      "ptr": 34328,
+      "inside": true
+     },
+     {
+      "at": 33151,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       54,
+       134,
+       19
+      ],
+      "ptr": 34358,
+      "inside": true
+     },
+     {
+      "at": 33164,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       84,
+       134,
+       19
+      ],
+      "ptr": 34388,
+      "inside": true
+     },
+     {
+      "at": 33177,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       205,
+       134,
+       19
+      ],
+      "ptr": 34509,
+      "inside": true
+     },
+     {
+      "at": 33190,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       70,
+       135,
+       19
+      ],
+      "ptr": 34630,
+      "inside": true
+     },
+     {
+      "at": 33203,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       191,
+       135,
+       18
+      ],
+      "ptr": 34751,
+      "inside": true
+     }
+    ],
+    "$8248": [
+     {
+      "at": 33352,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       56,
+       136,
+       19
+      ],
+      "ptr": 34872,
+      "inside": true
+     },
+     {
+      "at": 33365,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       90,
+       136,
+       19
+      ],
+      "ptr": 34906,
+      "inside": true
+     },
+     {
+      "at": 33378,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       124,
+       136,
+       19
+      ],
+      "ptr": 34940,
+      "inside": true
+     },
+     {
+      "at": 33391,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       158,
+       136,
+       19
+      ],
+      "ptr": 34974,
+      "inside": true
+     },
+     {
+      "at": 33404,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       199,
+       136,
+       19
+      ],
+      "ptr": 35015,
+      "inside": true
+     },
+     {
+      "at": 33417,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       208,
+       136,
+       19
+      ],
+      "ptr": 35024,
+      "inside": true
+     },
+     {
+      "at": 33430,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       217,
+       136,
+       19
+      ],
+      "ptr": 35033,
+      "inside": true
+     },
+     {
+      "at": 33443,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       226,
+       136,
+       19
+      ],
+      "ptr": 35042,
+      "inside": true
+     },
+     {
+      "at": 33456,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       235,
+       136,
+       19
+      ],
+      "ptr": 35051,
+      "inside": true
+     },
+     {
+      "at": 33469,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       37,
+       137,
+       19
+      ],
+      "ptr": 35109,
+      "inside": true
+     },
+     {
+      "at": 33482,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       95,
+       137,
+       19
+      ],
+      "ptr": 35167,
+      "inside": true
+     },
+     {
+      "at": 33495,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       153,
+       137,
+       121
+      ],
+      "ptr": 35225,
+      "inside": true
+     }
+    ]
+   },
+   "SV DATA2": {
+    "$8124": [
+     {
+      "at": 33060,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       174,
+       131,
+       19
+      ],
+      "ptr": 33710,
+      "inside": true
+     },
+     {
+      "at": 33073,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       183,
+       131,
+       19
+      ],
+      "ptr": 33719,
+      "inside": true
+     },
+     {
+      "at": 33086,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       192,
+       131,
+       19
+      ],
+      "ptr": 33728,
+      "inside": true
+     },
+     {
+      "at": 33099,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       201,
+       131,
+       19
+      ],
+      "ptr": 33737,
+      "inside": true
+     },
+     {
+      "at": 33112,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       209,
+       133,
+       19
+      ],
+      "ptr": 34257,
+      "inside": true
+     },
+     {
+      "at": 33125,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       218,
+       133,
+       19
+      ],
+      "ptr": 34266,
+      "inside": true
+     },
+     {
+      "at": 33138,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       24,
+       134,
+       19
+      ],
+      "ptr": 34328,
+      "inside": true
+     },
+     {
+      "at": 33151,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       54,
+       134,
+       19
+      ],
+      "ptr": 34358,
+      "inside": true
+     },
+     {
+      "at": 33164,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       84,
+       134,
+       19
+      ],
+      "ptr": 34388,
+      "inside": true
+     },
+     {
+      "at": 33177,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       205,
+       134,
+       19
+      ],
+      "ptr": 34509,
+      "inside": true
+     },
+     {
+      "at": 33190,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       70,
+       135,
+       19
+      ],
+      "ptr": 34630,
+      "inside": true
+     },
+     {
+      "at": 33203,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       191,
+       135,
+       18
+      ],
+      "ptr": 34751,
+      "inside": true
+     }
+    ],
+    "$8248": [
+     {
+      "at": 33352,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       56,
+       136,
+       19
+      ],
+      "ptr": 34872,
+      "inside": true
+     },
+     {
+      "at": 33365,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       90,
+       136,
+       19
+      ],
+      "ptr": 34906,
+      "inside": true
+     },
+     {
+      "at": 33378,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       124,
+       136,
+       19
+      ],
+      "ptr": 34940,
+      "inside": true
+     },
+     {
+      "at": 33391,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       158,
+       136,
+       19
+      ],
+      "ptr": 34974,
+      "inside": true
+     },
+     {
+      "at": 33404,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       199,
+       136,
+       19
+      ],
+      "ptr": 35015,
+      "inside": true
+     },
+     {
+      "at": 33417,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       208,
+       136,
+       19
+      ],
+      "ptr": 35024,
+      "inside": true
+     },
+     {
+      "at": 33430,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       217,
+       136,
+       19
+      ],
+      "ptr": 35033,
+      "inside": true
+     },
+     {
+      "at": 33443,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       226,
+       136,
+       19
+      ],
+      "ptr": 35042,
+      "inside": true
+     },
+     {
+      "at": 33456,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       235,
+       136,
+       19
+      ],
+      "ptr": 35051,
+      "inside": true
+     },
+     {
+      "at": 33469,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       37,
+       137,
+       19
+      ],
+      "ptr": 35109,
+      "inside": true
+     },
+     {
+      "at": 33482,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       95,
+       137,
+       19
+      ],
+      "ptr": 35167,
+      "inside": true
+     },
+     {
+      "at": 33495,
+      "bytes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       153,
+       137,
+       121
+      ],
+      "ptr": 35225,
+      "inside": true
+     }
+    ]
+   }
+  }
+ },
+ "results": [
+  {
+   "what": "SV DATA $8124: all twelve pointers land inside the scene's shape file",
+   "ok": true,
+   "detail": "12/12 in $83AE-$89D5"
+  },
+  {
+   "what": "SV DATA $8124: the pointers ascend",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "SV DATA $8124: +0 to +9 are zero in a file as shipped",
+   "ok": true,
+   "detail": "the BASIC writes +0 at run time to switch an object on"
+  },
+  {
+   "what": "SV DATA $8248: all twelve pointers land inside the scene's shape file",
+   "ok": true,
+   "detail": "12/12 in $83AE-$89D5"
+  },
+  {
+   "what": "SV DATA $8248: the pointers ascend",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "SV DATA $8248: +0 to +9 are zero in a file as shipped",
+   "ok": true,
+   "detail": "the BASIC writes +0 at run time to switch an object on"
+  },
+  {
+   "what": "SV DATA: $81C0 is not a thirteenth record",
+   "ok": true,
+   "detail": "+0..+9 = 1,6,187,227,69,227,6,0,227,0"
+  },
+  {
+   "what": "SV DATA2 $8124: all twelve pointers land inside the scene's shape file",
+   "ok": true,
+   "detail": "12/12 in $83AE-$89D5"
+  },
+  {
+   "what": "SV DATA2 $8124: the pointers ascend",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "SV DATA2 $8124: +0 to +9 are zero in a file as shipped",
+   "ok": true,
+   "detail": "the BASIC writes +0 at run time to switch an object on"
+  },
+  {
+   "what": "SV DATA2 $8248: all twelve pointers land inside the scene's shape file",
+   "ok": true,
+   "detail": "12/12 in $83AE-$89D5"
+  },
+  {
+   "what": "SV DATA2 $8248: the pointers ascend",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "SV DATA2 $8248: +0 to +9 are zero in a file as shipped",
+   "ok": true,
+   "detail": "the BASIC writes +0 at run time to switch an object on"
+  },
+  {
+   "what": "SV DATA2: $81C0 is not a thirteenth record",
+   "ok": true,
+   "detail": "+0..+9 = 1,6,187,227,69,227,6,0,227,0"
+  },
+  {
+   "what": "every byte differing between the two scenes is in the first table",
+   "ok": true,
+   "detail": "8 of 8"
+  },
+  {
+   "what": "and every one of them is the pointer field",
+   "ok": true,
+   "detail": "offsets 10, 11"
+  }
+ ]
+}

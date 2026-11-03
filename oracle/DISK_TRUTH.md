@@ -200,6 +200,83 @@ So the method holds: the oracle can boot this disk, answer its prompts, and reac
 
 ---
 
+## The A2-3D2 scene format
+
+This is the centre of the port, and it is now read. Three probes: `probe_datafiles.mjs`,
+`probe_objtable.mjs`, `probe_shapes.mjs`, with `render_shapes.mjs` drawing the result.
+
+### The BASIC names its own API
+
+`SD START` line 3, `SD RET` line 4 and `STARBASE` lines 1 and 127 assign the addresses to
+variables, so these labels are the author's, not inferred:
+
+| address | his name | what |
+| --- | --- | --- |
+| `$6000` | `CA` | A2-3D2 itself. `CALL 24576` renders one frame. |
+| `$8110` | | page soft switch, `84` = `$C054`, `85` = `$C055` |
+| `$8112`, `$8114` | | the other half of the page flip |
+| `$8116`/`$8118`/`$811A` | `XI`/`YI`/`ZI` | viewer position, 16-bit each |
+| `$811C`/`$811D`/`$811E` | `P1`/`B1`/`H1` | pitch / bank / heading, one byte each |
+| `$8124`, `$8248` | `ST1`, `TS1` | the two object tables |
+| `$817B` | | a rotation, stepped by 15 in `STARBASE` |
+| `$81DD`/`$81F3`/`$8209` | `SHLD`/`WARP`/`MSL` | shields, warp, missiles |
+| `$8222`+3n | `S(1)`..`S(7)` | seven three-byte somethings |
+| `$89CB` | `S1` | where `HEADING DATA` is BLOADed |
+
+`STARBASE` lines 185-186 are the render loop in miniature: poke the page switch, poke the
+rotation, `CALL 24576`, flip, repeat.
+
+### Two tables of twelve 13-byte records
+
+`probe_objtable.mjs`, 16 checks. At `$8124` and `$8248`, twelve records of thirteen bytes
+each. Bytes +0..+9 are runtime state and ship as zero; **+10/+11 is a pointer to the
+object's shape**; +12 is 19 for twenty-three of the twenty-four.
+
+The BASIC switches an object on by poking +0 (`POKE ST1,255`) and off with 0.
+
+The stride is not a guess. Two independent runs give it: the author's own pokes step by 13
+(`$8124`, `$8131`, `$813E`, `$814B` and `$8248`, `$8255`, `$8262`, `$826F`), and
+`SV DATA` and `SV DATA2` — the same 491-byte block configured for two different scenes —
+**differ in eight bytes and no others**, all of them the pointer field of records 1 to 5.
+Nothing else in the per-scene configuration changes at all.
+
+The length is not a guess either: laid out this way the first twelve records are identical
+in shape and the thirteenth is visibly not a record. `$8124 + 12*13 = $81C0`, exactly where
+the regularity stops.
+
+### The shape format
+
+`probe_shapes.mjs`, 14 checks, and `shapes.mjs` carries the reader.
+
+A shape is a list of commands and a terminator. Nearly every command is **seven bytes** —
+an opcode, then X, Y, Z as 16-bit little-endian signed. `COLOUR` is two.
+
+| opcode | bytes | meaning |
+| --- | --- | --- |
+| 0 | 7 | POINT |
+| 1 | 7 | MOVE — pen up |
+| 2 | 7 | DRAW — pen down, line from the last point |
+| 3 | 7 | a fourth kind, **not explained** |
+| 18 | 2 | COLOUR, one operand, only ever 1-4 |
+| 121 | 1 | end of shape |
+
+Read this way, **MAIN DATA and BASE STAR DATA parse with no opcode above 3 and no
+coordinate outside -140..130.**
+
+`render_shapes.mjs` draws each one front, top and side. Shapes 0 and 1 are unmistakably
+swept-wing spacecraft; 8 to 11 are flat sixteen-point starbursts at radius 21, 35, 63 and
+84, which is an explosion in four sizes; 16 to 19 are single points; 20 to 23 are squares.
+A mis-sliced parse does not come out looking like that.
+
+### The control
+
+`STARBASE MAIN DATA` shares `SV DATA`'s pointer table while holding different shapes, so
+most of those pointers are stale for it. The records `STARBASE` switches **on** (0 and 6,
+line 129) parse clean; the ones it explicitly zeroes (1, 2, 3, line 7) **de-sync**. The
+parser can still fail, which is the only reason the fourteen passes above mean anything.
+
+---
+
 ## Open questions
 
 Things this pass did **not** establish. None of them should be guessed at later and quietly
@@ -210,14 +287,18 @@ promoted to fact.
 2. **Whether the change changed anything else** — the RWTS, a protection check inside a
    binary, the contents of `INITIALS.DAT`. Comparing against a second image is the only
    honest way to answer it.
-3. **The A2-3D2 display-list format**, and what the three 1,575-byte model files hold. This
-   is the centre of the port and nothing is known about it yet.
-4. **Why `MAIN DATA`, `STARBASE MAIN DATA` and `BASE STAR DATA` are the same length** at the
-   same address — three scenes in one format, presumably, but presumably is not measured.
-5. **What is resident at `$6000`** at each point, given A2-3D2, the character set and the
+3. **Opcode 3.** Real, rare, seven bytes, and what distinguishes it from MOVE is not
+   established. Shape 3 of MAIN DATA uses seven of them.
+4. **What `CALL $6000` does with all this.** The data is read; the renderer that consumes
+   it has not been disassembled, so the projection, the clipping and the frame cadence are
+   all still unknown.
+5. **The 13-byte record's bytes +0 to +9**, beyond the fact that +0 switches the object on.
+   Position and rotation presumably live there; which byte is which is not measured.
+6. **`$81C0`-`$8247`**, the 136 bytes between the two object tables.
+7. **What is resident at `$6000`** at each point, given A2-3D2, the character set and the
    music all load there.
-6. **The `.OBJ0` overlays at `$08EF`**, which is 238 bytes above Applesoft's `$0801`. How a
+8. **The `.OBJ0` overlays at `$08EF`**, which is 238 bytes above Applesoft's `$0801`. How a
    BASIC program and a binary share that space is not understood.
-7. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
+9. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
    measured about when or in what format.
-8. **The `DEMO` path**, never walked.
+10. **The `DEMO` path**, never walked.
