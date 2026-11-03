@@ -226,9 +226,20 @@ Suggested order:
    **Three things block the rest of it**, and they should be settled before more code is
    written, because everything in the loop runs through them:
 
-   - **`MATH` at `$98F3`.** The loop moves the ship by calling `$999B`, `$99D2`, `$9A65`,
-     `$9C4B` and `$9C7A`. Tabulate them with `exercise.mjs`'s `callSub`, the way `$6480`
-     and `$65DE` were tabulated - inputs in, outputs out, no reading required.
+   - ~~**`MATH` at `$98F3`.**~~ **Done.** Nine entry points, in `port/src/game/math.js`,
+     held by `parity_gamemath.mjs` (14 checks: each routine, 240 random programs, and three
+     wrong-port controls at 60 of 60). `probe_math.mjs` has 28 checks.
+
+     Worth reading the "How this was nearly got wrong" note in DISK_TRUTH before tackling
+     the next blocker the same way. `MATH` is not a function library, it is an accumulator
+     machine, and the plan's own instruction here - "tabulate them the way `$6480` and
+     `$65DE` were tabulated, inputs in, outputs out, no reading required" - is what produced
+     two wrong answers. Sweeping inputs cannot characterise a routine that reads a register
+     the sweep never varies. Where a routine might hold state, **read it**.
+
+     It also turned up the warp gate: `$0948` is set from paddle 1 at `$0A8D`, and with the
+     paddle at rest the movement block never runs and `MATH` is never called. Any trace of
+     the loop's movement code has to engage warp first.
    - **The table at `$9801`.** The ship's position is an index into it, and nothing seen
      so far writes it. Find out what does; it may be built at startup or loaded by a file
      this plan has not looked at.

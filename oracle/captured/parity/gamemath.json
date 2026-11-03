@@ -1,0 +1,74 @@
+{
+ "results": [
+  {
+   "what": "the oracle reaches flight, with MATH resident",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "load ($9C5C) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "loadB ($9C6C) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "store ($9C7A) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "copy ($9C4B) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "add ($999B) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "sub ($99AB) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "compare ($99D2) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "negate ($9A08) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "divide ($9A65) agrees",
+   "ok": true,
+   "detail": "74 cases, 6 skipped as out of the divide's domain"
+  },
+  {
+   "what": "the port and MATH end in the same state after every random program",
+   "ok": true,
+   "detail": "240 programs, 1556 instructions, 167 divides"
+  },
+  {
+   "what": "control: the old reading of $999B, where add loads instead of accumulating is caught",
+   "ok": true,
+   "detail": "60 of 60 disagree with it; the port agrees on 60 of 60"
+  },
+  {
+   "what": "control: the old reading of $9C7A, where store zeroes the entry is caught",
+   "ok": true,
+   "detail": "60 of 60 disagree with it; the port agrees on 60 of 60"
+  },
+  {
+   "what": "control: a divide that floors instead of truncating toward zero is caught",
+   "ok": true,
+   "detail": "60 of 60 disagree with it; the port agrees on 60 of 60"
+  }
+ ]
+}

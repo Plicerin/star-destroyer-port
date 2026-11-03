@@ -1,0 +1,164 @@
+{
+ "shape": "a 24-bit signed accumulator machine over a byte-indexed table at $9800",
+ "registers": {
+  "ACC": "$FA-$FC",
+  "B": "$EB-$ED",
+  "EXT": "$FD-$FF",
+  "$CE": "the divide's sign flag",
+  "$EE": "where $9C5C parks X"
+ },
+ "routines": {
+  "$999B": "ACC += table[X]  (loads B, keeps ACC)",
+  "$99AB": "ACC := table[Y] - table[X]",
+  "$99D2": "compare table[Y] against table[X]: A register +1 / 0 / -1, signed",
+  "$9A08": "ACC := -ACC",
+  "$9A65": "ACC := table[Y] * 256 / table[X], |remainder| in EXT; no guard on either edge, and the domain is the quotient fitting 24 bits",
+  "$9C4B": "table[Y] := table[X]; X += 3; Y += 3",
+  "$9C5C": "ACC := table[Y]; Y += 3; X preserved via $EE",
+  "$9C6C": "B := table[X]; X := 0; Y := X + 3",
+  "$9C7A": "table[Y] := ACC; Y += 3"
+ },
+ "gate": "the movement block is gated on $0948, set by paddle 1 below $5A while WARP ($81F3) is not exhausted; at rest MATH is never called",
+ "results": [
+  {
+   "what": "the oracle reaches flight, with MATH resident",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "$9C5C loads ACC from table[Y], advances Y by 3 and parks X in $EE",
+   "ok": true,
+   "detail": "20 values, ACC pre-set each time"
+  },
+  {
+   "what": "$9C6C loads B from table[X], and leaves X at zero with Y at X+3",
+   "ok": true,
+   "detail": "20 values"
+  },
+  {
+   "what": "$9C7A stores ACC into table[Y] and advances Y by 3",
+   "ok": true,
+   "detail": "20 values of ACC"
+  },
+  {
+   "what": "and it does not zero the entry - that reading only held because ACC was zero",
+   "ok": true,
+   "detail": "ACC = $123456 leaves table[3] = $123456, not $000000"
+  },
+  {
+   "what": "$9C4B copies table[X] to table[Y] without touching ACC, advancing both by 3",
+   "ok": true,
+   "detail": "20 copies"
+  },
+  {
+   "what": "$999B adds table[X] to ACC, wrapping at 24 bits",
+   "ok": true,
+   "detail": "100 sums"
+  },
+  {
+   "what": "it accumulates across calls, which is why reading it as a function of the table failed",
+   "ok": true,
+   "detail": "1, 2 and 3 calls give 1000, 2000, 3000"
+  },
+  {
+   "what": "and the A register it leaves is not the entry high byte once ACC is non-zero",
+   "ok": true,
+   "detail": "ACC $010000 + $123456 = $133456, A register $13 not $12"
+  },
+  {
+   "what": "$99AB loads both and leaves ACC = table[Y] - table[X]",
+   "ok": true,
+   "detail": "25 differences, ACC pre-set each time"
+  },
+  {
+   "what": "$9A08 negates ACC in place",
+   "ok": true,
+   "detail": "20 values"
+  },
+  {
+   "what": "$99D2 compares table[Y] against table[X] as signed 24-bit",
+   "ok": true,
+   "detail": "11 pairs"
+  },
+  {
+   "what": "and it is signed - these pairs would come out the other way unsigned",
+   "ok": true,
+   "detail": "4 of the pairs cross zero"
+  },
+  {
+   "what": "$9A65 divides table[Y]*256 by table[X] into ACC",
+   "ok": true,
+   "detail": "225 pairs over the whole sign square, 0 outside 24 bits"
+  },
+  {
+   "what": "and leaves the remainder in EXT as a magnitude, never negated",
+   "ok": true,
+   "detail": "225 remainders"
+  },
+  {
+   "what": "concretely: -1000/3 and 1000/3 leave the same remainder with opposite quotients",
+   "ok": true,
+   "detail": "quotients -85333 and 85333, both remainder 1"
+  },
+  {
+   "what": "the sign flag $CE records whether the operands disagreed",
+   "ok": true,
+   "detail": "$CE = 255 for -1000/3, 0 for 1000/3"
+  },
+  {
+   "what": "the control cases are ones where these three variants actually differ",
+   "ok": true,
+   "detail": "10 of 10 tell them apart"
+  },
+  {
+   "what": "control: it does not floor",
+   "ok": true,
+   "detail": "0 matches"
+  },
+  {
+   "what": "control: nor use a signed remainder",
+   "ok": true,
+   "detail": "0 matches"
+  },
+  {
+   "what": "control: nor saturate",
+   "ok": true,
+   "detail": "0 matches"
+  },
+  {
+   "what": "a zero divisor is not checked: every trial subtraction succeeds, so ACC fills with ones",
+   "ok": true,
+   "detail": "5/0 gives ACC=$FFFFFF EXT=1280; -5/0 gives $000001"
+  },
+  {
+   "what": "the domain is the QUOTIENT fitting 24 bits, not the numerator",
+   "ok": true,
+   "detail": "65535/1, 32768/1 and 65536/256 are exact; 65536/1 is not"
+  },
+  {
+   "what": "with paddle 1 at rest the $0948 gate stays closed and MATH is never entered",
+   "ok": true,
+   "detail": "$0948 = 0, 0 entry points reached in 60 frames"
+  },
+  {
+   "what": "paddle 1 below $5A opens the gate and the loop starts driving MATH",
+   "ok": true,
+   "detail": "$0948 = $FF, 296 calls"
+  },
+  {
+   "what": "every division the game actually performs stays inside the domain, over 60 frames",
+   "ok": true,
+   "detail": "18 divisions, 0 past 24 bits, 0 by zero - 60 frames is evidence, not a proof, so the port still models both edges"
+  },
+  {
+   "what": "the listing is present and holds enough call sites to conclude anything",
+   "ok": true,
+   "detail": "229 found"
+  },
+  {
+   "what": "every call site sets the indices it uses, so the index exits are not a contract",
+   "ok": true,
+   "detail": "0 of 229 inherit an index - the port models no index bookkeeping"
+  }
+ ]
+}

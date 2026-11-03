@@ -995,8 +995,118 @@ include the seven radar-blip offsets (-20, -50, -10, -40, 20, 50, 60), which are
 numbers `SD RET` and `SD START2` declare as `T%(1..7)`; the binary carries its own copy
 rather than reading the BASIC's.
 
-Still unknown, and needed before the loop can be ported: what writes `$9801`'s table, what
-the `MATH` entry points compute, and the layout of the game's state at `$0900`-`$0950`.
+**The ship's position is an index, not a coordinate.** `$0901` and `$0903` index the table at
+`$9800`, whose top two bytes per entry become `XI` and `ZI`; the arithmetic on them is done by
+`MATH`, which is answered below. The same values go to `OBJ12`, so whatever object 12 is moves
+with the ship.
+
+Still unknown, and needed before the rest of the loop can be ported: what writes the `$9800`
+table, and the layout of the game's state at `$0900`-`$0950`.
+
+### `MATH` at `$98F3` - a 24-bit accumulator machine
+
+`MATH` is 1,023 bytes and the renderer never touches it. The game drives it constantly: 229
+call sites in `.OBJ0`, and 296 calls over sixty frames of warp. It is **not** a library of
+functions. It is a little machine with its registers in zero page, and the frame loop issues
+one instruction at a time:
+
+```
+$09DF  LDY $0915
+$09E2  LDX $0917
+$09E5  JSR $9A65     ; ACC := table[Y] * 256 / table[X]
+$09E8  LDX $0901
+$09EB  JSR $999B     ; ACC += table[X]
+$09EE  LDY $0901
+$09F1  JSR $9C7A     ; table[Y] := ACC
+```
+
+**The registers**, all 24-bit little-endian and signed:
+
+| | | |
+|---|---|---|
+| `ACC` | `$FA`-`$FC` | the accumulator |
+| `B` | `$EB`-`$ED` | the operand |
+| `EXT` | `$FD`-`$FF` | the divide's remainder, the multiply's high half |
+| `$CE` | | the sign flag the multiply and divide set and then act on |
+| `$EE` | | where `$9C5C` parks `X` across its own use of it |
+
+**The table** is byte-indexed from `$9800`: an index is a byte offset and a value is the three
+bytes at it. Entries sit three apart by convention, so most indices are multiples of three,
+but not all - a trace under warp shows `X` and `Y` at 66, 69, 75, 121, 124 and 167.
+
+**The entry points:**
+
+| | |
+|---|---|
+| `$999B` | `ACC += table[X]` - loads `B`, keeps `ACC` |
+| `$99AB` | `ACC := table[Y] - table[X]` |
+| `$99D2` | compare `table[Y]` against `table[X]`: the `A` register becomes +1, 0 or -1, signed |
+| `$9A08` | `ACC := -ACC` |
+| `$9A17` | multiply: 24 x 24 shift-add, 48-bit product across `$F9`-`$FE` |
+| `$9A65` | `ACC := table[Y] * 256 / table[X]`, remainder in `EXT` |
+| `$9C4B` | `table[Y] := table[X]`, three bytes |
+| `$9C5C` | `ACC := table[Y]`; `X` preserved via `$EE` |
+| `$9C6C` | `B := table[X]` |
+| `$9C7A` | `table[Y] := ACC` |
+
+`$9C86` onward is a register file - eight four-instruction routines shuffling 24-bit values
+between `$FA`-`$FC`, `$EB`-`$ED`, `$03`-`$05` and `$07`-`$09`.
+
+**The divide is the interesting one.** It is a restoring division: `$9B00` reduces both
+operands to magnitudes and records the combined sign in `$CE`, the dividend is shifted up one
+byte - which is where the `* 256` comes from, and makes the quotient 8.16 fixed point, so
+`$000100` is 1.0 - then 24 rounds of shift-and-trial-subtract accumulate the quotient in `ACC`
+and leave the remainder in `EXT`, and `$9A08` negates `ACC` at the end if the signs differed.
+Three consequences, all measured and all kept in the port:
+
+- **The remainder has no sign.** The negate only touches `ACC`, so `-1000/3` and `1000/3` both
+  leave a remainder of 1.
+- **`B` comes back as a magnitude**, because `$9B00` works in place. A later instruction that
+  reads `B` sees `|B|`.
+- **Neither edge is guarded.** A zero divisor makes every trial subtraction succeed, so `ACC`
+  fills with ones - `$FFFFFF`, or `+1` after the sign fix-up when the numerator was negative.
+  And the quotient register is 24 bits, so a quotient that does not fit wraps into it and the
+  answer is meaningless. The domain condition is on the **quotient**: `65535*256/1` is fine at
+  `$FFFF00` and `65536*256/256` is fine, but `65536*256/1` is not. Over sixty frames of warp
+  the running game performs eighteen divisions and every one is inside, with no zero divisors.
+
+**The index exits are not part of the contract.** The routines do advance `X` and `Y` -
+`$9C5C` adds three to `Y`, `$9C6C` leaves `X` at zero, `$99D2` exits its compare loop with
+both holding whatever the data led to - and the port models none of it, because nothing reads
+it. All 229 call sites load every index they use immediately before the call; `probe_math.mjs`
+checks that against the listing.
+
+**`$0948` is the warp gate.** The whole movement block at `$09DC`-`$0A06` is skipped when
+`$0948` is zero, and with the paddle at rest it is: over sixty frames of ordinary flight
+`MATH` is **never entered at all**. What opens it is at `$0A8D` - paddle 1 read through
+`PREAD`, engaged when the reading is below `$5A`, provided `WARP` (`$81F3`, an object field)
+has not reached `$C7`. While engaged `$0948` is `$FF` and `$0956` counts frames, burning one
+unit of `WARP` every `$37` - 55 - of them.
+
+#### How this was nearly got wrong
+
+The first pass treated `MATH` the way `$6480` and `$65DE` in the engine were treated: call
+each entry point over a sweep of inputs and read the behaviour off the results. That works for
+a pure function and it is how most of this document was built. Here it produced two confident,
+repeatable, **wrong** answers - `$999B` as "return the entry's high byte" and `$9C7A` as "zero
+the entry" - each passing a sweep of eighteen values with a readback confirming the writes had
+landed.
+
+Both are artifacts of the same thing. The harness varied the table and never varied the
+registers, and `ACC` happened to be zero in the machine state it restored, so `ACC + entry`
+read as `entry` and `store ACC` read as `store 0`. **A sweep over inputs cannot see a register
+it never varies**, however many inputs it uses, and the repeatability that made the answers
+look solid was the harness being consistently wrong rather than the routine being simple.
+
+What settled it was reading the code. `probe_math.mjs` now varies `ACC` and `B` as well as the
+table, and carries a check that no pure function can pass - calling `$999B` once, twice and
+three times over must give 1000, 2000, 3000 - plus a regression check for each of the two old
+readings. `parity_gamemath.mjs` goes further and compares whole random *programs*, because a
+routine can be individually right and wrong in combination.
+
+A smaller version of the same mistake, caught by a check rather than by rereading: `$EE` held
+3 after every call made with `X` = 3, which looked like the entry size. It is the index the
+caller passed.
 
 ---
 
@@ -1034,13 +1144,15 @@ promoted to fact.
 10. **The `DEMO` path**, never walked.
 11. ~~**The world-to-view transform.**~~ Derived, above, and both routines under it are
     now transliterated and held by `parity_math.mjs` and `parity_view.mjs`.
-12. **`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).** The renderer never touches either,
-    but the GAME does: the frame loop calls `$999B`, `$99D2`, `$9A65`, `$9C4B` and `$9C7A`
-    in `MATH` to move the ship. Both are resident in flight, byte-for-byte as the disk
-    has them. What the entry points compute is not established.
-13. **The table at `$9801`**, which the frame loop indexes to turn the ship's position
-    index into a coordinate. It is not Applesoft's - the running program has no arrays -
-    and nothing yet seen writes it.
+12. ~~**`MATH` (`$98F3`).**~~ Answered, below: a 24-bit accumulator machine, nine entry
+    points, ported and held by `parity_gamemath.mjs`. **`HEADING DATA` (`$89CB`)** is still
+    open - it is resident in flight, byte-for-byte as the disk has it, and nothing yet
+    traced reads it.
+13. **The table at `$9800`**, which `MATH` operates on and the frame loop indexes to turn
+    the ship's position into a coordinate. It is not Applesoft's - the running program has
+    no arrays - and nothing yet seen writes it. Its extent is `$9800`-`$98F2`, 243 bytes,
+    because `MATH`'s own code begins at `$98F3`.
 14. **The game's state at `$0900`-`$0950`**: `$0901` and `$0903` are position indices,
-    `$090D`-`$0910` index the enemy store, `$0948` gates the movement block, and the rest
-    is unread.
+    `$090D`-`$0910` index the enemy store, `$0915`-`$0917` are the divide's operands,
+    `$0947` and `$0956` are counters, and the rest is unread. `$0948` is answered - the
+    warp gate, below.
