@@ -1,0 +1,1035 @@
+{
+ "entries": {
+  "render": 24576,
+  "renderNoSave": 24579,
+  "cos": 24582,
+  "sin": 24585
+ },
+ "dispatch": 24796,
+ "handlers": [
+  25308,
+  25189,
+  25242,
+  25280,
+  25520,
+  25533,
+  25550,
+  25567,
+  30243,
+  32070,
+  25580,
+  25595,
+  32897,
+  25609,
+  25645,
+  25682,
+  25626,
+  25640,
+  32116,
+  27911,
+  32828,
+  28917,
+  28970,
+  28993,
+  29039,
+  29063,
+  29119,
+  29140,
+  29193,
+  29210
+ ],
+ "ops": {
+  "0": {
+   "len": 7,
+   "from": "handler",
+   "what": "POINT: plot one 3-D point"
+  },
+  "1": {
+   "len": 14,
+   "from": "traced",
+   "what": "LINE: two 3-D points, a move and a draw (7 + 7)"
+  },
+  "2": {
+   "len": 7,
+   "from": "traced",
+   "what": "DRAW on: line from the previous point to this one"
+  },
+  "3": {
+   "len": 7,
+   "from": "handler",
+   "what": "DRAW back: line from this point to the previous one"
+  },
+  "4": {
+   "len": 2,
+   "from": "handler",
+   "what": "set the mode byte $7C, which suppresses clipped lines"
+  },
+  "5": {
+   "len": 10,
+   "from": "traced",
+   "what": "VIEWER: X, Y, Z (16-bit each) then pitch, bank, heading"
+  },
+  "6": {
+   "len": 5,
+   "from": "traced",
+   "what": "2-D LINE in screen coordinates: x1, y1, x2, y2"
+  },
+  "7": {
+   "len": 2,
+   "from": "traced",
+   "what": "touch soft switch $C0nn (patches its own STA)"
+  },
+  "8": {
+   "len": 2,
+   "from": "traced",
+   "what": "clear a hires page"
+  },
+  "9": {
+   "len": 2,
+   "from": "traced",
+   "what": "select the page to draw on (patches the plotters)"
+  },
+  "10": {
+   "len": 3,
+   "from": "traced",
+   "what": "2-D POINT in screen coordinates: x, y"
+  },
+  "11": {
+   "len": null,
+   "from": "handler",
+   "what": "JUMP: the list pointer becomes the operand"
+  },
+  "12": {
+   "len": 2,
+   "from": "handler",
+   "what": "plot mode: 0 = draw (ORA), else erase (EOR)"
+  },
+  "13": {
+   "len": 3,
+   "from": "handler",
+   "what": "COMPILE: emit 2-D commands to the operand address"
+  },
+  "14": {
+   "len": 5,
+   "from": "traced",
+   "what": "VIEWPORT: x scale, y scale, x centre, y centre"
+  },
+  "15": {
+   "len": 7,
+   "from": "traced",
+   "what": "six engine constants, into $6140-$6145"
+  },
+  "16": {
+   "len": 1,
+   "from": "handler",
+   "what": "graphics mode: mixed, hires, graphics, page 1"
+  },
+  "17": {
+   "len": 1,
+   "from": "traced",
+   "what": "no-op (one byte, so it serves as patch space)"
+  },
+  "18": {
+   "len": 2,
+   "from": "traced",
+   "what": "COLOUR"
+  },
+  "19": {
+   "len": 13,
+   "from": "traced",
+   "what": "OBJECT: count, X, Y, Z, pitch, bank, heading, shape"
+  },
+  "20": {
+   "len": 2,
+   "from": "handler",
+   "what": "patches the 2-D line routine - unexplained"
+  },
+  "21": {
+   "len": 7,
+   "from": "handler",
+   "what": "unexplained; never executed by this disk"
+  },
+  "22": {
+   "len": 4,
+   "from": "handler",
+   "what": "unexplained; never executed by this disk"
+  },
+  "23": {
+   "len": 5,
+   "from": "handler",
+   "what": "unexplained; never executed by this disk"
+  },
+  "24": {
+   "len": 4,
+   "from": "handler",
+   "what": "unexplained; never executed by this disk"
+  },
+  "25": {
+   "len": 3,
+   "from": "handler",
+   "what": "unexplained; never executed by this disk"
+  },
+  "26": {
+   "len": 3,
+   "from": "handler",
+   "what": "unexplained; never executed by this disk"
+  },
+  "27": {
+   "len": 2,
+   "from": "handler",
+   "what": "unexplained; never executed by this disk"
+  },
+  "28": {
+   "len": 3,
+   "from": "handler",
+   "what": "unexplained; never executed by this disk"
+  },
+  "29": {
+   "len": 2,
+   "from": "handler",
+   "what": "set the mode byte $621E"
+  },
+  "121": {
+   "len": 1,
+   "from": "traced",
+   "what": "END: return from this list"
+  }
+ },
+ "cadence": {
+  "cycles": [
+   316677,
+   316412,
+   314169
+  ],
+  "meanCycles": 315753,
+  "ms": 309.4,
+  "rendersPerSecond": 3.23,
+  "instructions": [
+   95111,
+   95106,
+   94034
+  ]
+ },
+ "patched": [
+  [
+   "$6140",
+   "$6141"
+  ],
+  [
+   "$6144",
+   "$6145"
+  ],
+  [
+   "$6380",
+   "$6380"
+  ],
+  [
+   "$6386",
+   "$6386"
+  ],
+  [
+   "$63A3",
+   "$63A3"
+  ],
+  [
+   "$63A9",
+   "$63A9"
+  ],
+  [
+   "$684B",
+   "$684B"
+  ],
+  [
+   "$7734",
+   "$7737"
+  ],
+  [
+   "$7739",
+   "$773C"
+  ],
+  [
+   "$77F0",
+   "$77F3"
+  ],
+  [
+   "$7823",
+   "$7826"
+  ],
+  [
+   "$7845",
+   "$7848"
+  ],
+  [
+   "$788A",
+   "$788D"
+  ],
+  [
+   "$78AB",
+   "$78AE"
+  ],
+  [
+   "$78E9",
+   "$78EC"
+  ],
+  [
+   "$790B",
+   "$790E"
+  ],
+  [
+   "$7950",
+   "$7953"
+  ],
+  [
+   "$7978",
+   "$797B"
+  ],
+  [
+   "$79A7",
+   "$79A7"
+  ],
+  [
+   "$7A22",
+   "$7A25"
+  ],
+  [
+   "$7A55",
+   "$7A58"
+  ],
+  [
+   "$7A77",
+   "$7A7A"
+  ],
+  [
+   "$7ABC",
+   "$7ABF"
+  ],
+  [
+   "$7ADD",
+   "$7AE0"
+  ],
+  [
+   "$7B1B",
+   "$7B1E"
+  ],
+  [
+   "$7B3D",
+   "$7B40"
+  ],
+  [
+   "$7B82",
+   "$7B85"
+  ],
+  [
+   "$7BAA",
+   "$7BAD"
+  ],
+  [
+   "$7BD9",
+   "$7BD9"
+  ],
+  [
+   "$7C20",
+   "$7C23"
+  ],
+  [
+   "$7C2D",
+   "$7C2D"
+  ],
+  [
+   "$7C4A",
+   "$7C4D"
+  ],
+  [
+   "$7C55",
+   "$7C58"
+  ],
+  [
+   "$7C68",
+   "$7C68"
+  ],
+  [
+   "$7CB6",
+   "$7CB9"
+  ],
+  [
+   "$7CC3",
+   "$7CC3"
+  ],
+  [
+   "$7CE0",
+   "$7CE3"
+  ],
+  [
+   "$7CEB",
+   "$7CEE"
+  ],
+  [
+   "$7CFE",
+   "$7CFE"
+  ]
+ ],
+ "lengths": [
+  [
+   14,
+   [
+    5
+   ]
+  ],
+  [
+   15,
+   [
+    7
+   ]
+  ],
+  [
+   4,
+   [
+    2
+   ]
+  ],
+  [
+   7,
+   [
+    2
+   ]
+  ],
+  [
+   8,
+   [
+    2
+   ]
+  ],
+  [
+   9,
+   [
+    2
+   ]
+  ],
+  [
+   5,
+   [
+    10
+   ]
+  ],
+  [
+   17,
+   [
+    1
+   ]
+  ],
+  [
+   18,
+   [
+    2
+   ]
+  ],
+  [
+   19,
+   [
+    13
+   ]
+  ],
+  [
+   1,
+   [
+    14
+   ]
+  ],
+  [
+   2,
+   [
+    7
+   ]
+  ],
+  [
+   6,
+   [
+    5
+   ]
+  ],
+  [
+   10,
+   [
+    3
+   ]
+  ]
+ ],
+ "walk": [
+  "$80FB",
+  "$8100",
+  "$8107",
+  "$8109",
+  "$810B",
+  "$810D",
+  "$810F",
+  "$8111",
+  "$8113",
+  "$8115",
+  "$811F",
+  "$8120",
+  "$8121",
+  "$8123",
+  "$8130",
+  "$8451",
+  "$845F",
+  "$8466",
+  "$846D",
+  "$8474",
+  "$847B",
+  "$8482",
+  "$8489",
+  "$8490",
+  "$8497",
+  "$849E",
+  "$84A5",
+  "$84AC",
+  "$84B3",
+  "$84BA",
+  "$84C1",
+  "$84C8",
+  "$813D",
+  "$84D1",
+  "$84D3",
+  "$84E1",
+  "$84E8",
+  "$84EF",
+  "$84F6",
+  "$84FD",
+  "$8504",
+  "$850B",
+  "$8512",
+  "$8519",
+  "$8520",
+  "$8527",
+  "$852E",
+  "$8535",
+  "$853C",
+  "$8543",
+  "$854A",
+  "$854C",
+  "$814A",
+  "$8157",
+  "$8164",
+  "$8171",
+  "$817E",
+  "$818B",
+  "$8198",
+  "$81A5",
+  "$81B2",
+  "$81BF",
+  "$81C1",
+  "$81C6",
+  "$81CB",
+  "$81D0",
+  "$81D5",
+  "$81DA",
+  "$81DF",
+  "$81E1",
+  "$81E6",
+  "$81EB",
+  "$81F0",
+  "$81F5",
+  "$81F7",
+  "$81FC",
+  "$8201",
+  "$8206",
+  "$820B",
+  "$820D",
+  "$8212",
+  "$8217",
+  "$821C",
+  "$8221",
+  "$8224",
+  "$8227",
+  "$822A",
+  "$822D",
+  "$8230",
+  "$8233",
+  "$8236",
+  "$823B",
+  "$823C",
+  "$823D",
+  "$8247",
+  "$8838",
+  "$883A",
+  "$8848",
+  "$8856",
+  "$8858",
+  "$8254",
+  "$885A",
+  "$885C",
+  "$886A",
+  "$8878",
+  "$887A",
+  "$8261",
+  "$887C",
+  "$887E",
+  "$888C",
+  "$889A",
+  "$889C",
+  "$826E",
+  "$827B",
+  "$8288",
+  "$8295",
+  "$82A2",
+  "$82AF",
+  "$82BC",
+  "$82C9",
+  "$82D6",
+  "$82E3"
+ ],
+ "program": [
+  {
+   "at": "$80FB",
+   "op": 14,
+   "text": "VIEWPORT xscale 140 yscale 126 xcentre 0 ycentre 34"
+  },
+  {
+   "at": "$8100",
+   "op": 15,
+   "text": "CONST   128 62 255 127 69 37"
+  },
+  {
+   "at": "$8107",
+   "op": 4,
+   "text": "MODE    0"
+  },
+  {
+   "at": "$8109",
+   "op": 7,
+   "text": "SWITCH  $C052"
+  },
+  {
+   "at": "$810B",
+   "op": 7,
+   "text": "SWITCH  $C050"
+  },
+  {
+   "at": "$810D",
+   "op": 7,
+   "text": "SWITCH  $C057"
+  },
+  {
+   "at": "$810F",
+   "op": 7,
+   "text": "SWITCH  $C054"
+  },
+  {
+   "at": "$8111",
+   "op": 8,
+   "text": "CLEAR   page 1"
+  },
+  {
+   "at": "$8113",
+   "op": 9,
+   "text": "DRAWTO  page 1"
+  },
+  {
+   "at": "$8115",
+   "op": 5,
+   "text": "VIEWER  at 0,0,0  pitch 0 bank 0 heading 0"
+  },
+  {
+   "at": "$811F",
+   "op": 17,
+   "text": "NOP"
+  },
+  {
+   "at": "$8120",
+   "op": 17,
+   "text": "NOP"
+  },
+  {
+   "at": "$8121",
+   "op": 18,
+   "text": "COLOUR  4"
+  },
+  {
+   "at": "$8123",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $83AE"
+  },
+  {
+   "at": "$8130",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $8451"
+  },
+  {
+   "at": "$813D",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $84D1"
+  },
+  {
+   "at": "$814A",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $8566"
+  },
+  {
+   "at": "$8157",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $85DC"
+  },
+  {
+   "at": "$8164",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $85FA"
+  },
+  {
+   "at": "$8171",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $8618"
+  },
+  {
+   "at": "$817E",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $8636"
+  },
+  {
+   "at": "$818B",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $8654"
+  },
+  {
+   "at": "$8198",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $86CD"
+  },
+  {
+   "at": "$81A5",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $8746"
+  },
+  {
+   "at": "$81B2",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $87BF"
+  },
+  {
+   "at": "$81BF",
+   "op": 18,
+   "text": "COLOUR  1"
+  },
+  {
+   "at": "$81C1",
+   "op": 6,
+   "text": "LINE2D  187,227 -> 69,227"
+  },
+  {
+   "at": "$81C6",
+   "op": 6,
+   "text": "LINE2D  0,227 -> 0,162"
+  },
+  {
+   "at": "$81CB",
+   "op": 6,
+   "text": "LINE2D  191,176 -> 195,173"
+  },
+  {
+   "at": "$81D0",
+   "op": 6,
+   "text": "LINE2D  195,173 -> 191,170"
+  },
+  {
+   "at": "$81D5",
+   "op": 6,
+   "text": "LINE2D  191,170 -> 191,176"
+  },
+  {
+   "at": "$81DA",
+   "op": 6,
+   "text": "LINE2D  199,173 -> 244,173"
+  },
+  {
+   "at": "$81DF",
+   "op": 18,
+   "text": "COLOUR  3"
+  },
+  {
+   "at": "$81E1",
+   "op": 6,
+   "text": "LINE2D  191,214 -> 195,211"
+  },
+  {
+   "at": "$81E6",
+   "op": 6,
+   "text": "LINE2D  195,211 -> 191,208"
+  },
+  {
+   "at": "$81EB",
+   "op": 6,
+   "text": "LINE2D  191,208 -> 191,214"
+  },
+  {
+   "at": "$81F0",
+   "op": 6,
+   "text": "LINE2D  199,211 -> 244,211"
+  },
+  {
+   "at": "$81F5",
+   "op": 18,
+   "text": "COLOUR  4"
+  },
+  {
+   "at": "$81F7",
+   "op": 6,
+   "text": "LINE2D  191,195 -> 195,192"
+  },
+  {
+   "at": "$81FC",
+   "op": 6,
+   "text": "LINE2D  195,192 -> 191,189"
+  },
+  {
+   "at": "$8201",
+   "op": 6,
+   "text": "LINE2D  191,189 -> 191,195"
+  },
+  {
+   "at": "$8206",
+   "op": 6,
+   "text": "LINE2D  199,192 -> 244,192"
+  },
+  {
+   "at": "$820B",
+   "op": 18,
+   "text": "COLOUR  0"
+  },
+  {
+   "at": "$820D",
+   "op": 6,
+   "text": "LINE2D  0,44 -> 0,54"
+  },
+  {
+   "at": "$8212",
+   "op": 6,
+   "text": "LINE2D  0,14 -> 0,4"
+  },
+  {
+   "at": "$8217",
+   "op": 6,
+   "text": "LINE2D  246,30 -> 241,30"
+  },
+  {
+   "at": "$821C",
+   "op": 6,
+   "text": "LINE2D  10,30 -> 15,30"
+  },
+  {
+   "at": "$8221",
+   "op": 10,
+   "text": "POINT2D 236,80"
+  },
+  {
+   "at": "$8224",
+   "op": 10,
+   "text": "POINT2D 206,50"
+  },
+  {
+   "at": "$8227",
+   "op": 10,
+   "text": "POINT2D 246,30"
+  },
+  {
+   "at": "$822A",
+   "op": 10,
+   "text": "POINT2D 216,0"
+  },
+  {
+   "at": "$822D",
+   "op": 10,
+   "text": "POINT2D 20,60"
+  },
+  {
+   "at": "$8230",
+   "op": 10,
+   "text": "POINT2D 50,70"
+  },
+  {
+   "at": "$8233",
+   "op": 10,
+   "text": "POINT2D 60,10"
+  },
+  {
+   "at": "$8236",
+   "op": 14,
+   "text": "VIEWPORT xscale 65 yscale 66 xcentre 32 ycentre 195"
+  },
+  {
+   "at": "$823B",
+   "op": 17,
+   "text": "NOP"
+  },
+  {
+   "at": "$823C",
+   "op": 17,
+   "text": "NOP"
+  },
+  {
+   "at": "$823D",
+   "op": 5,
+   "text": "VIEWER  at 0,0,0  pitch 0 bank 0 heading 0"
+  },
+  {
+   "at": "$8247",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $8838"
+  },
+  {
+   "at": "$8254",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $885A"
+  },
+  {
+   "at": "$8261",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $887C"
+  },
+  {
+   "at": "$826E",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $889E"
+  },
+  {
+   "at": "$827B",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $88C7"
+  },
+  {
+   "at": "$8288",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $88D0"
+  },
+  {
+   "at": "$8295",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $88D9"
+  },
+  {
+   "at": "$82A2",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $88E2"
+  },
+  {
+   "at": "$82AF",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $88EB"
+  },
+  {
+   "at": "$82BC",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $8925"
+  },
+  {
+   "at": "$82C9",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $895F"
+  },
+  {
+   "at": "$82D6",
+   "op": 19,
+   "text": "OBJECT  off  at 0,0,0  pbh 0,0,0  shape $8999"
+  },
+  {
+   "at": "$82E3",
+   "op": 121,
+   "text": "END"
+  }
+ ],
+ "results": [
+  {
+   "what": "the dispatch table ends exactly where the interpreter begins",
+   "ok": true,
+   "detail": "$60DC + 30*2 = $6118"
+  },
+  {
+   "what": "all thirty handlers point inside the engine",
+   "ok": true,
+   "detail": "$6265..$8081"
+  },
+  {
+   "what": "SV DATA decodes end to end and reaches its terminator",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "SV DATA leaves no unexplained tail",
+   "ok": true,
+   "detail": "2 bytes after the END"
+  },
+  {
+   "what": "SV DATA2 decodes end to end and reaches its terminator",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "SV DATA2 leaves no unexplained tail",
+   "ok": true,
+   "detail": "2 bytes after the END"
+  },
+  {
+   "what": "the scene holds twenty-four object instructions",
+   "ok": true,
+   "detail": "24"
+  },
+  {
+   "what": "and they sit on the two addresses the BASIC pokes",
+   "ok": true,
+   "detail": "ST1 = $8124, TS1 = $8248 - operand 0 of the opcode before"
+  },
+  {
+   "what": "the two scenes differ only in which shapes their objects point at",
+   "ok": true,
+   "detail": "5 object instructions"
+  },
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": "difficulty 1"
+  },
+  {
+   "what": "three frames traced to completion",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the three frames agree to within 2% - the engine is not frame-synced, it just runs",
+   "ok": true,
+   "detail": "314169 to 316677 cycles"
+  },
+  {
+   "what": "opcode 14 patched the four viewport bytes in the projection code",
+   "ok": true,
+   "detail": "$6380=69->31 $6386=0->32 $63A3=94->32 $63A9=0->195"
+  },
+  {
+   "what": "and the plotting code was patched where opcodes 9 and 12 say it would be",
+   "ok": true,
+   "detail": "32 runs between $7700 and $7D00"
+  },
+  {
+   "what": "the engine never rewrote its own dispatch table",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "every executed address the traverse missed lies in the self-patched plotting code",
+   "ok": true,
+   "detail": "13 addresses"
+  },
+  {
+   "what": "every length the trace measured is the length the handler advances by",
+   "ok": true,
+   "detail": "14 opcodes"
+  },
+  {
+   "what": "each recursion went to the shape its object instruction names",
+   "ok": true,
+   "detail": "$8451 $84D1 $8838 $885A $887C"
+  },
+  {
+   "what": "the walk ends on the terminator the program ends with",
+   "ok": true,
+   "detail": "$82E3"
+  }
+ ]
+}

@@ -43,13 +43,14 @@ see the open questions.
 
 ## What the disk is
 
-`probe_catalog.mjs` — a 143,360-byte DOS 3.3 image, 35 tracks × 16 sectors × 256 bytes. The
+`dsk.mjs`, read by every probe here — a 143,360-byte DOS 3.3 image, 35 tracks × 16 sectors × 256 bytes. The
 VTOC reports DOS 3.3 and the catalog chain reads to the end without a bad link. **48 files.**
 
 | group | files |
 | --- | --- |
 | Applesoft | 21, all detokenised by `probe_chain.mjs` into `listing/` |
 | 3-D engine | `A2-3D2` at `$6000`, 8,443 bytes |
+| scene | `SV DATA`, `SV DATA2` at `$80FB`, 491 bytes — the display-list program, see below |
 | model data | `MAIN DATA`, `STARBASE MAIN DATA`, `BASE STAR DATA` — all at `$83AE`, all exactly 1,575 bytes |
 | pictures | 6 whole hi-res pages at `$2000` |
 | overlays | 6 `.OBJ0` binaries at `$08EF` |
@@ -226,7 +227,7 @@ variables, so these labels are the author's, not inferred:
 `STARBASE` lines 185-186 are the render loop in miniature: poke the page switch, poke the
 rotation, `CALL 24576`, flip, repeat.
 
-### Two tables of twelve 13-byte records
+### Two tables of twelve 13-byte records — which are twenty-four instructions
 
 `probe_objtable.mjs`, 16 checks. At `$8124` and `$8248`, twelve records of thirteen bytes
 each. Bytes +0..+9 are runtime state and ship as zero; **+10/+11 is a pointer to the
@@ -243,6 +244,26 @@ Nothing else in the per-scene configuration changes at all.
 The length is not a guess either: laid out this way the first twelve records are identical
 in shape and the thirteenth is visibly not a record. `$8124 + 12*13 = $81C0`, exactly where
 the regularity stops.
+
+**Corrected by `probe_renderer.mjs`, one byte to the left.** These are not records in a
+table. Each is an *instruction* — opcode 19 followed by twelve operand bytes — in the
+display-list program that `SV DATA` is, so the first one begins at `$8123`, not `$8124`.
+That is why "+12 is 19": +12 is not a field, it is the next instruction's opcode, and the
+twenty-fourth lacks one because nothing follows it. The author's `ST1` and `TS1` are
+operand 0 of the first opcode in each run, which is where a `POKE` has to aim.
+
+Everything measured about the records survives the correction; only the frame around them
+changes. Opcode 19's operands, from its handler at `$6D07`:
+
+| operand | what |
+| --- | --- |
+| 0 | 0 = skip the object, `$FF` = draw it, 1-254 = draw it and **decrement this byte in place** |
+| 1-6 | the object's position: X, Y, Z, 16-bit each, subtracted from the viewer's at `$70E3` |
+| 7-9 | the object's attitude: pitch, bank, heading |
+| 10-11 | the shape — written straight into the list pointer, which is how the engine recurses |
+
+The countdown in operand 0 is read off the handler, not observed: in flight every object
+is either 0 or `$FF`, and no counter was seen to tick.
 
 ### The shape format
 
@@ -277,6 +298,168 @@ parser can still fail, which is the only reason the fourteen passes above mean a
 
 ---
 
+## The renderer
+
+`probe_renderer.mjs`, 19 checks, with `renderer.mjs` holding the reading and
+`listing/A2-3D2.asm`, `listing/SV_DATA.list` and `listing/SV_DATA2.list` the output.
+
+Read two ways that have to agree: the binary disassembled from the disk, and the same
+engine traced instruction by instruction in the oracle while the game flies.
+
+### A2-3D2 is an interpreter, and `SV DATA` is a program
+
+`CALL 24576` is `JSR $6000`, and `$6000` is a four-entry jump table:
+
+| call | what |
+| --- | --- |
+| `$6000` | render a frame, saving the 96 bytes of zero page it uses |
+| `$6003` | render a frame without saving them |
+| `$6006` | cosine of a one-byte angle |
+| `$6009` | sine of a one-byte angle |
+
+`$6000` copies zero page `$60`-`$BF` into `$600C`-`$606B`, calls `$6003` and copies it
+back, which is what those 96 bytes are: not code, not data, a save area.
+
+The frame routine zeroes its state, points a 16-bit zero-page pointer `$9B`/`$9C` at
+**`$80FB`** - where DOS loads `SV DATA` - and runs the interpreter at `$6118`:
+
+```
+$6118  LDA #$0A  STA $B1          ; ten clip steps allowed for this command
+       LDY #$00
+       LDA ($9B),Y                ; fetch the opcode
+       BMI end                    ; >= $80 stops
+       CMP #$1E  BPL end          ; >= 30 stops
+       ASL A  TAX
+       LDA $60DC,X ... JMP ($A3)  ; dispatch
+```
+
+So the instruction set is **exactly thirty opcodes**, dispatched through thirty two-byte
+entries at `$60DC`. That is not a count of what this disk happens to use: the table runs
+from `$60DC` to `$6117` and the interpreter starts at `$6118`, so a thirty-first entry
+would overwrite the code that reads it.
+
+Each handler advances the pointer itself, through `$621F` ("add A to the list pointer"),
+so an instruction's length belongs to its opcode. Fourteen of the thirty were measured in
+the running machine - the distance the pointer moved between one fetch and the next - and
+all fourteen matched the `LDA #n` in their handler. The rest this disk never executes, and
+their lengths are read off the handler only, which the table in `renderer.mjs` says of
+each one.
+
+**The test of the whole reading** is that `SV DATA` then decodes end to end: 491 bytes,
+variable-length instructions, **71 of them**, landing on the terminator at `$82E3` with
+two spare bytes after it. A wrong length de-synchronises and cannot drift back into phase.
+`SV DATA2` does the same, and the two differ in five instructions, all of them objects
+pointing at different shapes.
+
+### What the scene says
+
+Readable now, start to finish (`listing/SV_DATA.list`):
+
+```
+$80FB  VIEWPORT xscale 140 yscale 126 xcentre 0 ycentre 34
+$8107  MODE 0
+$8109  SWITCH $C052 / $C050 / $C057 / $C054      <- graphics, hires, mixed, page 1
+$8111  CLEAR page 1
+$8113  DRAWTO page 1
+$8115  VIEWER at 0,0,0  pitch 0 bank 0 heading 0
+$8123  OBJECT x12                                <- the first "table"
+$81BF  COLOUR 1 ... LINE2D ... POINT2D x7        <- the instrument panel
+$8236  VIEWPORT xscale 65 yscale 66 xcentre 32 ycentre 195
+$823D  VIEWER ...                                <- a second viewpoint
+$8247  OBJECT x12                                <- the second "table"
+$82E3  END
+```
+
+Several things the earlier passes had as addresses are now instructions:
+
+- `$8110`, the "page soft switch" the BASIC pokes with 84 or 85, is the **operand of a
+  `SWITCH` instruction** whose handler patches its own `STA $C0nn`. `$8112` and `$8114` are
+  the operands of `CLEAR` and `DRAWTO`.
+- `XI`/`YI`/`ZI`/`P1`/`B1`/`H1` at `$8116`-`$811E` are the nine operand bytes of the
+  `VIEWER` instruction at `$8115`.
+- `SHLD` `$81DD`, `WARP` `$81F3` and `MSL` `$8209` are each the **third operand byte of a
+  2-D line** - the x of its far end. The three bar gauges are one line apiece, and the
+  BASIC moves their right-hand ends.
+- `S(1)`..`S(7)` at `$8222`+3n are seven **2-D point** instructions: the blips.
+- The 136 bytes at `$81C0`-`$8247` that nothing accounted for are the whole instrument
+  panel, plus a second viewport and viewpoint. The second `VIEWPORT` is small (scale 65x66
+  at centre 32,195) and is followed by its own `VIEWER`, which is the scope inset.
+
+### The geometry
+
+- **Angles are one byte to the turn.** `$6147` holds a 64-entry 16-bit quarter sine table
+  and `$61CB` folds the quadrants onto it; `$61C8` is the same table entered 64 units
+  earlier, which is the cosine. Both are exposed as engine entry points. A port that uses
+  `Math.sin` will not land on the same pixels.
+- **The field of view is exactly 90 degrees.** `$6A22` and `$6A7B` build a four-bit outcode
+  per point by testing `z+x`, `z-x`, `z+y`, `z-y` for overflow, which is the frustum
+  `|x| <= z`, `|y| <= z`. The drawing code rejects a line whose two outcodes share a bit -
+  Cohen-Sutherland's trivial reject.
+- **The clipper is a bisection, not an intersection.** A line that straddles a plane is
+  walked inward by halving, at most **ten times**, counted down in `$B1`, which `$6118`
+  reloads with 10 for every command. Clipped endpoints are therefore approximate in a
+  specific, reproducible way, and a port that solves the intersection exactly will differ
+  from the original at every window edge.
+- **The projection** is at `$6370`-`$63AF`: divide, scale by a constant, add a centre. Both
+  constants for both axes are **bytes inside that code** (`$6380`, `$6386`, `$63A3`,
+  `$63A9`), patched by the `VIEWPORT` instruction. x and y are scaled separately, which is
+  where the aspect correction lives.
+
+### Opcode 3, and the shape format
+
+Opcode 3 was an open question. Its handler `$62C0` loads the **saved previous point** as
+the far end, reads a new point as the near end, draws between them, and - reading through
+`$624B`, which does not update the saved point - leaves the previous point where it was.
+A run of opcode 3s is a hub with spokes radiating from it.
+
+`render_shapes.mjs` had been drawing nothing at all for it. Redrawn, MAIN DATA's shape 3
+is a hexagonal cone: six spokes to a centre, and a spire.
+
+The engine also reads opcode 1 as a single **fourteen**-byte instruction, two points, a
+move and a draw - the pair `shapes.mjs` had been reading as a 7-byte move always followed
+by a 7-byte draw. Same geometry, so that reader is left alone, with a note.
+
+### It rewrites itself
+
+The resident engine is **not** the file on the disk. Outside the save area, 119 bytes
+differ while the game flies, in four mechanisms, each one an opcode patching the code:
+
+| opcode | patches | effect |
+| --- | --- | --- |
+| 7 `SWITCH` | `$63E8` | the low byte of a `STA $C0nn` |
+| 9 `DRAWTO` | `$7C2D`, `$79A7`, `$7C68`, ... | the hires page base, in the plotting code |
+| 12 `PLOTMODE` | `$7734`, `$7739`, ... | `ORA (zp),Y` against `EOR (zp),Y` - draw or erase |
+| 14 `VIEWPORT` | `$6380`, `$6386`, `$63A3`, `$63A9` | the two scales and the two centres |
+
+Measured, not assumed: the probe compares the running image against the disk and checks
+those four addresses are among the differences. It also disassembles both - and thirteen
+addresses the machine executed are ones a disassembly of the *disk* does not find, all of
+them in the patched stretch between `$7700` and `$7D00`, because the patched bytes move
+the instruction boundaries. `listing/A2-3D2.asm` is therefore a listing of the **resident**
+image.
+
+### The cadence
+
+| | |
+| --- | --- |
+| one `CALL 24576` | **316,000 cycles**, three frames within 0.8% of each other |
+| in time | **309 ms**, so **3.23 renders a second** |
+| 6502 instructions | about 95,000 a frame |
+| display-list fetches | 122 |
+
+The engine is not synchronised to anything: it runs until it is done, 18.6 video frames
+later. Whatever the port does about frame rate, **3.2 Hz with a 90-degree frustum and a
+ten-step bisection clipper is what the original looks like**, and that is the baseline
+fidelity has to be measured against before any smoothing is offered as an option.
+
+### What is resident at `$6000`
+
+Measured during flight: `A2-3D2`, byte-identical to the disk file apart from its own
+patches. The character set and the music both BLOAD to `$6000` as well, but not while the
+game is flying.
+
+---
+
 ## Open questions
 
 Things this pass did **not** establish. None of them should be guessed at later and quietly
@@ -287,18 +470,23 @@ promoted to fact.
 2. **Whether the change changed anything else** — the RWTS, a protection check inside a
    binary, the contents of `INITIALS.DAT`. Comparing against a second image is the only
    honest way to answer it.
-3. **Opcode 3.** Real, rare, seven bytes, and what distinguishes it from MOVE is not
-   established. Shape 3 of MAIN DATA uses seven of them.
-4. **What `CALL $6000` does with all this.** The data is read; the renderer that consumes
-   it has not been disassembled, so the projection, the clipping and the frame cadence are
-   all still unknown.
-5. **The 13-byte record's bytes +0 to +9**, beyond the fact that +0 switches the object on.
-   Position and rotation presumably live there; which byte is which is not measured.
-6. **`$81C0`-`$8247`**, the 136 bytes between the two object tables.
-7. **What is resident at `$6000`** at each point, given A2-3D2, the character set and the
-   music all load there.
+3. ~~**Opcode 3.**~~ Answered: a line back to the saved previous point, which it leaves
+   in place. Handler `$62C0`.
+4. ~~**What `CALL $6000` does with all this.**~~ Answered above, with two things still open
+   under it: the exact screen mapping of the 2-D coordinates (`$771C` and `$7745` hold it,
+   and the panel's y values run past 192, so they are not straight pixel coordinates), and
+   the fourteen opcodes this disk never executes, whose lengths are known and whose
+   meanings are not.
+5. ~~**The 13-byte record's bytes +0 to +9.**~~ Answered: a frame counter, a 16-bit
+   position and a three-byte attitude. The counter's decrement is read off the handler and
+   was never seen to happen.
+6. ~~**`$81C0`-`$8247`.**~~ Answered: the instrument panel, as display-list instructions.
+7. ~~**What is resident at `$6000`.**~~ Answered for flight: A2-3D2. Not established for
+   the title, the demo or the end sequence, where the music loads over the same address.
 8. **The `.OBJ0` overlays at `$08EF`**, which is 238 bytes above Applesoft's `$0801`. How a
    BASIC program and a binary share that space is not understood.
 9. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
    measured about when or in what format.
 10. **The `DEMO` path**, never walked.
+11. **`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).** `SD` BLOADs `MATH` before chaining
+    `SD START`, and nothing in the renderer trace reads either of them.

@@ -58,11 +58,15 @@ function renderShape(shape) {
   VIEWS.forEach((view, i) => {
     const ox = i * (PANEL + GAP) + PANEL / 2, oy = PANEL / 2;
     const sx = (p) => ox + view.h(p) * k, sy = (p) => oy + view.v(p) * k;
+    // `pen` is the engine's saved previous point at $70-$76. Which opcodes move it is not
+    // a detail: opcode 3 deliberately does not, so a run of them radiates from one hub.
+    // The first version of this drew opcode 3 as a move and drew nothing at all for it.
     let pen = null;
     for (const cmd of shape.commands) {
       if (cmd.op === 18) continue;
+      if (cmd.op === 0) { c.plot(sx(cmd), sy(cmd)); c.plot(sx(cmd) + 1, sy(cmd)); continue; }
       if (cmd.op === 2 && pen) c.line(sx(pen), sy(pen), sx(cmd), sy(cmd));
-      else if (cmd.op === 0) { c.plot(sx(cmd), sy(cmd)); c.plot(sx(cmd) + 1, sy(cmd)); }
+      if (cmd.op === 3) { if (pen) c.line(sx(cmd), sy(cmd), sx(pen), sy(pen)); continue; }
       pen = cmd;
     }
     // A frame, so an empty panel reads as empty rather than as a missing file.

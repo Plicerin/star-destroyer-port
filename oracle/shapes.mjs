@@ -9,9 +9,21 @@
  * | 0 | 7 | POINT - plot the single point |
  * | 1 | 7 | MOVE - pen up, go to |
  * | 2 | 7 | DRAW - pen down, line from the last point |
- * | 3 | 7 | a fourth kind, see below |
+ * | 3 | 7 | DRAW BACK - line from this point to the last one, leaving the last one put |
  * | 18 | 2 | COLOUR, one operand |
  * | 121 | 1 | end of shape |
+ *
+ * The engine itself, disassembled later (renderer.mjs), reads opcode 1 as a single
+ * FOURTEEN-byte instruction: two points, a move and a draw. Parsing it here as a 7-byte
+ * move followed by the 7-byte opcode 2 that always follows it gives the same geometry, so
+ * this reader is left as it is - but the engine's handler is at $6265 and it is one
+ * instruction, not two.
+ *
+ * Opcode 3 ($62C0) is the one this was wrong about. It loads the SAVED previous point as
+ * the far end, reads a new point as the near end, draws between them, and - because it
+ * reads through $624B, which does not update the saved point - leaves the previous point
+ * where it was. So a run of opcode 3s is a hub with spokes radiating from it, which is
+ * exactly what the explosions are.
  *
  * How this was arrived at, in order:
  *
@@ -23,7 +35,7 @@
  *    raw bytes of one, 18 is followed by a single small number and then the seven-byte
  *    pattern resumes. Taking 18 as two bytes, MAIN DATA and BASE STAR DATA parse with
  *    no opcode above 3 and no coordinate outside -140..130, which is a model.
- * 3. Opcode 3 is real but rare, and what distinguishes it from MOVE is not established.
+ * 3. Opcode 3 was real but unexplained until the engine was disassembled; see above.
  *
  * STARBASE MAIN DATA is the control. It shares SV DATA's pointer table while holding
  * different shapes, so most of those pointers are stale for it - and the records STARBASE
@@ -39,7 +51,7 @@ export const file = (n) => d.read(d.files.find((x) => x.name === n));
 export const TABLES = [0x8124, 0x8248];
 export const STRIDE = 13, COUNT = 12, PTR = 10;
 export const END = 121, COLOUR = 18;
-export const OPS = { 0: 'POINT', 1: 'MOVE', 2: 'DRAW', 3: 'OP3', 18: 'COLOUR' };
+export const OPS = { 0: 'POINT', 1: 'MOVE', 2: 'DRAW', 3: 'DRAWBACK', 18: 'COLOUR' };
 
 const s16 = (lo, hi) => { const v = lo | (hi << 8); return v > 32767 ? v - 65536 : v; };
 

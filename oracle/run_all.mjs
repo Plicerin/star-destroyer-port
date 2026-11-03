@@ -5,21 +5,28 @@
 // should be the same twenty minutes every time, and it should say plainly what failed.
 //
 //   node run_all.mjs            everything
-//   node run_all.mjs repair     only the harnesses whose name contains "repair"
+//   node run_all.mjs renderer   only the probes whose name contains "renderer"
 //
 // Exit code is the number of harnesses that failed, so CI or a shell can test it.
+//
+// This file came over from the Space Vikings oracle, where the harnesses are named
+// `*_parity.mjs` and `*_check.mjs`. Nothing in this project is called that - they are
+// `probe_*.mjs` - so for its whole life here it matched no files, printed "nothing
+// matches" and exited 0. A suite runner that passes because it found nothing to run is
+// worse than none, since it reports success.
 import { spawn } from 'child_process';
 import fs from 'fs';
 
 const filter = process.argv[2] || '';
-const files = fs.readdirSync('.')
-  .filter((f) => f.endsWith('_parity.mjs') || f.endsWith('_check.mjs') || f === 'playthrough.mjs')
-  .filter((f) => !filter || f.includes(filter))
-  .sort();
-
+const all = fs.readdirSync('.').filter((f) => f.startsWith('probe_') && f.endsWith('.mjs')).sort();
+if (!all.length) {
+  console.log('no probe_*.mjs here - refusing to report success on an empty suite');
+  process.exit(1);
+}
+const files = all.filter((f) => !filter || f.includes(filter));
 if (!files.length) {
-  console.log(`nothing matches "${filter}"`);
-  process.exit(0);
+  console.log(`nothing matches "${filter}" among ${all.length} probes`);
+  process.exit(1);
 }
 
 const run = (file) => new Promise((resolve) => {
