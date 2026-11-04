@@ -151,6 +151,81 @@
    "detail": "18 divisions, 0 past 24 bits, 0 by zero - 60 frames is evidence, not a proof, so the port still models both edges"
   },
   {
+   "what": "$9998 loads ACC and then adds, so it is the whole add where $999B is only its tail",
+   "ok": true,
+   "detail": "30 sums, ACC pre-set each time"
+  },
+  {
+   "what": "and that is what separates them: the same call gives 1007 against 507",
+   "ok": true,
+   "detail": "$9998 gives 1007, $999B gives 507"
+  },
+  {
+   "what": "$9A17 leaves ACC = table[Y] * table[X] / 256, with the discarded byte in $F9",
+   "ok": true,
+   "detail": "96 products, 40 of them inexact"
+  },
+  {
+   "what": "$9A04 tests the sign bit and falls into the negate, so it is an absolute value",
+   "ok": true,
+   "detail": "20 values"
+  },
+  {
+   "what": "but not quite - the negate wraps, so the most negative value comes back negative",
+   "ok": true,
+   "detail": "-8388608 gives -8388608"
+  },
+  {
+   "what": "it agrees with trunc(sqrt(ACC * 256)) across the range",
+   "ok": true,
+   "detail": "128 inputs"
+  },
+  {
+   "what": "except at ACC = 1, where the first halving reaches zero and the equality test fires",
+   "ok": true,
+   "detail": "1 gives 0, where the closed form gives 16 - which is why the port runs the loop"
+  },
+  {
+   "what": "and it takes no magnitude, so ACC = -1 is rooted as the pattern $FFFFFF",
+   "ok": true,
+   "detail": "-1 gives 65535; trunc(sqrt($FFFFFF * 256)) = 65535"
+  },
+  {
+   "what": "every answer is a whole number of degrees",
+   "ok": true,
+   "detail": "0 of 496 are not"
+  },
+  {
+   "what": "and the range is 0 to 90",
+   "ok": true,
+   "detail": "0 to 90"
+  },
+  {
+   "what": "it is monotonic, which is what lets the port describe it by its step boundaries",
+   "ok": true,
+   "detail": "0 decreases over 496 inputs spanning 0 to 7200000"
+  },
+  {
+   "what": "and it is NOT trunc(atan) - the series has its own rounding, high and low",
+   "ok": true,
+   "detail": "52 of 496 inputs disagree with a trunc(atan) model"
+  },
+  {
+   "what": "some whole degrees are skipped entirely, which no closed form would predict",
+   "ok": true,
+   "detail": "4 from the step boundaries, 4 confirmed in the machine"
+  },
+  {
+   "what": "a negative ratio gives a negative angle of the same size",
+   "ok": true,
+   "detail": "-256 gives -45 degrees"
+  },
+  {
+   "what": "nothing reads B, EXT, R3 or R7 after an arctangent - the next MATH call reloads them",
+   "ok": true,
+   "detail": "so the port modelling only ACC there is a limitation nothing can observe"
+  },
+  {
    "what": "the listing is present and holds enough call sites to conclude anything",
    "ok": true,
    "detail": "229 found"

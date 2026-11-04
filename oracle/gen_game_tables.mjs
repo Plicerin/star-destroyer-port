@@ -48,16 +48,85 @@ for (let a = 0x08F2; a < 0x0940; a++) {
 }
 
 // The initial table, taken twice from different power-on fills so the capture can say which
-// bytes are the game's and which are only the machine's.
-const grab = async (fill) => {
+// bytes are the game's and which are only the machine's. The second pass also harvests the
+// arctangent thresholds, since it has a machine open anyway.
+const grab = async (fill, extra = null) => {
   const a2 = await openOracle();
   await toFlight(a2, { fill });
   const t = JSON.parse(await a2.ev('JSON.stringify(window.M.range(0x9800, 0x98F3))'));
+  const more = extra ? await extra(a2) : null;
   await a2.close();
-  return t;
+  return { t, more };
 };
-const zero = await grab(0x00);
-const alt = await grab(0xA5);
+
+/**
+ * $9C04's thresholds.
+ *
+ * It is an arctangent that answers in whole degrees - ACC in, ACC out, both scaled by 256 -
+ * and it is a series approximation with its own rounding, not trunc(atan). Over 765 inputs a
+ * trunc(atan) model disagrees 102 times, sometimes high and sometimes low, so there is no
+ * tidy closed form to write down.
+ *
+ * What it is, measured, is monotonic: 1,201 inputs spanning 0 to 8.3 million, no decrease.
+ * A monotonic step function with at most 91 outputs is completely described by the input at
+ * which each step begins, so those are binary-searched out of the machine and the port does
+ * a lookup. That is exact, including the degrees the approximation never produces at all -
+ * 39, 40, 50 and 51 are skipped, which no formula would have predicted.
+ */
+const harvestAtan = async (a2) => {
+  await a2.ev(`(() => {
+    window.M.atan1 = (acc) => {
+      const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+      const before = cpu.getState();
+      const zp = []; for (let a = 0; a < 0x100; a++) zp.push(rd(a));
+      for (let a = 0; a < 0x10; a++) wr(a, 0);
+      for (let a = 0xC0; a < 0x100; a++) wr(a, 0);
+      wr(0xFA, acc & 0xff); wr(0xFB, (acc >> 8) & 0xff); wr(0xFC, (acc >> 16) & 0xff);
+      const s = cpu.getState();
+      wr(0x100 + s.sp, 0xFF); s.sp = (s.sp - 1) & 0xff;
+      wr(0x100 + s.sp, 0xFE); s.sp = (s.sp - 1) & 0xff;
+      s.pc = 0x9C04; s.x = 3; s.y = 0;
+      cpu.setState(s);
+      cpu.stepCyclesDebug(4000000, () => cpu.getPC() === 0xFFFF ? true : undefined);
+      let v = rd(0xFA) | (rd(0xFB) << 8) | (rd(0xFC) << 16);
+      if (v > 0x7FFFFF) v -= 0x1000000;
+      for (let a = 0; a < 0x100; a++) wr(a, zp[a]);
+      cpu.setState(before);
+      return v / 256;
+    };
+    return 'ok';
+  })()`);
+  const at = (acc) => a2.ev(`window.M.atan1(${acc})`).then(Number);
+
+  // Monotonic over a dense-low, sparse-high sweep. If this ever fails the lookup is invalid.
+  const probe = [...new Set(Array.from({ length: 1201 }, (_, i) => Math.round(i * i * 5.8))
+    .filter((v) => v <= 0x7FFFFF))].sort((a, b) => a - b);
+  const seen = [];
+  for (const v of probe) seen.push(await at(v));
+  for (let i = 1; i < seen.length; i++) {
+    if (seen[i] < seen[i - 1]) {
+      throw new Error(`$9C04 is not monotonic: ${probe[i - 1]} gives ${seen[i - 1]}`
+        + ` but ${probe[i]} gives ${seen[i]} - the threshold lookup cannot stand in for it`);
+    }
+  }
+  const top = await at(0x7FFFFF);
+  const thresholds = [];
+  for (let deg = 1; deg <= top; deg++) {
+    let lo = 0, hi = 0x7FFFFF;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (await at(mid) >= deg) hi = mid; else lo = mid + 1;
+    }
+    thresholds.push(lo);
+  }
+  return { thresholds, top, probed: probe.length };
+};
+
+const zeroRun = await grab(0x00);
+const altRun = await grab(0xA5, harvestAtan);
+const zero = zeroRun.t;
+const alt = altRun.t;
+const atan = altRun.more;
 const UNINIT = [];
 const INIT = zero.map((v, i) => {
   if (v === alt[i]) return v;
@@ -116,6 +185,18 @@ const out = [
   `// ${243 - UNINIT.length} of 243 bytes are identical from a $00 and an $A5 power-on fill.`,
   'export const TABLE_INIT = [', fmt(INIT, 4), '];',
   '',
+  '// $9C04\'s thresholds: the smallest ACC that answers at least d degrees, for d = 1 up.',
+  '// It is an arctangent in whole degrees, ACC in and out, both scaled by 256 - and a series',
+  '// approximation, not trunc(atan), which disagrees with a trunc(atan) model on 102 of 765',
+  '// inputs. It IS monotonic, checked over ' + atan.probed + ' inputs, so these thresholds',
+  '// describe it exactly. Note the degrees it never produces - 40, 41, 50 and 51 share a',
+  '// threshold with the degree above, so the approximation steps straight over them -',
+  '// 39, 40, 50 and 51, confirmed against the machine at each boundary.',
+  'export const ATAN_THRESHOLD = [', fmt(atan.thresholds, 8), '];',
+  '',
+  `/** The largest answer $9C04 can give, in degrees: ${atan.top}. */`,
+  `export const ATAN_MAX_DEGREES = ${atan.top};`,
+  '',
   '// The bytes that are NOT deterministic: never written by the game, so they still hold',
   '// whatever the machine powered on with. Emitted as zero above. Anything that reads them',
   '// is reading the Apple\'s uninitialised RAM, and the port must not depend on the value.',
@@ -130,3 +211,5 @@ console.log(`  HEADING_SIN/COS  256 bytes each, from $89CB and $8ACF`);
 console.log(`  VARS             ${VARS.length} table offsets, from $08F2`);
 console.log(`  TABLE_INIT       243 bytes, ${243 - UNINIT.length} deterministic,`
   + ` uninitialised at [${UNINIT.join(', ')}]`);
+console.log(`  ATAN_THRESHOLD   ${atan.thresholds.length} steps, 1 to ${atan.top} degrees,`
+  + ` monotonic over ${atan.probed} probes`);

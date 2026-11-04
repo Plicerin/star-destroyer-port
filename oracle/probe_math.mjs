@@ -23,6 +23,7 @@
 import { openOracle } from './a2.mjs';
 import { toFlight, arm } from './exercise.mjs';
 import { hx } from './disasm6502.mjs';
+import { ATAN_THRESHOLD } from '../port/src/game/tables.js';
 import fs from 'fs';
 
 const results = [];
@@ -82,7 +83,7 @@ await a2.ev(`(() => {
     const out = {
       returned, a: aReg, x: cx, y: cy,
       acc: get24(rd, RA), b: get24(rd, RB), ext: get24(rd, RE),
-      sign: rd(0xCE), savedX: rd(0xEE), table: {},
+      sign: rd(0xCE), savedX: rd(0xEE), f9: rd(0xF9), table: {},
     };
     for (let i = 0; i < 0xF0; i += 3) out.table[i] = get24(rd, 0x9800 + i);
     for (let a = 0x9800; a < 0x98F3; a++) wr(a, snapTab[a - 0x9800]);
@@ -368,6 +369,194 @@ console.log('\n=== MATH under warp ===');
     warp.hits.length >= 10 && outside.length === 0 && zeroDen.length === 0,
     `${warp.hits.length} divisions, ${outside.length} past 24 bits, ${zeroDen.length}`
       + ' by zero - 60 frames is evidence, not a proof, so the port still models both edges');
+}
+
+// --- the rest of the arithmetic ----------------------------------------------------------------
+console.log('');
+console.log('=== $9998 add, $9A17 multiply, $9A04 absolute value ===');
+{
+  const wrong = [];
+  for (const ey of [0, 1000, -1000, 32767, -32768, 0x7FFFFF]) {
+    for (const ex of [1, -1, 7, 1000, -98765]) {
+      const r = await run(0x9998, 3, 0, { 0: u24(ey), 3: u24(ex) }, { acc: u24(0x5A5A5A) });
+      const want = s24(u24(ey + ex));
+      if (s24(r.acc) !== want) wrong.push(`${ey}+${ex}: ${s24(r.acc)}, expected ${want}`);
+    }
+  }
+  check('$9998 loads ACC and then adds, so it is the whole add where $999B is only its tail',
+    wrong.length === 0, wrong.slice(0, 3).join('; ') || '30 sums, ACC pre-set each time');
+  // The two differ exactly in whether ACC survives, so one shared input tells them apart.
+  const a = await run(0x9998, 3, 0, { 0: 1000, 3: 7 }, { acc: 500 });
+  const b = await run(0x999B, 3, 0, { 0: 1000, 3: 7 }, { acc: 500 });
+  check('and that is what separates them: the same call gives 1007 against 507',
+    s24(a.acc) === 1007 && s24(b.acc) === 507,
+    `$9998 gives ${s24(a.acc)}, $999B gives ${s24(b.acc)}`);
+}
+{
+  const wrong = [];
+  let withRemainder = 0;
+  for (const ey of [0, 1, -1, 100, -100, 256, 1000, -1000, 4096, 65536, -65536, 3]) {
+    for (const ex of [1, -1, 256, -256, 1000, 100, 5, 60000]) {
+      const r = await run(0x9A17, 3, 0, { 0: u24(ey), 3: u24(ex) }, {});
+      const p = Math.abs(ey) * Math.abs(ex);
+      const q = Math.trunc(p / 256);
+      const want = s24(u24((ey < 0) !== (ex < 0) ? -q : q));
+      if (p % 256 !== 0) withRemainder++;
+      if (s24(r.acc) !== want) wrong.push(`${ey}*${ex}: ${s24(r.acc)}, expected ${want}`);
+      if (r.f9 !== p % 256) wrong.push(`${ey}*${ex}: $F9 = ${r.f9}, expected ${p % 256}`);
+    }
+  }
+  console.log('  the product is 48 bits across $F9-$FE and ACC is bytes 1 to 3 of it, so the');
+  console.log('  answer is the product over 256 - the mirror of the divide, which multiplies');
+  console.log('  by 256. Together they make a consistent fixed point: a stored value is its');
+  console.log('  quantity times 256 throughout.');
+  check('$9A17 leaves ACC = table[Y] * table[X] / 256, with the discarded byte in $F9',
+    wrong.length === 0 && withRemainder > 20,
+    wrong.slice(0, 3).join('; ') || `96 products, ${withRemainder} of them inexact`);
+}
+{
+  const wrong = [];
+  for (const v of VALUES) {
+    const r = await run(0x9A04, 0, 0, {}, { acc: u24(v) });
+    const want = s24(u24(s24(u24(v)) < 0 ? -s24(u24(v)) : s24(u24(v))));
+    if (s24(r.acc) !== want) wrong.push(`${v}: ${s24(r.acc)}, expected ${want}`);
+  }
+  check('$9A04 tests the sign bit and falls into the negate, so it is an absolute value',
+    wrong.length === 0, wrong.slice(0, 3).join('; ') || `${VALUES.length} values`);
+  const edge = await run(0x9A04, 0, 0, {}, { acc: u24(-0x800000) });
+  check('but not quite - the negate wraps, so the most negative value comes back negative',
+    s24(edge.acc) === -0x800000, `-8388608 gives ${s24(edge.acc)}`);
+}
+
+// --- the square root ---------------------------------------------------------------------------
+console.log('');
+console.log('=== $9AD0 square root ===');
+console.log('  Newton: x := (n * 256 / x + x) / 2, starting at x = n, at most sixteen rounds,');
+console.log('  stopping when ACC equals B rather than on a tolerance');
+{
+  const wrong = [];
+  const cases = [];
+  for (let i = 2; i < 120; i++) cases.push(Math.floor(i * i * 1.7) + i);
+  for (const v of [0, 2, 3, 255, 256, 257, 1000, 65536, 1000000, 0x7FFFFF]) cases.push(v);
+  for (const n of cases) {
+    const r = await run(0x9AD0, 3, 0, {}, { acc: u24(n) });
+    const want = Math.trunc(Math.sqrt(n * 256));
+    if (s24(r.acc) !== want) wrong.push(`${n}: ${s24(r.acc)}, closed form ${want}`);
+  }
+  check('it agrees with trunc(sqrt(ACC * 256)) across the range',
+    wrong.length === 0, wrong.slice(0, 3).join('; ') || `${cases.length} inputs`);
+
+  // The edge that makes it worth transliterating rather than modelling.
+  const one = await run(0x9AD0, 3, 0, {}, { acc: 1 });
+  check('except at ACC = 1, where the first halving reaches zero and the equality test fires',
+    s24(one.acc) === 0, `1 gives ${s24(one.acc)}, where the closed form gives`
+      + ` ${Math.trunc(Math.sqrt(256))} - which is why the port runs the loop`);
+
+  // It never calls $9B00, so a negative input is worked on as a bit pattern.
+  const neg = await run(0x9AD0, 3, 0, {}, { acc: u24(-1) });
+  check('and it takes no magnitude, so ACC = -1 is rooted as the pattern $FFFFFF',
+    s24(neg.acc) === 65535,
+    `-1 gives ${s24(neg.acc)}; trunc(sqrt($FFFFFF * 256)) = ${Math.trunc(Math.sqrt(0xFFFFFF * 256))}`);
+}
+
+// --- the arctangent ----------------------------------------------------------------------------
+console.log('');
+console.log('=== $9C04 arctangent ===');
+console.log('  ACC in and ACC out, both scaled by 256, and the answer is a whole number of');
+console.log('  degrees: 256 in - a ratio of 1.0 - comes back as 45 * 256');
+{
+  // Dense below a ratio of 1.0, where the series and a closed form part company, then
+  // coarser. A purely quadratic sweep steps over almost all of the interesting band.
+  const probe = [...new Set([
+    ...Array.from({ length: 257 }, (_, i) => i * 4),
+    ...Array.from({ length: 120 }, (_, i) => 1024 + (i + 1) * 128),
+    ...Array.from({ length: 120 }, (_, i) => Math.round((i + 1) * (i + 1) * 500)),
+  ].filter((v) => v <= 0x7FFFFF))].sort((a, b) => a - b);
+  const seen = [];
+  for (const v of probe) {
+    seen.push(s24((await run(0x9C04, 3, 0, {}, { acc: v })).acc));
+  }
+  check('every answer is a whole number of degrees', seen.every((v) => v % 256 === 0),
+    `${seen.filter((v) => v % 256 !== 0).length} of ${seen.length} are not`);
+  const degs = seen.map((v) => v / 256);
+  check('and the range is 0 to 90', Math.min(...degs) === 0 && Math.max(...degs) === 90,
+    `${Math.min(...degs)} to ${Math.max(...degs)}`);
+  let drops = 0;
+  for (let i = 1; i < degs.length; i++) if (degs[i] < degs[i - 1]) drops++;
+  check('it is monotonic, which is what lets the port describe it by its step boundaries',
+    drops === 0, `${drops} decreases over ${probe.length} inputs spanning 0 to ${probe[probe.length - 1]}`);
+
+  // It is a series approximation, not trunc(atan), and the port must not pretend otherwise.
+  const model = (acc) => {
+    const t = Math.abs(acc) / 256;
+    return t <= 1 ? Math.trunc(Math.atan(t) * 180 / Math.PI)
+      : 90 - Math.trunc(Math.atan(1 / t) * 180 / Math.PI);
+  };
+  const differ = probe.filter((v, i) => model(v) !== degs[i]).length;
+  check('and it is NOT trunc(atan) - the series has its own rounding, high and low',
+    differ > 20, `${differ} of ${probe.length} inputs disagree with a trunc(atan) model`);
+
+  // Degrees the approximation steps straight over. A sweep cannot establish this - its own
+  // gaps would look like the function's - so it comes from the step boundaries instead. Where
+  // a degree's threshold equals the next one's, there is no input that answers that degree,
+  // and each one is then confirmed against the machine at the threshold itself.
+  const skipped = [];
+  for (let i = 0; i + 1 < ATAN_THRESHOLD.length; i++) {
+    if (ATAN_THRESHOLD[i] === ATAN_THRESHOLD[i + 1]) skipped.push(i + 1);
+  }
+  const confirmed = [];
+  for (const dd of skipped) {
+    const at = s24((await run(0x9C04, 3, 0, {}, { acc: ATAN_THRESHOLD[dd - 1] })).acc) / 256;
+    const below = s24((await run(0x9C04, 3, 0, {}, { acc: ATAN_THRESHOLD[dd - 1] - 1 })).acc) / 256;
+    if (at > dd && below < dd) confirmed.push(`${dd} (jumps ${below} to ${at})`);
+  }
+  console.log('  degrees the series never answers: ' + (confirmed.join(', ') || 'none'));
+  check('some whole degrees are skipped entirely, which no closed form would predict',
+    skipped.length > 0 && confirmed.length === skipped.length,
+    `${skipped.length} from the step boundaries, ${confirmed.length} confirmed in the machine`);
+
+  const sign = await run(0x9C04, 3, 0, {}, { acc: u24(-256) });
+  check('a negative ratio gives a negative angle of the same size',
+    s24(sign.acc) === -45 * 256, `-256 gives ${s24(sign.acc) / 256} degrees`);
+}
+
+// --- what $9C04 leaves behind ------------------------------------------------------------------
+// The port models only ACC for the arctangent. That is a real limitation, so it gets checked
+// rather than assumed: the question is whether anything reads the registers it clobbers.
+{
+  const asm = fs.readFileSync('listing/STAR_DESTROYER.asm', 'utf8').split(/\r?\n/);
+  const rows = asm.map((l) => {
+    const m = l.match(/^\$([0-9A-F]{4})\s+(?:\S+:\s+)?((?:[0-9A-F]{2} )+)\s*(.*)$/);
+    return m ? { addr: m[1], text: m[3].trim() } : null;
+  });
+  const sites = [];
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i] && rows[i].text === 'JSR $9C04') sites.push(i);
+  }
+  // After the atan, the next MATH call must be one that reads only ACC, or one that reloads.
+  const READS_ONLY_ACC = new Set(['JSR $9A04', 'JSR $9A08', 'JSR $9C7A', 'JSR $9C90',
+    'JSR $9C9A', 'JSR $9C86']);
+  const RELOADS = new Set(['JSR $99D2', 'JSR $99AB', 'JSR $9A65', 'JSR $9A17', 'JSR $9998']);
+  const risky = [];
+  for (const i of sites) {
+    let settled = false;
+    for (let j = i + 1, n = 0; j < rows.length && n < 8; j++) {
+      if (!rows[j]) continue;
+      n++;
+      const t = rows[j].text;
+      if (!t.startsWith('JSR $9')) continue;
+      if (READS_ONLY_ACC.has(t)) continue;
+      settled = RELOADS.has(t);
+      break;
+    }
+    if (!settled) risky.push(rows[i].addr);
+  }
+  console.log('  $9C04 is called from ' + sites.length + ' sites, all the same four'
+    + ' instructions: $9A65, $9C04, $9A04, $9C7A');
+  check('nothing reads B, EXT, R3 or R7 after an arctangent - the next MATH call reloads them',
+    sites.length === 3 && risky.length === 0,
+    risky.length ? `unsettled at ${risky.join(', ')}`
+      : 'so the port modelling only ACC there is a limitation nothing can observe');
 }
 
 // --- what the call sites rely on ---------------------------------------------------------------

@@ -51,9 +51,34 @@
    "detail": "74 cases, 6 skipped as out of the divide's domain"
   },
   {
+   "what": "addFrom ($9998) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "multiply ($9A17) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "abs ($9A04) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "sqrt ($9AD0) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
+   "what": "atan ($9C04) agrees",
+   "ok": true,
+   "detail": "80 cases"
+  },
+  {
    "what": "the port and MATH end in the same state after every random program",
    "ok": true,
-   "detail": "240 programs, 1556 instructions, 167 divides"
+   "detail": "240 programs, 1577 instructions, 105 divides"
   },
   {
    "what": "control: the old reading of $999B, where add loads instead of accumulating is caught",
@@ -67,6 +92,21 @@
   },
   {
    "what": "control: a divide that floors instead of truncating toward zero is caught",
+   "ok": true,
+   "detail": "60 of 60 disagree with it; the port agrees on 60 of 60"
+  },
+  {
+   "what": "control: an arctangent that truncates atan instead of running the series is caught",
+   "ok": true,
+   "detail": "60 of 60 disagree with it; the port agrees on 60 of 60"
+  },
+  {
+   "what": "control: a square root that uses the closed form instead of Newton is caught",
+   "ok": true,
+   "detail": "60 of 60 disagree with it; the port agrees on 60 of 60"
+  },
+  {
+   "what": "control: a multiply that keeps the whole product instead of dividing by 256 is caught",
    "ok": true,
    "detail": "60 of 60 disagree with it; the port agrees on 60 of 60"
   }

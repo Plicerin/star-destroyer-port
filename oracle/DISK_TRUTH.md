@@ -1036,21 +1036,66 @@ but not all - a trace under warp shows `X` and `Y` at 66, 69, 75, 121, 124 and 1
 
 **The entry points:**
 
-| | |
-|---|---|
-| `$999B` | `ACC += table[X]` - loads `B`, keeps `ACC` |
-| `$99AB` | `ACC := table[Y] - table[X]` |
-| `$99D2` | compare `table[Y]` against `table[X]`: the `A` register becomes +1, 0 or -1, signed |
-| `$9A08` | `ACC := -ACC` |
-| `$9A17` | multiply: 24 x 24 shift-add, 48-bit product across `$F9`-`$FE` |
-| `$9A65` | `ACC := table[Y] * 256 / table[X]`, remainder in `EXT` |
-| `$9C4B` | `table[Y] := table[X]`, three bytes |
-| `$9C5C` | `ACC := table[Y]`; `X` preserved via `$EE` |
-| `$9C6C` | `B := table[X]` |
-| `$9C7A` | `table[Y] := ACC` |
+| | | sites |
+|---|---|---|
+| `$9998` | `ACC := table[Y] + table[X]` | 16 |
+| `$999B` | `ACC += table[X]` - loads `B`, keeps `ACC` | 12 |
+| `$99AB` | `ACC := table[Y] - table[X]` | 14 |
+| `$99D2` | compare `table[Y]` against `table[X]`: `A` becomes +1, 0 or -1, signed | 55 |
+| `$9A04` | `ACC := |ACC|` - a sign test falling into the negate | 11 |
+| `$9A08` | `ACC := -ACC` | |
+| `$9A17` | `ACC := table[Y] * table[X] / 256` | 8 |
+| `$9A65` | `ACC := table[Y] * 256 / table[X]`, remainder in `EXT` | 24 |
+| `$9AD0` | `ACC := sqrt(ACC * 256)`, by Newton | 4 |
+| `$9C04` | `ACC := arctan(ACC)` in whole degrees, scaled by 256 | 3 |
+| `$9C4B` | `table[Y] := table[X]`, three bytes | 62 |
+| `$9C5C` | `ACC := table[Y]`; `X` preserved via `$EE` | |
+| `$9C6C` | `B := table[X]` | |
+| `$9C7A` | `table[Y] := ACC` | 62 |
+
+**Entries and bodies.** Most entries are a couple of loads and then a body, and the bodies are
+re-entered from elsewhere in the file without the loads: `$9AD0` drives `$999E` (add), `$99D8`
+(compare) and `$9A6E` (divide) directly, over registers it has already arranged. `$9998` is
+`$9C5C` falling into `$999B`, and `$9A04` is a two-instruction sign test falling into `$9A08`.
+The port is split the same way, which is what lets the square root be a transliteration.
+
+**The fixed point is consistent.** The divide multiplies its dividend by 256 and the multiply
+divides its product by 256, so a stored 24-bit value is its quantity times 256 throughout -
+the low byte a fraction, the top two bytes the whole number the renderer reads.
+
+**`$9A17`** builds a 48-bit product across `$F9`-`$FE` and takes `ACC` from bytes 1 to 3 of it,
+so the discarded low byte is left in `$F9` and bytes 4 and 5 land in `EXT`'s low two bytes.
+`$FF` is not part of the shift chain, so `EXT`'s top byte survives a multiply.
+
+**`$9AD0`** is Newton's method: `x := (n * 256 / x + x) / 2` from `x = n`, at most sixteen
+rounds, stopping when `ACC` equals `B` rather than on a tolerance. It is **transliterated, not
+modelled**, because its edges are the point. `trunc(sqrt(n * 256))` agrees on 209 of 210 inputs
+and fails at `ACC = 1`, where the first halving reaches zero, already equals `B`, and the
+routine returns **0** instead of 16. It never calls `$9B00` either, so a negative input is
+simply worked on as a pattern: `ACC = -1` roots `$FFFFFF * 256` and gives 65535.
+
+**`$9C04`** is an arctangent answering in whole degrees, input and output both scaled by 256 -
+so `ACC = 256`, a ratio of 1.0, comes back as `45 * 256`. It is a series with a reflection
+above 1.0, and it has its own rounding: a `trunc(atan)` model disagrees on 52 of 496 inputs,
+sometimes high and sometimes low. It **is** monotonic, so the port describes it by the 90
+inputs at which each degree begins and does a lookup - exact, including the four degrees it
+never answers at all. **39, 40, 50 and 51 are skipped**: the series jumps 38 to 41 and 49 to
+52, confirmed in the machine at each boundary. No closed form would have predicted that.
+
+Only `ACC` is modelled for the arctangent. The real series leaves working values in `B`,
+`EXT`, `R3` and `R7` that the lookup does not reproduce, which is allowed because nothing
+reads them - all three call sites are the same four instructions, `$9A65`, `$9C04`, `$9A04`,
+`$9C7A`, and the next `MATH` call after them reloads both registers. `probe_math.mjs` checks
+that against the listing rather than taking it on trust.
+
+**The registers are bit patterns, not values.** `$9B00` is meant to leave magnitudes, but it
+negates in place and the negate wraps, so `$800000` - the most negative value there is - comes
+out as itself and still negative. The bodies do unsigned arithmetic on three bytes and never
+see a sign, and the port has to do the same or it diverges at exactly that input. `$9A04` has
+the same hole: it is an absolute value everywhere except `$800000`, which it returns unchanged.
 
 `$9C86` onward is a register file - eight four-instruction routines shuffling 24-bit values
-between `$FA`-`$FC`, `$EB`-`$ED`, `$03`-`$05` and `$07`-`$09`.
+between `ACC` (`$FA`-`$FC`), `B` (`$EB`-`$ED`), `R3` (`$03`-`$05`) and `R7` (`$07`-`$09`).
 
 **The divide is the interesting one.** It is a restoring division: `$9B00` reduces both
 operands to magnitudes and records the combined sign in `$CE`, the dividend is shifted up one

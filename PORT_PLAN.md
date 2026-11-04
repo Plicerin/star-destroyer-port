@@ -226,9 +226,17 @@ Suggested order:
    **Three things block the rest of it**, and they should be settled before more code is
    written, because everything in the loop runs through them:
 
-   - ~~**`MATH` at `$98F3`.**~~ **Done.** Nine entry points, in `port/src/game/math.js`,
-     held by `parity_gamemath.mjs` (14 checks: each routine, 240 random programs, and three
-     wrong-port controls at 60 of 60). `probe_math.mjs` has 28 checks.
+   - ~~**`MATH` at `$98F3`.**~~ **Done, all of it.** Fourteen entry points in
+     `port/src/game/math.js`, covering all 271 call sites in `.OBJ0`, held by
+     `parity_gamemath.mjs` (22 checks: each routine singly, 240 random programs, and six
+     wrong-port controls each failing on 60 of 60 while the port agrees on all 60).
+     `probe_math.mjs` has 43 checks.
+
+     The last five were `$9998` (add), `$9A04` (absolute value), `$9A17` (multiply), `$9AD0`
+     (square root) and `$9C04` (arctangent). Two of them are the interesting ones: the root
+     is transliterated because `trunc(sqrt(n*256))` is wrong at exactly one input, and the
+     arctangent is a lookup over 90 measured step boundaries because it is a series with its
+     own rounding that skips four whole degrees.
 
      Worth reading the "How this was nearly got wrong" note in DISK_TRUTH before tackling
      the next blocker the same way. `MATH` is not a function library, it is an accumulator
