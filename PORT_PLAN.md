@@ -323,11 +323,34 @@ Suggested order:
    Each of those is a control in `parity_dispatch.mjs`, along with three for the turn itself,
    and all seven fire.
 
-   **What is left in the three regions** is the collision test at the top of the next block
-   ($0E05, $120F, $1619, each calling an explosion routine at $1E98, $1EC9 or $1EFA), the
-   enemy's own movement below it, and the missile flight at $0F83, $138D and $1798. The
-   cooldown decrements at $0E23, $122D and $1637 are ported, because the dispatch's cooldown
-   means nothing without them.
+   **The enemies and their missiles are ported.** `port/src/game/entities.js`, held by
+   `parity_entities.mjs` (11 checks) over `probe_entities.mjs` (18). Four blocks per class -
+   `reach` at $0E05, `hold` at $0E2F, `move` at $0E3D and `missile` at $0F83 - twelve in all,
+   and with the dispatch they are the whole of the three enemy regions bar the explosion
+   routines and the player's own shots.
+
+   Most of it turned out to be the ship's movement again. $0E3D is $09D1 without the warp
+   gate, and that is a byte-level claim: the fifteen opcodes from $09DC and from $0E43 are the
+   same, and the four compare-and-copy pairs that wrap them are identical in all four places
+   once a stray CLC in the ship's copy is set aside. So `wrapPosition` and
+   `buildStepOperands` are shared out of flight.js rather than written again, which is what
+   the probe's instruction-stream comparison is there to justify.
+
+   Three things measured that a reasonable port would get wrong, each a control: the three
+   arrival thresholds are **not** the same comparison - `reach` fires at or inside its
+   threshold and the other two only strictly inside, which shows at exact equality; the
+   enemies divide by the **same** throttle entry the ship does, so they always fly at warp
+   speed; and the missile has **no** world wrap, so it leaves the world and keeps going.
+
+   **An open question closed, and a correction**: the object record's count. It was recorded
+   here and in DISK_TRUTH as a frame counter whose decrement "was never seen to happen". It
+   happens - A2-3D2 does it at $6D18, one per render - and $FF is exempt, so the byte is a
+   switch and a timer at once. Nothing in .OBJ0 ever decrements a count, so a missile's
+   twenty-frame life is twenty renders and the loop has no part in it.
+
+   **What is left in the three regions** is the explosion routines ($1E98, $1EC9, $1EFA), the
+   damage routines the two arrival flags trigger ($1C99 and $1CFC through $18BC and $18C9),
+   and the player's own shots at $0EF3, $0F3B and their copies.
 
    **A hazard fixed on the way**, in `exercise.mjs`: `toFlight` could return before DOS had
    finished loading the binary, leaving everything above `$17EB` holding the power-on fill.

@@ -72,10 +72,15 @@ export const MISSILE_LIFETIME = 0x14;
 export const MISSILE_Y = -10;
 
 /**
- * The three copies, as parameters.
+ * The three enemy classes, as parameters.
  *
  * `coolingTurn` names which of the two turn labels the cooldown branch jumps to, because that
  * is what the original does - `BEQ`/`JMP` to a label, not a turn by an amount.
+ *
+ * The addresses are carried along because they are the port's provenance and the harnesses
+ * drive the blocks by them: `at` and `exit` bracket the dispatch, `coolDownAt` the four
+ * instructions that run the cooldown down, and `reachAt`, `holdAt`, `moveAt` and `missileAt`
+ * the four blocks in entities.js.
  */
 export const CLASSES = [
   {
@@ -95,6 +100,11 @@ export const CLASSES = [
     /** $0911, $0913 */ missilePos: [dir(0x0911), dir(0x0913)],
     /** $0927, $0929 */ missileStep: [dir(0x0927), dir(0x0929)],
     coolDownAt: 0x0E23,
+    reachAt: 0x0E05, reachExits: [0x0E20, 0x0E23],
+    holdAt: 0x0E2F, holdExits: [0x0E3D, 0x0EF3],
+    moveAt: 0x0E3D, moveExit: 0x0EF3,
+    missileAt: 0x0F83, missileExit: 0x1014,
+    explode: 0x1E98,
   },
   {
     name: 'class 2',
@@ -113,6 +123,11 @@ export const CLASSES = [
     /** $0912, $0914 */ missilePos: [dir(0x0912), dir(0x0914)],
     /** $0928, $092A */ missileStep: [dir(0x0928), dir(0x092A)],
     coolDownAt: 0x122D,
+    reachAt: 0x120F, reachExits: [0x122A, 0x122D],
+    holdAt: 0x1239, holdExits: [0x1247, 0x12FD],
+    moveAt: 0x1247, moveExit: 0x12FD,
+    missileAt: 0x138D, missileExit: 0x141E,
+    explode: 0x1EC9,
   },
   {
     name: 'class 3',
@@ -131,6 +146,11 @@ export const CLASSES = [
     /** $0912, $0914 */ missilePos: [dir(0x0912), dir(0x0914)],
     /** $0928, $092A */ missileStep: [dir(0x0928), dir(0x092A)],
     coolDownAt: 0x1637,
+    reachAt: 0x1619, reachExits: [0x1634, 0x1637],
+    holdAt: 0x1643, holdExits: [0x1652, 0x1708],
+    moveAt: 0x1652, moveExit: 0x1708,
+    missileAt: 0x1798, missileExit: 0x1829,
+    explode: 0x1EFA,
   },
 ];
 

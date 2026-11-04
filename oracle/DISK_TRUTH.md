@@ -1407,6 +1407,85 @@ One interaction worth recording: `$1AE8` always writes the entries named by `$09
 which are the *ship's* step operands. A launch therefore overwrites them, and that is harmless
 only because the movement block rebuilds them before every use.
 
+### The enemies move, their missiles fly, and the loop asks twice whether anything arrived
+
+`probe_entities.mjs` (18 checks) and `parity_entities.mjs` (11). Four blocks per enemy class,
+twelve in all, and with the dispatch above them they are the whole of the three big enemy
+regions bar the explosion routines and the player's own shots.
+
+```
+$0E05  reach      range <= 11 units: the enemy has rammed the ship
+$0E2F  hold       range <  25 units: the enemy stops moving and holds station
+$0E3D  move       step along its heading, wrap at the world's edge, publish
+$0F83  missile    step by the stored step, publish, range to the ship, hit test
+```
+
+with the copies at `$120F`/`$1239`/`$1247`/`$138D` for class 2 and
+`$1619`/`$1643`/`$1652`/`$1798` for class 3.
+
+**The enemy's movement is the ship's movement.** `$0E3D` is `$09D1` without the warp gate, and
+that is a byte-level claim, not a resemblance: the fifteen opcodes from `$09DC` and from `$0E43`
+are the same, and so are the four compare-and-copy pairs that wrap them - identical in all four
+places once a stray `CLC` the ship's copy carries at `$0A14` is set aside. All four wrap against
+the same four bound entries, `$08F2`-`$08F5`. That is why the port shares one `wrapPosition`
+rather than writing it out four times.
+
+**So an enemy always flies at warp speed.** All eight divides - the ship's two and the three
+enemies' six - name the same throttle entry, `$0917`, holding 1280. The ship only moves that
+fast with warp engaged, so an unwarped ship is being closed on and a warped one is matched.
+
+**The missile does not wrap and does not call `$1AE8`.** Its step was computed once at launch
+and stored, so a pass is two adds, a publish and a range. A port that gave it the world wrap
+would look right until a missile left the world.
+
+**The missile's hit test overwrites the range.** It copies its own position and the ship's into
+`$1C3D`'s four argument slots and calls it, leaving a new range in `$090A` on top of the one the
+dispatch region worked out. Nothing reads the old one by then, but the order is not
+interchangeable.
+
+**The three thresholds are not the same comparison.** `reach` loads the threshold as `Y` and the
+range as `X`, so `BPL` makes it fire on `range <= threshold`; `hold` and the missile's test load
+them the other way round and fire on `range < threshold`. It shows only at exact equality, and
+it is exactly what the two controls in `parity_entities.mjs` get wrong. In units, with the range
+being `sqrt(2 * (|dx| + |dz|))`:
+
+| | entry | range | L1 separation |
+|---|---|---|---|
+| ram the ship | `$092F` | 11 | about 60 |
+| stop moving | `$0926` | 25 | about 313 |
+| missile hits | `$0932` | 13 | about 85 |
+
+**What the arrivals leave for someone else.** `reach` sets `$0942` and the missile sets
+`$0941`; `$18BC` and `$18C9` read them and call the damage routines at `$1C99` and `$1CFC`.
+`reach` also calls an explosion routine - `$1E98`, `$1EC9` or `$1EFA` - which is not ported, so
+the harness stops at the `JSR`.
+
+Neither movement block touches an object's **Y**, so an enemy's altitude is whatever its spawn
+set.
+
+#### The object count is a lifetime the renderer runs, and `$FF` means forever
+
+This answers an open question and corrects what this file said about it. The 13-byte record's
+first operand was recorded as "a frame counter" whose "decrement is read off the handler and was
+never seen to happen". It happens.
+
+Measured: a count of 20 put on an object comes down by one at a time, every step of it from
+**`$6D18`, inside A2-3D2**. Nothing in `.OBJ0` ever increments or decrements a count - the
+twenty-one `INC`/`DEC` sites that touch an object record are all the dispatch turning a heading.
+So the 20 the dispatch writes into a missile is twenty **renders**, and expiry is the renderer's
+business, not the loop's.
+
+**But `$FF` is not a lifetime.** The five objects that are drawn every pass in flight - 1, 2, 12,
+13 and 14 - sit at 255 and stay there over six passes, undecremented. So one byte is both a
+switch and a timer: zero is off, `$FF` is on indefinitely, anything else counts down and
+switches itself off.
+
+Measuring this took three attempts and each failure is worth recording, because all three were
+the harness interfering with what it was watching. Forcing a count onto an enemy woke the spawn
+code, which stored over it. Using a missile instead meant the missile *flew*, reached the ship
+and zeroed its own count through the very block being ported. Only a missile parked a long way
+out with a zero step is watched by nothing but the renderer.
+
 ### The binary loads late, and a probe can measure the fill
 
 Found while writing `probe_geometry.mjs`, and it invalidated a finding already in this file.
@@ -1451,8 +1530,10 @@ promoted to fact.
    was open under it: the 2-D screen mapping, all thirty opcodes, and the projection's
    arithmetic.
 5. ~~**The 13-byte record's bytes +0 to +9.**~~ Answered: a frame counter, a 16-bit
-   position and a three-byte attitude. The counter's decrement is read off the handler and
-   was never seen to happen.
+   position and a three-byte attitude. The counter's decrement **does** happen - it is
+   A2-3D2's, at `$6D18`, one per render - and `$FF` is exempt, which is how the byte serves as
+   a switch and a timer at once. See "The object count is a lifetime the renderer runs".
+   This entry read "was never seen to happen" until `probe_entities.mjs` went looking.
 6. ~~**`$81C0`-`$8247`.**~~ Answered: the instrument panel, as display-list instructions.
 7. ~~**What is resident at `$6000`.**~~ Answered for flight: A2-3D2. Not established for
    the title, the demo or the end sequence, where the music loads over the same address.

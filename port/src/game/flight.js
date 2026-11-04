@@ -77,6 +77,42 @@ export function buildStepOperands(math, heading) {
   }
 }
 
+/**
+ * $0A09-$0A60 - wrap a position at the edges of the world.
+ *
+ * Four pairs, each a signed compare followed by a copy of the opposite bound, and each pair
+ * jumps straight past the rest on success - so at most one wrap happens per pass. The
+ * compare's answer is read as the original reads it: `BPL` taken means the X operand is not
+ * above the Y operand.
+ *
+ * Shared, because the same four pairs appear four times over the same four bound entries:
+ * once for the ship at $0A09 and once for each enemy class at $0E70, $127A and $1685.
+ * probe_entities.mjs checks that those four really are the same instruction stream.
+ *
+ * @param {Math24} math
+ * @param {number} x the X position entry's index
+ * @param {number} z the Z position entry's index
+ */
+export function wrapPosition(math, x, z) {
+  // Below the minimum in X: come back at the maximum.
+  if (!(math.compare(VAR.minX, x) >= 0)) {
+    math.copy(VAR.maxX, x);
+    return;
+  }
+  // Above the maximum in X: come back at the minimum.
+  if (!(math.compare(x, VAR.maxX) >= 0)) {
+    math.copy(VAR.minX, x);
+    return;
+  }
+  if (!(math.compare(VAR.minZ, z) >= 0)) {
+    math.copy(VAR.maxZ, z);
+    return;
+  }
+  if (!(math.compare(z, VAR.maxZ) >= 0)) {
+    math.copy(VAR.minZ, z);
+  }
+}
+
 export class Flight {
   constructor() {
     this.math = new Math24();
@@ -127,33 +163,9 @@ export class Flight {
     }
   }
 
-  /**
-   * $0A09-$0A60 - wrap at the edges of the world.
-   *
-   * Four pairs, each a signed compare followed by a copy of the opposite bound, and each
-   * pair jumps straight past the rest on success - so at most one wrap happens per frame.
-   * The compare's answer is read as the original reads it: `BPL` taken means the X operand
-   * is not above the Y operand.
-   */
+  /** $0A09-$0A60 - wrap the ship at the edges of the world. */
   wrap() {
-    const m = this.math;
-    // Below the minimum in X: come back at the maximum.
-    if (!(m.compare(VAR.minX, VAR.posX) >= 0)) {
-      m.copy(VAR.maxX, VAR.posX);
-      return;
-    }
-    // Above the maximum in X: come back at the minimum.
-    if (!(m.compare(VAR.posX, VAR.maxX) >= 0)) {
-      m.copy(VAR.minX, VAR.posX);
-      return;
-    }
-    if (!(m.compare(VAR.minZ, VAR.posZ) >= 0)) {
-      m.copy(VAR.maxZ, VAR.posZ);
-      return;
-    }
-    if (!(m.compare(VAR.posZ, VAR.maxZ) >= 0)) {
-      m.copy(VAR.minZ, VAR.posZ);
-    }
+    wrapPosition(this.math, VAR.posX, VAR.posZ);
   }
 
   /**
