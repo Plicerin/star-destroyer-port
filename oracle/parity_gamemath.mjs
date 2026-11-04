@@ -192,23 +192,26 @@ console.log('\n=== one instruction at a time ===');
         const steps = [{ op: name, addr: OPS[name].addr, x: 3, y: 0 }];
         const regs = { acc: u24(v), b: u24(w) };
         const port = runPort(t, regs, steps);
-        // $9A65 has no overflow guard, and a quotient past 24 bits leaves the real routine
-        // holding garbage this model does not claim to reproduce. Those cases are skipped,
-        // and counted, so the skip cannot quietly swallow the whole sweep.
-        if ((name === 'divide' || name === 'sqrt') && port.last.inDomain === false) {
+        // A quotient past 24 bits saturates the quotient register to $FFFFFF, which the port
+        // now reproduces - probe_geometry.mjs measured it, after this harness had spent its
+        // life skipping those cases outright rather than asking what they did. What is still
+        // not modelled is EXT, which ends up holding a rotation of the shifted dividend that
+        // no call site reads, so the case is compared with EXT out of scope rather than
+        // dropped, and the count is reported either way.
+        const ignores = [...(OPS[name].ignores || [])];
+        if (port.last.inDomain === false) {
           skipped++;
-          continue;
+          ignores.push('EXT');
         }
         n++;
-        const d = diff(await runEngine(t, regs, steps), port, TABLE_BYTES,
-          OPS[name].ignores || []);
+        const d = diff(await runEngine(t, regs, steps), port, TABLE_BYTES, ignores);
         if (d.length) bad.push(`${name} with ${v}/${w}: ${d[0]}`);
       }
     }
     check(`${name} ($${OPS[name].addr.toString(16).toUpperCase()}) agrees`,
       bad.length === 0 && n >= 40,
       bad.slice(0, 2).join('; ')
-        || `${n} cases` + (skipped ? `, ${skipped} skipped as out of the divide's domain` : ''));
+        || `${n} cases` + (skipped ? `, ${skipped} with EXT out of scope past 24 bits` : ''));
   }
 }
 
@@ -217,7 +220,7 @@ console.log('\n=== random programs ===');
 {
   const PROGRAMS = 240;
   const bad = [];
-  let instructions = 0, divides = 0;
+  let instructions = 0, divides = 0, saturated = 0;
   for (let p = 0; p < PROGRAMS; p++) {
     const t = randTable();
     const regs = { acc: Math.floor(rnd() * 0x1000000), b: Math.floor(rnd() * 0x1000000) };
@@ -225,15 +228,21 @@ console.log('\n=== random programs ===');
     instructions += prog.length;
     divides += prog.filter((s) => s.op === 'divide').length;
     const ignores = [...new Set(prog.flatMap((st) => OPS[st.op].ignores || []))];
-    const d = diff(await runEngine(t, regs, prog), runPort(t, regs, prog), TABLE_BYTES,
-      ignores);
+    const port = runPort(t, regs, prog);
+    // As above: a saturating divide leaves EXT holding something no call site reads.
+    if (port.last.inDomain === false) {
+      saturated++;
+      ignores.push('EXT');
+    }
+    const d = diff(await runEngine(t, regs, prog), port, TABLE_BYTES, ignores);
     if (d.length) {
       bad.push(`program ${p} (${prog.map((s) => s.op).join(' ')}): ${d.slice(0, 2).join(', ')}`);
     }
   }
   check('the port and MATH end in the same state after every random program',
     bad.length === 0, bad.slice(0, 2).join(' | ')
-      || `${PROGRAMS} programs, ${instructions} instructions, ${divides} divides`);
+      || `${PROGRAMS} programs, ${instructions} instructions, ${divides} divides,`
+        + ` ${saturated} ending on a saturating divide`);
 }
 
 // --- controls ----------------------------------------------------------------------------------

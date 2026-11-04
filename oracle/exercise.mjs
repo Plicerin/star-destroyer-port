@@ -17,8 +17,9 @@
  * which is in ROM and nothing branches to, so it cannot be reached by accident.
  */
 import { identify } from './screens.mjs';
+import { openDisk, DISK } from './dsk.mjs';
 
-export const LIST = 0x80FB;          // where $6090 points the list pointer, hard-coded
+export const LIST = 0x80FB;        // where $6090 points the list pointer, hard-coded
 export const LIST_LEN = 491;         // SV DATA's length - what has to be saved and restored
 export const SENTINEL = 0xFFFF;      // where the engine returns to, for us
 
@@ -51,8 +52,12 @@ export const op = {
  * guessed: START chains LOGO1, which polls $C000 for 500 BASIC iterations and chains
  * SELECT on a key; SELECT reads $C000 exactly once and chains DEMO if nothing is pending,
  * so the press has to land inside its picture load. Hence knocking rather than tapping.
+ *
+ * It then waits for the game binary to be entirely resident, which a fixed sleep does not
+ * guarantee - see settleBinary.
  */
-export async function toFlight(a2, { difficulty = 1, settleMs = 20000, fill = 0x00 } = {}) {
+export async function toFlight(a2, { difficulty = 1, settleMs = 20000, fill = 0x00,
+  settleCode = true } = {}) {
   await a2.coldStart({ fill });
   let started = false;
   for (let i = 0; i < 60 && !started; i++) {
@@ -76,7 +81,50 @@ export async function toFlight(a2, { difficulty = 1, settleMs = 20000, fill = 0x
   }
   if (chosen !== difficulty) throw new Error('the difficulty screen never took the key');
   await a2.waitMs(settleMs);
-  return { difficulty: chosen };
+  const resident = settleCode ? await settleBinary(a2) : null;
+  return { difficulty: chosen, resident };
+}
+
+/** The game binary, which `SD PART2` BRUNs over $08EF-$1FF0. */
+export const OBJ0 = 'STAR DESTROYER.OBJ0';
+
+/**
+ * The binary's own variables, which live inside its code image and so stop matching the
+ * file the moment the game runs. Measured: over a minute of flight these two windows are
+ * the only addresses in $08EF-$1FF0 that ever differ from the file.
+ */
+export const OBJ0_VARIABLES = [[0x0933, 0x0956], [0x1D4A, 0x1D51]];
+
+/**
+ * Wait until `STAR DESTROYER.OBJ0` is entirely resident, and say how long that took.
+ *
+ * Needed because the settle above is a sleep, and a sleep is not the condition anyone
+ * wants. Measured: with a twenty-second settle, toFlight could return with the last 2,023
+ * bytes of the binary - everything from $17EB up - still holding the power-on fill, because
+ * DOS had not reached those sectors. The subroutines at $1AE8, $1C3D, $1D09 and $1F67 all
+ * live in that window, so a probe that read them during it would be reading nothing at all;
+ * the write that finally fixes $1C3D comes from $B8D6, which is DOS's own RWTS.
+ *
+ * It throws rather than giving up quietly, and it names the addresses that would not settle,
+ * because a wait that times out and carries on is how a probe comes to measure the fill.
+ */
+export async function settleBinary(a2, { tries = 60, waitMs = 500 } = {}) {
+  const disk = openDisk(DISK);
+  const f = disk.read(disk.files.find((x) => x.name === OBJ0));
+  const variable = (a) => OBJ0_VARIABLES.some(([lo, hi]) => a >= lo && a <= hi);
+  let differing = [];
+  for (let i = 0; i < tries; i++) {
+    const live = JSON.parse(await a2.ev(
+      `JSON.stringify(window.M.range(${f.addr}, ${f.addr + f.len}))`));
+    differing = [];
+    for (let k = 0; k < f.len; k++) {
+      if (live[k] !== f.data[k] && !variable(f.addr + k)) differing.push(f.addr + k);
+    }
+    if (!differing.length) return { seconds: (i * waitMs) / 1000 };
+    await a2.waitMs(waitMs);
+  }
+  throw new Error(`${OBJ0} never settled: ${differing.length} bytes still differ from the file,`
+    + ` first at $${differing[0].toString(16)}`);
 }
 
 /** Install the experiment harness in the page. Call once, after toFlight. */

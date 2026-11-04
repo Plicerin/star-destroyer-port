@@ -197,17 +197,17 @@
  },
  "cadence": {
   "cycles": [
-   316677,
-   316412,
-   314169
+   314169,
+   314169,
+   314283
   ],
-  "meanCycles": 315753,
-  "ms": 309.4,
-  "rendersPerSecond": 3.23,
+  "meanCycles": 314207,
+  "ms": 307.9,
+  "rendersPerSecond": 3.25,
   "instructions": [
-   95111,
-   95106,
-   94034
+   94034,
+   94113,
+   94257
   ]
  },
  "patched": [
@@ -236,8 +236,12 @@
    "$63A9"
   ],
   [
+   "$63E8",
+   "$63E8"
+  ],
+  [
    "$684B",
-   "$684B"
+   "$684C"
   ],
   [
    "$7734",
@@ -284,10 +288,6 @@
    "$797B"
   ],
   [
-   "$79A7",
-   "$79A7"
-  ],
-  [
    "$7A22",
    "$7A25"
   ],
@@ -324,16 +324,8 @@
    "$7BAD"
   ],
   [
-   "$7BD9",
-   "$7BD9"
-  ],
-  [
    "$7C20",
    "$7C23"
-  ],
-  [
-   "$7C2D",
-   "$7C2D"
   ],
   [
    "$7C4A",
@@ -344,16 +336,8 @@
    "$7C58"
   ],
   [
-   "$7C68",
-   "$7C68"
-  ],
-  [
    "$7CB6",
    "$7CB9"
-  ],
-  [
-   "$7CC3",
-   "$7CC3"
   ],
   [
    "$7CE0",
@@ -362,10 +346,6 @@
   [
    "$7CEB",
    "$7CEE"
-  ],
-  [
-   "$7CFE",
-   "$7CFE"
   ]
  ],
  "lengths": [
@@ -994,7 +974,7 @@
   {
    "what": "the three frames agree to within 2% - the engine is not frame-synced, it just runs",
    "ok": true,
-   "detail": "314169 to 316677 cycles"
+   "detail": "314169 to 314283 cycles"
   },
   {
    "what": "opcode 14 patched the four viewport bytes in the projection code",
@@ -1004,7 +984,7 @@
   {
    "what": "and the plotting code was patched where opcodes 9 and 12 say it would be",
    "ok": true,
-   "detail": "32 runs between $7700 and $7D00"
+   "detail": "26 runs between $7700 and $7D00"
   },
   {
    "what": "the engine never rewrote its own dispatch table",

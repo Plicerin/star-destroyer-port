@@ -185,24 +185,41 @@ export class Math24 {
    *
    * Neither edge is guarded and the port keeps it that way. With a zero divisor every trial
    * subtraction succeeds, so the quotient fills with ones - $FFFFFF, or +1 after the sign
-   * fix-up - and EXT keeps the shifted dividend. And the quotient register is 24 bits, so a
-   * quotient that does not fit wraps into it and the answer is meaningless. The domain
-   * condition is on the QUOTIENT: 65535*256/1 is fine at $FFFF00 and 65536*256/256 is fine,
-   * but 65536*256/1 is not.
+   * fix-up - and EXT keeps the shifted dividend.
    *
-   * @returns {{inDomain: boolean}} false where the original produces something this does not
+   * **A quotient too wide for 24 bits saturates the same way, it does not wrap.** The
+   * quotient register is three bytes and the trial subtraction keeps succeeding once the
+   * divisor is small enough, so it fills with ones and the answer is $FFFFFF again, signed by
+   * $CE. Measured over 300 divides by oracle/probe_geometry.mjs: 23 overflowing cases, all
+   * 23 saturating, 0 wrapping. This port read it as a wrap until then, which was wrong in a
+   * case the game reaches - the bearing of a target on an axis divides by a nudged delta of
+   * 1, and 409601*256 is far past 24 bits.
+   *
+   * The domain condition is on the QUOTIENT: 65535*256/1 is fine at $FFFF00 and 65536*256/256
+   * is fine, but 65536*256/1 is not. `inDomain` now says only that EXT is modelled; ACC is
+   * right either way. EXT in the overflow case is a rotation of the shifted dividend that no
+   * caller reads - the 229 call sites all reload - so it is left alone rather than invented.
+   *
+   * @returns {{inDomain: boolean}} false where EXT is left as it was rather than modelled
    */
   divideBody() {
     const num = u24(this.acc) * 256, den = u24(this.b);
+    const saturate = () => {
+      this.acc = wrap24(this.sign ? -0xFFFFFF : 0xFFFFFF);
+    };
     if (den === 0) {
       this.ext = num & 0xFFFFFF;
-      this.acc = wrap24(this.sign ? -0xFFFFFF : 0xFFFFFF);
+      saturate();
       return { inDomain: true };
     }
     const q = Math.trunc(num / den);
+    if (q >= 0x1000000) {
+      saturate();
+      return { inDomain: false };
+    }
     this.ext = num % den;
     this.acc = wrap24(this.sign ? -q : q);
-    return { inDomain: q < 0x1000000 };
+    return { inDomain: true };
   }
 
   /**
@@ -315,17 +332,20 @@ export class Math24 {
     let rounds = 0x10;                        // $EE
     this.sign = 0;
     this.b = 0;
+    // The original has no early exit for a divide it cannot do, so neither does this: an
+    // overflowing divide saturates and the iteration carries on from the saturated value.
+    // The flag is only carried out so a caller can see that EXT went unmodelled on the way.
+    let modelled = true;
     for (;;) {
       this.addB();                            // $999E
       // CLC then ROR through $FC, $FB, $FA: a logical shift right of the 24-bit pattern,
       // not an arithmetic one, so a negative ACC becomes a large positive.
       this.acc = wrap24(u24(this.acc) >>> 1);
-      if (this.compareB() === 0) return { inDomain: true };   // $99D8 / BEQ
-      if (--rounds === 0) return { inDomain: true };
+      if (this.compareB() === 0) return { inDomain: modelled };   // $99D8 / BEQ
+      if (--rounds === 0) return { inDomain: modelled };
       this.b = this.acc;                      // $9C86
       this.acc = this.r7;                     // $9CA4
-      const d = this.divideBody();            // $9A6E, with $CE still zero
-      if (!d.inDomain) return { inDomain: false };
+      modelled = this.divideBody().inDomain && modelled;   // $9A6E, with $CE still zero
     }
   }
 

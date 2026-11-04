@@ -48,7 +48,7 @@
   {
    "what": "divide ($9A65) agrees",
    "ok": true,
-   "detail": "74 cases, 6 skipped as out of the divide's domain"
+   "detail": "80 cases, 6 with EXT out of scope past 24 bits"
   },
   {
    "what": "addFrom ($9998) agrees",
@@ -78,7 +78,7 @@
   {
    "what": "the port and MATH end in the same state after every random program",
    "ok": true,
-   "detail": "240 programs, 1577 instructions, 105 divides"
+   "detail": "240 programs, 1577 instructions, 105 divides, 0 ending on a saturating divide"
   },
   {
    "what": "control: the old reading of $999B, where add loads instead of accumulating is caught",

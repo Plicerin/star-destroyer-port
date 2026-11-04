@@ -814,7 +814,7 @@
   {
    "what": "and the overlay is the thing that is running there",
    "ok": true,
-   "detail": "3867 of 5890 bytes match the disk; the rest is its own state"
+   "detail": "5890 of 5890 bytes match the disk; the rest is its own state"
   },
   {
    "what": "it is almost entirely code, reachable from one entry point",

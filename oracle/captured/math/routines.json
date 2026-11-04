@@ -121,7 +121,7 @@
    "detail": "0 matches"
   },
   {
-   "what": "control: nor saturate",
+   "what": "control: nor clamp to the signed range",
    "ok": true,
    "detail": "0 matches"
   },
@@ -136,19 +136,29 @@
    "detail": "65535/1, 32768/1 and 65536/256 are exact; 65536/1 is not"
   },
   {
-   "what": "with paddle 1 at rest the $0948 gate stays closed and MATH is never entered",
+   "what": "past 24 bits the quotient SATURATES to $FFFFFF - it does not wrap into the register",
    "ok": true,
-   "detail": "$0948 = 0, 0 entry points reached in 60 frames"
+   "detail": "11 overflowing divides, all $FFFFFF with the sign fix-up applied, and a wrapping model disagrees with every one"
   },
   {
-   "what": "paddle 1 below $5A opens the gate and the loop starts driving MATH",
+   "what": "with paddle 1 at rest the gate stays closed, so the MOVEMENT block never divides",
    "ok": true,
-   "detail": "$0948 = $FF, 296 calls"
+   "detail": "$0948 = 0, 0 divides from $09E5 or $09FA out of 19"
   },
   {
-   "what": "every division the game actually performs stays inside the domain, over 60 frames",
+   "what": "but MATH runs whatever the gate does - the rest of the loop drives it every pass",
    "ok": true,
-   "detail": "18 divisions, 0 past 24 bits, 0 by zero - 60 frames is evidence, not a proof, so the port still models both edges"
+   "detail": "8 entry points reached and 19 divides with the gate shut, which is the range and bearing blocks and $1C3D"
+  },
+  {
+   "what": "paddle 1 below $5A opens the gate and the movement block starts dividing too",
+   "ok": true,
+   "detail": "$0948 = $FF, 304 calls, 4 from $09E5 and $09FA"
+  },
+  {
+   "what": "every division the movement block performs stays inside the domain",
+   "ok": true,
+   "detail": "4 divides from the movement block, none past 24 bits - a few passes is evidence, not a proof, so the port still models both edges"
   },
   {
    "what": "$9998 loads ACC and then adds, so it is the whole add where $999B is only its tail",

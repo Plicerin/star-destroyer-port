@@ -289,7 +289,7 @@ console.log('  24 rounds of shift-and-trial-subtract, then negate ACC if the sig
     discriminating >= 8, `${discriminating} of ${CTRL.length} tell them apart`);
   check('control: it does not floor', floored === 0, `${floored} matches`);
   check('control: nor use a signed remainder', signedRem === 0, `${signedRem} matches`);
-  check('control: nor saturate', saturating === 0, `${saturating} matches`);
+  check('control: nor clamp to the signed range', saturating === 0, `${saturating} matches`);
 
   // The unguarded edges.
   const z = await run(0x9A65, 3, 0, { 0: 5, 3: 0 }, {});
@@ -314,16 +314,55 @@ console.log('  24 rounds of shift-and-trial-subtract, then negate ACC if the sig
   check('the domain is the QUOTIENT fitting 24 bits, not the numerator', bad.length === 0,
     bad.slice(0, 3).join('; ')
       || '65535/1, 32768/1 and 65536/256 are exact; 65536/1 is not');
+
+  // And what it leaves when the quotient does not fit. This went unasked for a long time -
+  // the port assumed the quotient wrapped into the register and the parity harness skipped
+  // the cases rather than measuring them, which is how an assumption survives. The answer is
+  // that it SATURATES, the same way a zero divisor does: once the divisor is small enough
+  // every trial subtraction succeeds and the quotient fills with ones. It matters because
+  // the bearing block reaches it - a target on an axis divides by a delta of 1.
+  {
+    const over = [], odd = [];
+    for (const [num, den] of [[65536, 1], [70000, 1], [409601, 1], [409601, 2], [8388607, 1],
+      [100000, 1], [-409601, 1], [409601, -1], [-409601, -1], [1000000, 7], [131072, 2]]) {
+      const mag = Math.abs(num) * 256, q = Math.trunc(mag / Math.abs(den));
+      if (q < 0x1000000) continue;
+      over.push([num, den]);
+      const r = await run(0x9A65, 3, 0, { 0: u24(num), 3: u24(den) }, {});
+      const want = s24(u24((num < 0) !== (den < 0) ? -0xFFFFFF : 0xFFFFFF));
+      const wrapped = s24(u24((num < 0) !== (den < 0) ? -q : q));
+      if (s24(r.acc) !== want) odd.push(`${num}/${den}: ${hx(u24(r.acc), 6)}, not the saturation`);
+      // Only informative where the two readings differ at all.
+      if (want === wrapped) odd.push(`${num}/${den}: saturation and wrapping agree here`);
+    }
+    check('past 24 bits the quotient SATURATES to $FFFFFF - it does not wrap into the register',
+      odd.length === 0 && over.length >= 8, odd.slice(0, 3).join('; ')
+        || `${over.length} overflowing divides, all $FFFFFF with the sign fix-up applied,`
+          + ' and a wrapping model disagrees with every one');
+  }
 }
 
 // --- what the running game actually asks for ---------------------------------------------------
-// Whether the unguarded domain matters is a question about the game, not the routine, so it
-// gets measured rather than assumed. $0948 gates the movement block, and paddle 1 under $5A
-// is what opens it - with the paddle at rest MATH is never called at all.
+// Whether the unguarded edges matter is a question about the game, not the routine, so it
+// gets measured rather than assumed. $0948 gates the movement block and paddle 1 under $5A
+// is what opens it.
+//
+// This section used to say that with the paddle at rest MATH is never entered at all. That
+// was wrong, and it was wrong for a reason worth recording: `toFlight` could return while DOS
+// was still loading the last 2,023 bytes of the binary, and the blocks that call MATH
+// irrespective of the gate - the range and bearing at $0C0F onward, the collision subroutine
+// at $1C3D - live in that window. With the whole binary resident they run every pass. The
+// gate closes the MOVEMENT block, not MATH, and the two are told apart here by the divide's
+// own operands rather than by whether MATH was entered.
 console.log('\n=== MATH under warp ===');
 {
+  // The gate the throttle sets is read by the NEXT pass - $09D7 comes before $0A8D in the
+  // loop - so a trace that starts counting the instant the paddle moves is counting the
+  // previous setting. Two passes of about 330,000 cycles each go by first, which is the lag
+  // the port models in Flight.throttle.
   const trace = async (paddle) => {
     await a2.ev(`(() => { window.M.a2.getIO().paddle(1, ${paddle}); return 'p'; })()`);
+    await a2.ev('(() => { window.M.cpu.stepCyclesDebug(700000, () => {}); return 1; })()');
     return JSON.parse(await a2.ev(`JSON.stringify((() => {
       const cpu = window.M.cpu, rd = window.M.rd;
       const seen = {}, hits = [];
@@ -336,7 +375,13 @@ console.log('\n=== MATH under warp ===');
             if (pc === 0x9A65) {
               const st = cpu.getState();
               const g = (b) => rd(b) | (rd(b + 1) << 8) | (rd(b + 2) << 16);
-              hits.push({ x: st.x, y: st.y, num: g(0x9800 + st.y), den: g(0x9800 + st.x) });
+              // JSR has just pushed the address of its own last byte, so the stack says
+              // which block this divide belongs to. Operands alone do not: several blocks
+              // use the same indices.
+              const sp = (st.sp + 1) & 0xff;
+              const from = (rd(0x100 + sp) | (rd(0x100 + ((sp + 1) & 0xff)) << 8)) - 2;
+              hits.push({ from, x: st.x, y: st.y,
+                num: g(0x9800 + st.y), den: g(0x9800 + st.x) });
             }
           }
         });
@@ -344,31 +389,50 @@ console.log('\n=== MATH under warp ===');
       return { seen, gate: rd(0x0948), warp: rd(0x81F3), hits: hits.slice(0, 500) };
     })())`));
   };
+  // The movement block's two divides are at $09E5 and $09FA. Operands do not identify them -
+  // several blocks use the same indices - so the call site does.
+  const MOVEMENT = [0x09E5, 0x09FA];
+  const moves = (hits) => hits.filter(({ from }) => MOVEMENT.includes(from));
+  const sites = (hits) => [...new Set(hits.map(({ from }) => from))].sort()
+    .map((a) => hx(a, 4)).join(', ');
+
   const idle = await trace(255);
-  check('with paddle 1 at rest the $0948 gate stays closed and MATH is never entered',
-    idle.gate === 0 && Object.keys(idle.seen).length === 0,
-    `$0948 = ${idle.gate}, ${Object.keys(idle.seen).length} entry points reached in 60 frames`);
+  console.log('  with the gate shut, $9A65 is called from ' + sites(idle.hits));
+  check('with paddle 1 at rest the gate stays closed, so the MOVEMENT block never divides',
+    idle.gate === 0 && moves(idle.hits).length === 0,
+    `$0948 = ${idle.gate}, ${moves(idle.hits).length} divides from $09E5 or $09FA`
+      + ` out of ${idle.hits.length}`);
+  check('but MATH runs whatever the gate does - the rest of the loop drives it every pass',
+    idle.hits.length > 0 && Object.keys(idle.seen).length > 0,
+    `${Object.keys(idle.seen).length} entry points reached and ${idle.hits.length} divides`
+      + ' with the gate shut, which is the range and bearing blocks and $1C3D');
 
   const warp = await trace(0);
   const total = Object.values(warp.seen).reduce((a, b) => a + b, 0);
   console.log('  calls per entry point over 60 frames under warp: '
     + Object.entries(warp.seen).map(([p, n]) => hx(Number(p), 4) + ' x' + n).join(', '));
-  check('paddle 1 below $5A opens the gate and the loop starts driving MATH',
-    warp.gate === 0xFF && total > 50, `$0948 = ${hx(warp.gate)}, ${total} calls`);
+  console.log('  under warp it is called from ' + sites(warp.hits));
+  check('paddle 1 below $5A opens the gate and the movement block starts dividing too',
+    warp.gate === 0xFF && total > 50 && moves(warp.hits).length > 0,
+    `$0948 = ${hx(warp.gate)}, ${total} calls, ${moves(warp.hits).length} from`
+      + ' $09E5 and $09FA');
 
   // Whether the unguarded divide is a practical problem. An earlier pass answered "yes, 6 of
   // 18", using the wrong domain condition - it tested whether the NUMERATOR times 256 fits in
   // 24 bits, when what has to fit is the quotient. Under the right condition every division
-  // the running game performs is inside, which is the opposite conclusion.
-  const outside = warp.hits.filter(({ num, den }) => {
+  // the MOVEMENT block performs is inside, and the divides the rest of the loop performs are
+  // measured separately, because that is where the saturating case lives.
+  const saturating = (hits) => hits.filter(({ num, den }) => {
     const d = Math.abs(s24(den));
-    return d !== 0 && Math.trunc(Math.abs(s24(num)) * 256 / d) >= 0x1000000;
+    return d === 0 || Math.trunc(Math.abs(s24(num)) * 256 / d) >= 0x1000000;
   });
-  const zeroDen = warp.hits.filter(({ den }) => s24(den) === 0);
-  check('every division the game actually performs stays inside the domain, over 60 frames',
-    warp.hits.length >= 10 && outside.length === 0 && zeroDen.length === 0,
-    `${warp.hits.length} divisions, ${outside.length} past 24 bits, ${zeroDen.length}`
-      + ' by zero - 60 frames is evidence, not a proof, so the port still models both edges');
+  const all = [...idle.hits, ...warp.hits];
+  console.log(`  ${all.length} divisions over both traces, ${saturating(all).length} of them`
+    + ' past 24 bits or by zero');
+  check('every division the movement block performs stays inside the domain',
+    moves(warp.hits).length >= 2 && saturating(moves(warp.hits)).length === 0,
+    `${moves(warp.hits).length} divides from the movement block, none past 24 bits -`
+      + ' a few passes is evidence, not a proof, so the port still models both edges');
 }
 
 // --- the rest of the arithmetic ----------------------------------------------------------------

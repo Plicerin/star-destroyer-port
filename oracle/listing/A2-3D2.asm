@@ -1,6 +1,6 @@
 ; A2-3D2, $6000-$80FA, 8443 bytes, as it is while the game flies.
 ; Produced by probe_renderer.mjs. The bytes are the resident image, which differs
-; from the disk file in 119 places the engine patched into itself.
+; from the disk file in 115 places the engine patched into itself.
 ; Gaps printed as .byte are bytes nothing reaches from the entry points: the
 ; zero-page save area $600C-$606B, the dispatch table at
 ; $60DC, the sine table at $6147, and the engine's own variables.
@@ -378,7 +378,7 @@ $63DF  OP07:         C8         INY
 $63E0                B1 9B      LDA ($9B),Y
 $63E2                8D E8 63   STA $63E8
 $63E5                A9 00      LDA #$00
-$63E7                8D 54 C0   STA $C054
+$63E7                8D 55 C0   STA $C055
 $63EA                F0 C9      BEQ ADV2
 $63EC  OP10:         C8         INY
 $63ED                B1 9B      LDA ($9B),Y
@@ -955,7 +955,7 @@ $6843                20 80 64   JSR MULCORE
 $6846                85 8E      STA $8E
 $6848                86 8F      STX $8F
 $684A                60         RTS
-$684B                .byte $01, $00
+$684B                .byte $03, $01
 $684D  FETCHPT:      84 B2      STY $B2
 $684F                A0 01      LDY #$01
 $6851                B1 9B      LDA ($9B),Y
@@ -2758,7 +2758,7 @@ $799C                C5 BC      CMP $BC
 $799E                B0 03      BCS $79A3
 $79A0                20 A6 79   JSR $79A6
 $79A3                4C F5 77   JMP $77F5
-$79A6                C9 3C      CMP #$3C
+$79A6                C9 1C      CMP #$1C
 $79A8                F0 0D      BEQ $79B7
 $79AA                18         CLC
 $79AB                98         TYA
@@ -3060,7 +3060,7 @@ $7BCE                C5 BD      CMP $BD
 $7BD0                90 03      BCC $7BD5
 $7BD2                20 D8 7B   JSR $7BD8
 $7BD5                4C 27 7A   JMP $7A27
-$7BD8                C9 63      CMP #$63
+$7BD8                C9 43      CMP #$43
 $7BDA                F0 0D      BEQ $7BE9
 $7BDC                38         SEC
 $7BDD                98         TYA
@@ -3109,7 +3109,7 @@ $7C25                F0 2A      BEQ $7C51
 $7C27                A5 9A      LDA $9A
 $7C29                38         SEC
 $7C2A                E9 04      SBC #$04
-$7C2C                C9 40      CMP #$40
+$7C2C                C9 20      CMP #$20
 $7C2E                90 37      BCC $7C67
 $7C30                85 9A      STA $9A
 $7C32                A5 B8      LDA $B8
@@ -3143,7 +3143,7 @@ $7C60                D0 23      BNE $7C85
 $7C62                C8         INY
 $7C63                A9 03      LDA #$03
 $7C65                10 E1      BPL $7C48
-$7C67                C9 3C      CMP #$3C
+$7C67                C9 1C      CMP #$1C
 $7C69                F0 0B      BEQ $7C76
 $7C6B                18         CLC
 $7C6C                98         TYA
@@ -3194,7 +3194,7 @@ $7CBB                F0 2A      BEQ $7CE7
 $7CBD                A5 9A      LDA $9A
 $7CBF                18         CLC
 $7CC0                69 04      ADC #$04
-$7CC2                C9 60      CMP #$60
+$7CC2                C9 40      CMP #$40
 $7CC4                B0 37      BCS $7CFD
 $7CC6                85 9A      STA $9A
 $7CC8                A5 B8      LDA $B8
@@ -3228,7 +3228,7 @@ $7CF6                D0 23      BNE $7D1B
 $7CF8                C8         INY
 $7CF9                A9 03      LDA #$03
 $7CFB                10 E1      BPL $7CDE
-$7CFD                C9 63      CMP #$63
+$7CFD                C9 43      CMP #$43
 $7CFF                F0 0B      BEQ $7D0C
 $7D01                38         SEC
 $7D02                98         TYA

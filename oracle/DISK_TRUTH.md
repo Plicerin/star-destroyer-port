@@ -1108,12 +1108,21 @@ Three consequences, all measured and all kept in the port:
   leave a remainder of 1.
 - **`B` comes back as a magnitude**, because `$9B00` works in place. A later instruction that
   reads `B` sees `|B|`.
-- **Neither edge is guarded.** A zero divisor makes every trial subtraction succeed, so `ACC`
-  fills with ones - `$FFFFFF`, or `+1` after the sign fix-up when the numerator was negative.
-  And the quotient register is 24 bits, so a quotient that does not fit wraps into it and the
-  answer is meaningless. The domain condition is on the **quotient**: `65535*256/1` is fine at
-  `$FFFF00` and `65536*256/256` is fine, but `65536*256/1` is not. Over sixty frames of warp
-  the running game performs eighteen divisions and every one is inside, with no zero divisors.
+- **Neither edge is guarded, and both edges saturate.** A zero divisor makes every trial
+  subtraction succeed, so `ACC` fills with ones - `$FFFFFF`, or `+1` after the sign fix-up when
+  the numerator was negative. **A quotient too wide for 24 bits does the same thing.** The
+  domain condition is on the **quotient**: `65535*256/1` is fine at `$FFFF00` and
+  `65536*256/256` is fine, but `65536*256/1` is not, and what it gives back is `$FFFFFF`, not
+  the low 24 bits of the answer. Measured over 300 divides: 23 overflowing cases, 23
+  saturating, 0 wrapping.
+
+  This was read as a wrap for two commits, and the reason it survived is worth recording. The
+  port wrapped, `parity_gamemath.mjs` *skipped* every out-of-domain case rather than asking
+  what it did, and `probe_math.mjs` asserted only that the answer was "not the quotient" -
+  three places agreeing to leave the question alone. What forced it was porting the bearing,
+  where the case is reachable: a target on an axis gives a nudged delta of 1, and
+  `409601*256` is far past 24 bits. `EXT` in the overflow case is a rotation of the shifted
+  dividend, and that **is** left unmodelled, because no call site reads it.
 
 **The index exits are not part of the contract.** The routines do advance `X` and `Y` -
 `$9C5C` adds three to `Y`, `$9C6C` leaves `X` at zero, `$99D2` exits its compare loop with
@@ -1238,9 +1247,18 @@ $0AA2  INC $0956               and count
 $0AA8  CPX #$37 / ... DEC WARP every 55 passes, spend a unit
 ```
 
-With the paddle at rest the gate is zero, the block is skipped, and the ship stops dead -
-`MATH` is never entered at all. `$09D7` reads the gate *before* `$0A8D` sets it, so throttling
-on takes a pass to bite.
+With the paddle at rest the gate is zero, the block is skipped and the ship stops dead.
+`$09D7` reads the gate *before* `$0A8D` sets it, so throttling on takes a pass to bite.
+
+**The gate does not gate `MATH`.** This file said for a while that with the paddle at rest
+`MATH` was never entered at all, which was wrong, and wrong because of the loading hazard
+below: the blocks that drive `MATH` irrespective of the gate live above `$17EB`, and the
+measurement was taken while that part of the binary had not arrived. With the whole binary
+resident and the gate shut, `$9A65` alone is still called from eight sites every pass -
+`$0C78`, `$0D27`, `$0E4C`, `$0E61`, `$1088`, `$1137`, `$1256`, `$126B` - which are the range
+and bearing blocks. Opening the gate adds exactly two, `$09E5` and `$09FA`, the movement
+block's own. `probe_math.mjs` tells them apart by the return address on the stack, because the
+operands do not: several blocks divide by the same entries.
 
 #### The loop's period
 
@@ -1249,6 +1267,100 @@ main view and then the scope inset through A2-3D2 each time, so it runs at rough
 a video frame rate. Any harness that traces the loop has to be sized in passes: the first
 version of `parity_flight.mjs` budgeted 17,030 cycles a frame, the right number for a video
 frame, and a ninety-frame trace came back holding one sample.
+
+### Range and bearing: the two idioms the loop asks a geometric question with
+
+`probe_geometry.mjs` (28 checks) and `parity_geometry.mjs` (10). Seven of the nine places the
+game works out where something is are one of two blocks of `MATH` instructions, repeated with
+different indices out of the directory at `$08F2` - which is most of why the five big loop
+regions look as repetitive as they do.
+
+**The range appears four times.** Three inline, one per enemy class, each gated on an object
+count: `$0C0F` on `OBJ1.count`, `$101F` on `OBJ2.count`, `$1429` on `OBJ3.count`. The fourth,
+`$1C3D`, is the same seventy-five bytes with an `RTS` after them, called from nine places that
+first copy four coordinates into `$092B`-`$092E`. The 54 bytes after the four index loads are
+**byte-identical in all four**, and the loads are the only thing a copy varies.
+
+```
+$1C3D  LDY $092B / LDX $092D / JSR $99AB / LDY $0908 / JSR $9C7A    dx
+$1C4C  LDY $092C / LDX $092E / JSR $99AB / LDY $0909 / JSR $9C7A    dz
+$1C5B  LDY $0908 / LDX $0920 / JSR $9A17 / JSR $9A04 / ... $090C    |dx| * 2
+$1C6D  LDY $0909 / LDX $0920 / JSR $9A17 / JSR $9A04               |dz| * 2
+$1C79  LDX $090C / JSR $999B / JSR $9AD0 / LDY $090A / JSR $9C7A    + and root
+```
+
+**It is not a distance.** The entry `$0920` points at holds **512**, which is 2.0 in the fixed
+point, so the two multiplies *double* each delta rather than squaring it - there is no second
+operand anywhere that would make it a square. What comes out is
+
+```
+range = sqrt(2 * (|dx| + |dz|))
+```
+
+in world units: the root of twice the L1 norm. Opposite corners of the world are 135 units
+apart on this scale where the Euclidean distance is 6,813, and the thresholds it is compared
+against (`$0926`, `$092F`, `$0932`) are sized for it - the one at `$092F` is 11 units, which
+is an L1 separation of about 60. `probe_geometry.mjs` carries a control that fails if anyone
+replaces it with a hypotenuse. The sum cannot overflow 24 bits, because the world is not wide
+enough: the widest possible is 4,653,056 against `$800000`.
+
+**The bearing appears three times**, always straight after an inline range, reading the deltas
+it left in `$0908` and `$0909`. The three copies are byte-identical across all 257 bytes once
+their jump targets move with them. It is a four-quadrant arctangent in whole degrees, then
+rescaled into the 256-unit heading the display list uses, and four things about it are
+measured oddities the port keeps:
+
+- **It increments the low byte of each delta first**, with no carry (`$0C5A`-`$0C71`). That is
+  what stops a delta of zero dividing by zero - a target on the axis gives 0, which becomes 1
+  - but when a delta's low byte is already `$FF` the increment wraps it to zero and causes the
+  divide by zero it was put there to prevent. A delta of 255 is that case, and the bearing
+  comes out 0. With deltas under a whole unit the increment changes the answer 90 times in 100.
+- **The two positive-`dx` quadrants are resolved against 271 degrees**, not 270: `$0922`
+  points at an entry holding `271 * 256`.
+- **Degrees become heading units by dividing by 359**, not 360, so a full turn is
+  `256*256/359` = 182.55 units rather than 182.04. The two errors partly cancel.
+- **The fold runs to 361 degrees**, which is 257 heading units - more than a byte. The caller
+  at `$0D63` reads the answer as the *middle* byte of the entry, so 257 wraps to 1 and the
+  circle closes.
+
+The fold's shape is worth transliterating rather than tidying. Four blocks of two signed
+compares, and the second one does **not** jump away afterwards: it falls into the third, whose
+tests then run and cannot fire. `$99D2` loads `ACC` and `B` before comparing, so those
+discarded compares still move the registers, and a port that collapsed the four blocks into an
+else-if chain diverges at `$0D21` on 72 of 132 separations.
+
+```
+$0C87  dx < 0, dz < 0  ->  bearing := 90 - bearing   ; JMP $0D21
+$0CAF  dx < 0, dz > 0  ->  bearing := bearing + 90   ; falls through
+$0CD4  dx > 0, dz > 0  ->  bearing := 271 - bearing  ; JMP $0D21
+$0CFC  dx > 0, dz < 0  ->  bearing := bearing + 271
+$0D21  bearing := bearing * 256 / 359
+```
+
+**And each copy ends with forty bytes that are jumped over.** `$0D33`, `$1143` and `$154D`
+hold the same two compare-and-copy pairs: clamp the bearing above at the entry `$0923` points
+at, and below at zero. `$0923` holds `256 * 256` - exactly 256 heading units, one short of the
+257 the live path actually produces. The clamp that would have caught the overshoot is in the
+binary, disabled.
+
+### The binary loads late, and a probe can measure the fill
+
+Found while writing `probe_geometry.mjs`, and it invalidated a finding already in this file.
+
+`SD PART2` does `BRUN STAR DESTROYER.OBJ0`, 5,890 bytes over `$08EF`-`$1FF0`. `toFlight` used
+to hand back the machine after a fixed settle, and measured, that settle could end with the
+**last 2,023 bytes of the binary - everything from `$17EB` up - still holding the power-on
+fill.** The subroutines at `$1AE8`, `$1C3D`, `$1D09` and `$1F67` are all in that window. The
+write that finally puts the code there comes from `$B8D6`, which is DOS's own RWTS.
+
+So `toFlight` now waits for the condition instead of for the clock: it compares live memory
+against the file until they match, and **throws** if they never do. The only addresses that
+ever differ once it is loaded are `$0933`-`$0956` and `$1D4A`-`$1D51`, the binary's own
+variables kept inside its code image.
+
+What this cost: the claim that the warp gate stops `MATH` being entered, corrected above. What
+it is worth guarding against is a probe that reads `$FF FF 00 00` out of a page of code and
+reports a number for it.
 
 ---
 
@@ -1295,7 +1407,16 @@ promoted to fact.
     binary and by nothing else. 241 of its 243 bytes are deterministic. **What still has no
     answer is which code builds it** - 18 indexed stores in `.OBJ0` are the only writers
     found and none of them is on the setup path, so the port starts from a capture.
-14. **The game's state at `$0900`-`$0950`**: `$0901` and `$0903` are position indices,
-    `$090D`-`$0910` index the enemy store, `$0915`-`$0917` the movement operands, `$0947`
-    and `$0956` are counters, `$0948` is the warp gate, `$0949` the saved heading, and the
-    rest is unread.
+14. **The game's state at `$0900`-`$0950`**, now mostly read. `$0901` and `$0903` are the
+    ship's position indices; `$0908`-`$090C` are the range and bearing block's working
+    entries - dx, dz, range, bearing, scratch; `$090D`-`$0910` and `$0930`-`$0931` index the
+    three enemy classes' positions; `$0915`-`$0917` are the movement operands; `$091F`-`$0924`
+    are constants of the build - zero, 2.0, 90 degrees, 271 degrees, a disabled clamp's bound
+    and 359; `$0926`, `$092F` and `$0932` are range thresholds; `$092B`-`$092E` are `$1C3D`'s
+    four argument slots; `$0947` and `$0956` are counters; `$0948` is the warp gate and
+    `$0949` the saved heading; and `$0933`-`$0956` holds the flags and counters the blocks
+    write, which together with `$1D4A`-`$1D51` are the only bytes of the binary's image that
+    change as it runs - `$0938`, `$0939`, `$0943`, `$0947` and `$0949` were seen moving over
+    a minute of flight. What is still unread is
+    `$0905`-`$0907`, `$0911`-`$0914`, `$0918`-`$091E`, `$0925`, `$0927`-`$092A` and
+    `$0933`-`$0937`.

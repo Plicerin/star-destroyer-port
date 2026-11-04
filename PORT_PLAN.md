@@ -221,7 +221,9 @@ Suggested order:
    reference into $6000-$83FF is named by the display-list field it writes.
    That is a dozen instructions of about 401 a frame. The rest of the loop is next, and
    the five large regions ($0957-$0AE0, $0C04-$0DA2, $0E05-$0EF6, $1014-$11AC,
-   $120F-$1300) are where it lives.
+   $120F-$1300) are where it lives. Three of them now open with ported code - see "Range and
+   bearing" below - and what is left in each is the dispatch after it: what the game does
+   with a range and a bearing once it has them.
 
    **Three things block the rest of it**, and they should be settled before more code is
    written, because everything in the loop runs through them:
@@ -246,8 +248,17 @@ Suggested order:
      the sweep never varies. Where a routine might hold state, **read it**.
 
      It also turned up the warp gate: `$0948` is set from paddle 1 at `$0A8D`, and with the
-     paddle at rest the movement block never runs and `MATH` is never called. Any trace of
-     the loop's movement code has to engage warp first.
+     paddle at rest the movement block never runs. Any trace of the loop's movement code has
+     to engage warp first - **but the gate does not stop `MATH`**. This plan and DISK_TRUTH
+     both said it did, which was an artifact of measuring while the top 2KB of the binary
+     had not finished loading; the range and bearing blocks drive `MATH` every pass whatever
+     the gate does. Corrected, with the call sites, under "Range and bearing" in DISK_TRUTH.
+
+     One substantive thing in `MATH` was also wrong until the bearing forced it: a quotient
+     too wide for 24 bits **saturates** to `$FFFFFF` rather than wrapping into the register.
+     The port wrapped, `parity_gamemath.mjs` skipped those cases instead of measuring them,
+     and `probe_math.mjs` only asserted the answer was "not the quotient" - three places
+     agreeing to leave a question alone. It is reachable in play, so it mattered.
    - ~~**The table at `$9801`.**~~ Mostly done. It is `MATH`'s own storage at
      `$9800`-`$98F2`, byte-indexed through a directory of 65 offsets at `$08F2`, and the
      binary is the only writer - no file loads there and no BASIC line POKEs there. 241 of
@@ -259,16 +270,40 @@ Suggested order:
      the only writers found and none is on the setup path. The capture stands in for that
      until it is found, and it is honest because it is verified deterministic - but it is a
      capture, not an understanding.
-   - **The state at `$0900`-`$0950`.** Partly mapped: `$0901`/`$0903` are the position
-     indices, `$0915`-`$0917` the movement operands, `$090D`-`$0910` index the enemy store,
-     `$0948` is the warp gate and `$0949` the saved heading, `$0947` and `$0956` are
-     counters. The rest is unread, and mapping it is what makes the remaining five regions
-     readable rather than transliterable.
+   - ~~**The state at `$0900`-`$0950`.**~~ **Mostly mapped**, and mapping it is what made
+     the five regions readable rather than transliterable. `$0901`/`$0903` are the ship's
+     position indices; `$0908`-`$090C` the range and bearing block's working entries;
+     `$090D`-`$0910` and `$0930`-`$0931` index the three enemy classes; `$0915`-`$0917` the
+     movement operands; `$091F`-`$0924` are constants of the build; `$0926`, `$092F` and
+     `$0932` range thresholds; `$092B`-`$092E` are `$1C3D`'s argument slots; `$0948` the
+     warp gate and `$0949` the saved heading. See open question 14 in DISK_TRUTH for the
+     eighteen bytes still unread, none of which the two ported idioms touch.
 
    **Movement is ported.** `port/src/game/flight.js` and `port/src/game/tables.js`, held by
    `parity_flight.mjs` - 19 checks, including a frame-by-frame replay seeded once and never
    resynchronised, all four wraps provoked in the machine, and the published `XI`/`ZI`. See
    DISK_TRUTH, "Flying: the heading, the throttle and the edge of the world".
+
+   **Range and bearing are ported.** `port/src/game/geometry.js`, held by
+   `parity_geometry.mjs` (10 checks) over `probe_geometry.mjs` (28). This is the piece that
+   makes the five regions mostly already-written: seven of the nine places the game asks a
+   geometric question are one of these two blocks with different indices, and the probe
+   proves it by byte comparison - the four range copies share 54 identical bytes after their
+   index loads, the three bearing copies are identical across all 257 once their jump targets
+   move. So `$0C04-$0DA2`, `$1014-$11AC` and `$138D-$1798` each begin with code that now
+   exists.
+
+   Three measured things in them that a reasonable port would get wrong, all with controls:
+   the range is `sqrt(2 * (|dx| + |dz|))` and **not** a Euclidean distance; the bearing
+   increments each delta's low byte before dividing, which both prevents and causes a divide
+   by zero; and its quadrant fold uses **271** degrees and **359** degrees-per-turn. There is
+   also a disabled clamp sitting in all three copies that would have caught the one-unit
+   overshoot the live path produces.
+
+   **A hazard fixed on the way**, in `exercise.mjs`: `toFlight` could return before DOS had
+   finished loading the binary, leaving everything above `$17EB` holding the power-on fill.
+   It now waits for live memory to match the file and throws if it never does. Two findings
+   had already been built on measurements taken inside that window.
 
    Useful structure already established: an enemy is ONE entity with TWO object
    instructions, *i* in the main view and *i+12* in the scope, switched on and moved
