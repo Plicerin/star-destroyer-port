@@ -80,7 +80,9 @@ export const MISSILE_Y = -10;
  * The addresses are carried along because they are the port's provenance and the harnesses
  * drive the blocks by them: `at` and `exit` bracket the dispatch, `coolDownAt` the four
  * instructions that run the cooldown down, and `reachAt`, `holdAt`, `moveAt` and `missileAt`
- * the four blocks in entities.js.
+ * the four blocks in entities.js. The rest - `shotAt`, `tickAt`, `awardAt`, `respawnAt`,
+ * `debrisPlace`, `enemyOff` - belong to kill.js, and `wave`, `bump`, `score`,
+ * `debrisCounter` and `cascadeTo` are the parameters those blocks differ in.
  */
 export const CLASSES = [
   {
@@ -105,6 +107,11 @@ export const CLASSES = [
     moveAt: 0x0E3D, moveExit: 0x0EF3,
     missileAt: 0x0F83, missileExit: 0x1014,
     explode: 0x1E98,
+    debrisPlace: 0x1944, enemyOff: 0x1AAC,
+    shotAt: [0x0EF3, 0x0F3B],
+    debrisCounter: 0x093E, tickAt: 0x1829, tickExit: 0x1837,
+    score: 0x1FFC, awardAt: 0x1895,
+    wave: 0x1FF9, bump: 10, respawnAt: 0x1E98, cascadeTo: null,
   },
   {
     name: 'class 2',
@@ -128,6 +135,11 @@ export const CLASSES = [
     moveAt: 0x1247, moveExit: 0x12FD,
     missileAt: 0x138D, missileExit: 0x141E,
     explode: 0x1EC9,
+    debrisPlace: 0x19B1, enemyOff: 0x1AB5,
+    shotAt: [0x12FD, 0x1345],
+    debrisCounter: 0x093F, tickAt: 0x1837, tickExit: 0x1844,
+    score: 0x1FFD, awardAt: 0x18A2,
+    wave: 0x1FFA, bump: 20, respawnAt: 0x1EC9, cascadeTo: 2,
   },
   {
     name: 'class 3',
@@ -151,6 +163,11 @@ export const CLASSES = [
     moveAt: 0x1652, moveExit: 0x1708,
     missileAt: 0x1798, missileExit: 0x1829,
     explode: 0x1EFA,
+    debrisPlace: 0x1A1E, enemyOff: 0x1ABE,
+    shotAt: [0x1708, 0x1750],
+    debrisCounter: 0x0940, tickAt: 0x1844, tickExit: 0x1851,
+    score: 0x1FFE, awardAt: 0x18AF,
+    wave: 0x1FFB, bump: 20, respawnAt: 0x1EFA, cascadeTo: null,
   },
 ];
 

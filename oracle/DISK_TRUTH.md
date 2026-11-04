@@ -1463,6 +1463,87 @@ the harness stops at the `JSR`.
 Neither movement block touches an object's **Y**, so an enemy's altitude is whatever its spawn
 set.
 
+### Killing an enemy: the shot, the debris and the respawn
+
+`probe_kill.mjs` (15 checks) and `parity_kill.mjs` (12). Six blocks and nine subroutines,
+perfectly regular - two player shots against three enemy classes - and three parts of the
+chain that are not what they look like.
+
+```
+$0EF3  LDX OBJ6.count / BEQ          is this shot up?
+$0EF8  copy the shot and the enemy into $092B-$092E / JSR $1C3D
+$0F1F  LDY $090A / LDX $092F / JSR $99D2 / BPL    range <= 11 units: a hit
+$0F2A  STA $093E                      the debris counter, 4
+$0F2F  JSR $1944                      put the debris where the enemy is
+$0F32  JSR $1F67                      switch the shot off
+$0F35  JSR $1A8B                      aim the debris along the shot's heading
+$0F38  JSR $1AAC                      switch the enemy off
+```
+
+All six run the same 25 opcodes in the same order; each names the debris placer for its
+**class** (`$1944`, `$19B1`, `$1A1E`) and the aim for its **shot** (`$1A8B`, `$1AC7`). The
+threshold is `$092F` - the same entry an enemy rams the ship at, 11 units of range.
+
+Switching a shot off takes two routines: `$1F67` zeroes the main record's count and `$1A8B`'s
+own tail zeroes the scope twin's. Nothing says why they are split.
+
+**The debris is four objects and only three are ever drawn.** `$1944` copies the dead enemy's
+published X and Z into objects 8, 9, 10, 11 and the twins 20, 21, 22, 23, and `$1A8B` copies
+the shot's heading into all eight. But the only code in the binary that writes a debris
+object's count is `$1D09`, and it writes six addresses: 8/20, 9/21 and 10/22. **Nothing
+anywhere switches objects 11 and 23 on.** Their position and heading are maintained on every
+kill and they are never seen.
+
+**The debris is an animation driven down by a counter**, one piece a pass. `$1829`, `$1837`
+and `$1844` tick each class's counter and call `$1D09` with the value: 4 switches on the first
+pair, 3 the second, 2 the third, and **1 respawns the enemy**. Each piece gets a count of 1, so
+the renderer draws it once and switches it off - a three-pass puff. The three tests are
+`CPX`/`BEQ` on **equality**, so a counter above 4 would match none of them and fall through to
+the respawn; nothing in play is above 4, and the port reproduces the test as written because
+the first version that read it as `>= 4` was caught by parity.
+
+#### The respawn has an `ADC` with no `CLC`
+
+`$1E98`, `$1EC9` and `$1EFA`, one per class:
+
+```
+LDX wave / BEQ            nothing left in this wave
+DEC wave
+OBJ.count := $FF, twin too
+LDA #bump / ADC $9802,Y   the enemy's X high byte, plus the bump, plus the CALLER'S CARRY
+store to the entry and to both records
+LDA #$96                  and a fixed Z high byte
+```
+
+The bump is 10 for class 1 and 20 for classes 2 and 3, and there is no `CLC` before the `ADC`,
+so what it actually adds is 10 or 11 and 20 or 21. Measured, **both callers arrive with the
+carry set**: the debris tick comes through `$1D09`'s `CPY #$01`/`#$02`/`#$03` equality, which
+sets it, and the reach block comes through `JSR $99D2`, and MATH's compare leaves it set. So in
+play the bump is always one more than the immediate operand says. The port takes the carry as
+an argument rather than hard-coding 11, so the control can tell the two apart - and it fails on
+6 of 6.
+
+The Z it writes, `$96`, is the high byte only, which makes the coordinate 38,400 or so - far
+outside the `maxZ` of 1,600 the movement block wraps against. A fresh enemy therefore snaps to
+the Z edge on its first pass and flies in from there. It is also where class 1's enemies start,
+so this is the game putting them back.
+
+**Class 2's respawn cascades into class 3's.** `$1ECC` is `BEQ $1EFA`, and `$1EFA` is class 3's
+routine - so with class 2's wave counter empty it does not return, it spawns a class 3 enemy
+and decrements that wave instead. Classes 1 and 3 branch to a local `CLC`/`RTS`. Measured
+directly: with `$1FFA` at 0 and `$1FFB` at 5, object 3 comes on and `$1FFB` goes to 4.
+
+#### The score, and why two blocks' order decides it
+
+`$1895`, `$18A2` and `$18AF` are `LDX counter / CPX #$03 / BCC past it / JSR $1DD3 / INC score`,
+one per class, incrementing `$1FFC`, `$1FFD` and `$1FFE`. They fire while the debris counter is
+3 or more, which is 4 and 3 - two passes, so two increments.
+
+Except it is one. Traced over a pass, the loop visits `$1829` **before** `$1895`, so the tick
+has already decremented when the award looks: the counter is 3 on the pass after the kill and 2
+the pass after that, and the score goes up exactly once. `$1895` sits *below* `$1829` in memory
+and the loop does not run in address order, so this was traced rather than read.
+
 #### The object count is a lifetime the renderer runs, and `$FF` means forever
 
 This answers an open question and corrects what this file said about it. The 13-byte record's

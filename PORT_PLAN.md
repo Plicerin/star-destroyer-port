@@ -348,9 +348,29 @@ Suggested order:
    switch and a timer at once. Nothing in .OBJ0 ever decrements a count, so a missile's
    twenty-frame life is twenty renders and the loop has no part in it.
 
-   **What is left in the three regions** is the explosion routines ($1E98, $1EC9, $1EFA), the
-   damage routines the two arrival flags trigger ($1C99 and $1CFC through $18BC and $18C9),
-   and the player's own shots at $0EF3, $0F3B and their copies.
+   **The kill chain is ported.** `port/src/game/kill.js`, held by `parity_kill.mjs` (12
+   checks) over `probe_kill.mjs` (15). The player's two shots against the three classes - six
+   blocks, perfectly regular - plus the nine subroutines a hit calls, the debris animation,
+   the respawn and the score.
+
+   Three things in it are not what they look like, and each is a control:
+
+   - **the debris is four objects and three are drawn.** Objects 11 and 23 are positioned and
+     aimed on every kill and nothing in the binary ever gives them a count
+   - **the respawn's `ADC` has no `CLC`**, so its bump is 10 or 11 (and 20 or 21) depending on
+     the caller's carry. Both callers arrive with it set, for different reasons, so in play it
+     is always the higher number. The port takes the carry as an argument
+   - **class 2's respawn cascades into class 3's**: `$1ECC` is `BEQ $1EFA`, so an exhausted
+     class 2 spawns a class 3 enemy rather than returning
+
+   Parity caught one real port bug on the way: `$1D09`'s three tests are `CPX`/`BEQ` on
+   equality, not a range, so a debris counter above 4 falls through to the respawn. The first
+   version read `>= 4`.
+
+   **What is left in the three regions** is the damage routines the two arrival flags trigger
+   ($1C99 and $1CFC, through $18BC and $18C9), which is the shield and the player's lives, and
+   then Phase 6's sound - $1D52 with its parameter block at $1D4A-$1D51, which $1DD3 and $1F8E
+   fill in.
 
    **A hazard fixed on the way**, in `exercise.mjs`: `toFlight` could return before DOS had
    finished loading the binary, leaving everything above `$17EB` holding the power-on fill.
