@@ -240,12 +240,27 @@ Suggested order:
      It also turned up the warp gate: `$0948` is set from paddle 1 at `$0A8D`, and with the
      paddle at rest the movement block never runs and `MATH` is never called. Any trace of
      the loop's movement code has to engage warp first.
-   - **The table at `$9801`.** The ship's position is an index into it, and nothing seen
-     so far writes it. Find out what does; it may be built at startup or loaded by a file
-     this plan has not looked at.
-   - **The state at `$0900`-`$0950`.** `$0901`/`$0903` are the position indices,
-     `$090D`-`$0910` index the enemy store, `$0948` gates a block. Mapping it is what
-     makes the rest of the loop readable rather than transliterable.
+   - ~~**The table at `$9801`.**~~ Mostly done. It is `MATH`'s own storage at
+     `$9800`-`$98F2`, byte-indexed through a directory of 65 offsets at `$08F2`, and the
+     binary is the only writer - no file loads there and no BASIC line POKEs there. 241 of
+     its 243 bytes come out identical from a `$00` and an `$A5` power-on fill, so the port
+     starts from a generated capture (`gen_game_tables.mjs`) and `parity_flight.mjs` checks
+     the capture against the machine.
+
+     **What is still open** is which code builds it: the 18 indexed stores in `.OBJ0` are
+     the only writers found and none is on the setup path. The capture stands in for that
+     until it is found, and it is honest because it is verified deterministic - but it is a
+     capture, not an understanding.
+   - **The state at `$0900`-`$0950`.** Partly mapped: `$0901`/`$0903` are the position
+     indices, `$0915`-`$0917` the movement operands, `$090D`-`$0910` index the enemy store,
+     `$0948` is the warp gate and `$0949` the saved heading, `$0947` and `$0956` are
+     counters. The rest is unread, and mapping it is what makes the remaining five regions
+     readable rather than transliterable.
+
+   **Movement is ported.** `port/src/game/flight.js` and `port/src/game/tables.js`, held by
+   `parity_flight.mjs` - 19 checks, including a frame-by-frame replay seeded once and never
+   resynchronised, all four wraps provoked in the machine, and the published `XI`/`ZI`. See
+   DISK_TRUTH, "Flying: the heading, the throttle and the edge of the world".
 
    Useful structure already established: an enemy is ONE entity with TWO object
    instructions, *i* in the main view and *i+12* in the scope, switched on and moved

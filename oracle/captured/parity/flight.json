@@ -1,0 +1,100 @@
+{
+ "results": [
+  {
+   "what": "the oracle reaches flight",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "what": "the generated TABLE_INIT matches the machine at the start of flight",
+   "ok": true,
+   "detail": "241 bytes, 2 skipped as uninitialised"
+  },
+  {
+   "what": "and the uninitialised bytes are the two the generator found",
+   "ok": true,
+   "detail": "[104, 105]"
+  },
+  {
+   "what": "the trace sampled the movement block on every pass",
+   "ok": true,
+   "detail": "24 of 24 samples"
+  },
+  {
+   "what": "and the gate is open, so the block actually ran",
+   "ok": true,
+   "detail": "23 of 24 frames open"
+  },
+  {
+   "what": "and the ship moved, so there is something to get wrong",
+   "ok": true,
+   "detail": "23 distinct X positions across 24 frames"
+  },
+  {
+   "what": "and the coordinate it publishes matches XI and ZI in the display list",
+   "ok": true,
+   "detail": "23 frames of XI and ZI"
+  },
+  {
+   "what": "the port reproduces every position in the trace, seeded once and never resynced",
+   "ok": true,
+   "detail": "23 steps, 24 bits each, fraction included"
+  },
+  {
+   "what": "the heading changes during the trace, so the heading tables are exercised",
+   "ok": true,
+   "detail": "24 distinct headings over 24 frames"
+  },
+  {
+   "what": "the port follows the turn exactly",
+   "ok": true,
+   "detail": "23 steps across 24 headings"
+  },
+  {
+   "what": "control: replaying it with the heading frozen does not match",
+   "ok": true,
+   "detail": "22 of 23 steps differ"
+  },
+  {
+   "what": "X past the maximum: the machine wraps on the next pass and the port wraps with it",
+   "ok": true,
+   "detail": "6 samples, wrapped on step 0: true, 5 steps"
+  },
+  {
+   "what": "X past the minimum: the machine wraps on the next pass and the port wraps with it",
+   "ok": true,
+   "detail": "6 samples, wrapped on step 0: true, 5 steps"
+  },
+  {
+   "what": "Z past the maximum: the machine wraps on the next pass and the port wraps with it",
+   "ok": true,
+   "detail": "6 samples, wrapped on step 0: true, 5 steps"
+  },
+  {
+   "what": "Z past the minimum: the machine wraps on the next pass and the port wraps with it",
+   "ok": true,
+   "detail": "6 samples, wrapped on step 0: true, 5 steps"
+  },
+  {
+   "what": "with the paddle at rest the gate closes and the ship stops dead",
+   "ok": true,
+   "detail": "10 frames, position unchanged: true"
+  },
+  {
+   "what": "and the port stands still too, running the wrap but not the move",
+   "ok": true,
+   "detail": "9 steps"
+  },
+  {
+   "what": "warp fuel is spent while engaged",
+   "ok": true,
+   "detail": "WARP went from 243 to 242"
+  },
+  {
+   "what": "the port spends it on the same frames, from the same counter",
+   "ok": true,
+   "detail": "13 frames, 1 unit spent"
+  }
+ ],
+ "straightSamples": 24
+}

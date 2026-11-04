@@ -1000,8 +1000,8 @@ rather than reading the BASIC's.
 `MATH`, which is answered below. The same values go to `OBJ12`, so whatever object 12 is moves
 with the ship.
 
-Still unknown, and needed before the rest of the loop can be ported: what writes the `$9800`
-table, and the layout of the game's state at `$0900`-`$0950`.
+Still unknown, and needed before the rest of the loop can be ported: which code builds the
+`$9800` table in the first place, and the rest of the game's state at `$0900`-`$0950`.
 
 ### `MATH` at `$98F3` - a 24-bit accumulator machine
 
@@ -1108,6 +1108,103 @@ A smaller version of the same mistake, caught by a check rather than by rereadin
 3 after every call made with `X` = 3, which looked like the entry size. It is the index the
 caller passed.
 
+### Flying: the heading, the throttle and the edge of the world
+
+`MATH` is the arithmetic; this is what the frame loop asks it for. The movement block runs
+between `$09D1` and `$0A60` and does three things.
+
+**It builds a step from the heading.** `$1AE8` takes the heading out of the display list,
+indexes two tables in `HEADING DATA`, and writes each component into a `MATH` entry:
+
+```
+$1AE8  LDY $0949            the heading, saved from H1.heading at $09D4
+$1AEB  LDA $89CB,Y          the X component
+$1AEE  LDY $0915
+$1AF1  STA $9801,Y          into the MIDDLE byte of the entry
+$1AF4  CMP #$7F / BCC / BEQ
+$1AFA  LDA #$FF             sign-extend into the high byte
+$1B06  STA $9800,Y          low byte zero
+       ... the same for $8ACF into $0916 ...
+```
+
+So an entry is the component times 256 - a whole number of coordinate units with no fraction.
+
+`$89CB` and `$8ACF` are a sine and a cosine of amplitude 100 over a 256-step circle, 260 bytes
+apart inside a 520-byte file. **No closed form reproduces them.** A sweep of 102 candidates -
+amplitudes 96 to 104 in halves, each with round, trunc and floor, with and without a half-step
+phase - leaves `trunc(100*sin)` closest at a mean error of 0.17 and a worst of 3, and nothing
+exact. The quarter turn reads 99 where every amplitude-100 model gives 100, so whatever
+generated them, probably Applesoft's own `SIN`, is not worth guessing at. The port embeds the
+512 bytes, for the same reason `gen_tables.mjs` embeds the engine's plotting tables.
+
+Worth noting that the sign test at `$1AF4` separates `$7F` from `$80` by hand, with two
+branches rather than a `BMI` - and that **no table entry can reach either**, because the
+components run -100 to 99. The branch is unreachable in play. The port keeps it anyway.
+
+**It divides, adds and stores.** Three `MATH` instructions an axis, with the accumulator
+carrying the value between them:
+
+```
+$09DF  LDY $0915 / LDX $0917 / JSR $9A65     ACC := step * 256 / throttle
+$09E8  LDX $0901 / JSR $999B                 ACC += position
+$09EE  LDY $0901 / JSR $9C7A                 position := ACC
+```
+
+**The throttle is a divisor.** `$0917` names an entry holding 1280, so the largest step is
+`100 * 256 * 256 / 1280` = 5120, which is 20 coordinate units a pass. A larger value there
+means a slower ship.
+
+**Position is 24-bit and the coordinate is its top two bytes.** `$0A66` publishes `$9801,Y`
+and `$9802,Y` into `XI` (`$8116`) and object 12, and `$0A7B` does the same for Z into `ZI`
+(`$811A`). The lowest byte of a position is a fraction the renderer never sees, which is what
+lets the ship travel at a fraction of a unit a pass and still hand over whole numbers.
+
+**The world wraps.** Four compare-and-copy pairs at `$0A09`, each jumping past the rest on
+success, so at most one wrap happens per pass. X wraps symmetrically at +/-786432, which is
++/-3072 units. **Z does not**: `+409600` and `-344064`, or `+1600` and `-1344`. The asymmetry
+is in the data, and the port keeps it.
+
+The wrap test comes *after* the step, which matters to anything trying to provoke one: a
+position placed within one pass's travel of a bound can be pulled back inside before the
+compare and never wrap at all.
+
+#### The variable directory at `$08F2`
+
+`$08F2` onward in `.OBJ0` is a list of 65 byte offsets into `MATH`'s table, one per 24-bit
+variable, running 0 to 221. The frame loop reads them with `LDX`/`LDY`, so `LDX $0901` means
+"the index of the ship's X", not a value. Nothing ever writes them - they are constants of the
+build, sitting immediately after the `JMP $0957` that starts the file.
+
+Mostly three apart, but the stride breaks three times: 87 to 106, 124 to 128, 170 to 185.
+**Thirty-five of the offsets are not multiples of three**, which is why the table has to be
+modelled as bytes rather than as an array of entries. The throttle at offset 128 is one of
+them.
+
+#### The warp gate
+
+`$0948` gates the whole movement block, and `$0A8D` is what sets it:
+
+```
+$0A8D  LDX #$01 / JSR PREAD    paddle 1
+$0A92  CPY #$5A / BCS          at or above $5A: closed
+$0A96  LDX WARP / CPX #$C7     $81F3 exhausted: closed
+$0A9D  LDX #$FF / STX $0948    otherwise open
+$0AA2  INC $0956               and count
+$0AA8  CPX #$37 / ... DEC WARP every 55 passes, spend a unit
+```
+
+With the paddle at rest the gate is zero, the block is skipped, and the ship stops dead -
+`MATH` is never entered at all. `$09D7` reads the gate *before* `$0A8D` sets it, so throttling
+on takes a pass to bite.
+
+#### The loop's period
+
+One pass is about **126,600 instructions**, measured over seven intervals. The game renders the
+main view and then the scope inset through A2-3D2 each time, so it runs at roughly 3Hz, not at
+a video frame rate. Any harness that traces the loop has to be sized in passes: the first
+version of `parity_flight.mjs` budgeted 17,030 cycles a frame, the right number for a video
+frame, and a ninety-frame trace came back holding one sample.
+
 ---
 
 ## Open questions
@@ -1144,15 +1241,16 @@ promoted to fact.
 10. **The `DEMO` path**, never walked.
 11. ~~**The world-to-view transform.**~~ Derived, above, and both routines under it are
     now transliterated and held by `parity_math.mjs` and `parity_view.mjs`.
-12. ~~**`MATH` (`$98F3`).**~~ Answered, below: a 24-bit accumulator machine, nine entry
-    points, ported and held by `parity_gamemath.mjs`. **`HEADING DATA` (`$89CB`)** is still
-    open - it is resident in flight, byte-for-byte as the disk has it, and nothing yet
-    traced reads it.
-13. **The table at `$9800`**, which `MATH` operates on and the frame loop indexes to turn
-    the ship's position into a coordinate. It is not Applesoft's - the running program has
-    no arrays - and nothing yet seen writes it. Its extent is `$9800`-`$98F2`, 243 bytes,
-    because `MATH`'s own code begins at `$98F3`.
+12. ~~**`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).**~~ Both answered, below. `MATH` is a
+    24-bit accumulator machine with nine entry points; `HEADING DATA` is a sine and cosine
+    pair of amplitude 100 that `$1AE8` reads to build the ship's step. Ported and held by
+    `parity_gamemath.mjs` and `parity_flight.mjs`.
+13. ~~**The table at `$9800`.**~~ Answered as far as it needs to be, below: `MATH`'s own
+    storage, `$9800`-`$98F2`, byte-indexed through a directory at `$08F2`, written by the
+    binary and by nothing else. 241 of its 243 bytes are deterministic. **What still has no
+    answer is which code builds it** - 18 indexed stores in `.OBJ0` are the only writers
+    found and none of them is on the setup path, so the port starts from a capture.
 14. **The game's state at `$0900`-`$0950`**: `$0901` and `$0903` are position indices,
-    `$090D`-`$0910` index the enemy store, `$0915`-`$0917` are the divide's operands,
-    `$0947` and `$0956` are counters, and the rest is unread. `$0948` is answered - the
-    warp gate, below.
+    `$090D`-`$0910` index the enemy store, `$0915`-`$0917` the movement operands, `$0947`
+    and `$0956` are counters, `$0948` is the warp gate, `$0949` the saved heading, and the
+    rest is unread.

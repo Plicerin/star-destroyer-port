@@ -52,8 +52,8 @@ export const op = {
  * SELECT on a key; SELECT reads $C000 exactly once and chains DEMO if nothing is pending,
  * so the press has to land inside its picture load. Hence knocking rather than tapping.
  */
-export async function toFlight(a2, { difficulty = 1, settleMs = 20000 } = {}) {
-  await a2.coldStart();
+export async function toFlight(a2, { difficulty = 1, settleMs = 20000, fill = 0x00 } = {}) {
+  await a2.coldStart({ fill });
   let started = false;
   for (let i = 0; i < 60 && !started; i++) {
     await a2.waitMs(500);
