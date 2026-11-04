@@ -300,6 +300,35 @@ Suggested order:
    also a disabled clamp sitting in all three copies that would have caught the one-unit
    overshoot the live path produces.
 
+   **The dispatch is ported.** `port/src/game/dispatch.js` and
+   `port/src/game/objects.js`, held by `parity_dispatch.mjs` (12 checks) over
+   `probe_dispatch.mjs` (21). This is what each of those three regions does with the range and
+   bearing it has just worked out: turn the enemy toward the bearing, and fire when it lines
+   up. `objects.js` is the display list's record layout, which the dispatch needs and the
+   missile flight and the publish will need after it.
+
+   Unlike the range and bearing, **the three copies here are not copies.** Dropping two
+   redundant stores that only class 1 has, all three run the same 58 opcodes in the same
+   order, bar one - but they differ in four things that matter, and a port written from one
+   copy gets three of them wrong in the others:
+
+   - the cooldown branch lands on a different turn label, so the same code turns +2 for class
+     1 and -3 for classes 2 and 3
+   - class 3's cooldown is 15 frames where the others are 20
+   - classes 2 and 3 share one missile, object 5, so either firing blocks the other
+   - class 3's launch-sound flag is set with `STA` where the others use `STX`, so it takes the
+     enemy's heading instead of the 1 the dead `LDX #$01` loaded - which only shows at heading
+     0, where class 3 launches silently
+
+   Each of those is a control in `parity_dispatch.mjs`, along with three for the turn itself,
+   and all seven fire.
+
+   **What is left in the three regions** is the collision test at the top of the next block
+   ($0E05, $120F, $1619, each calling an explosion routine at $1E98, $1EC9 or $1EFA), the
+   enemy's own movement below it, and the missile flight at $0F83, $138D and $1798. The
+   cooldown decrements at $0E23, $122D and $1637 are ported, because the dispatch's cooldown
+   means nothing without them.
+
    **A hazard fixed on the way**, in `exercise.mjs`: `toFlight` could return before DOS had
    finished loading the binary, leaving everything above `$17EB` holding the power-on fill.
    It now waits for live memory to match the file and throws if it never does. Two findings

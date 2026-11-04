@@ -1343,6 +1343,70 @@ at, and below at zero. `$0923` holds `256 * 256` - exactly 256 heading units, on
 257 the live path actually produces. The clamp that would have caught the overshoot is in the
 binary, disabled.
 
+### The dispatch: what an enemy does with a bearing
+
+`probe_dispatch.mjs` (21 checks) and `parity_dispatch.mjs` (12). The block that follows each
+inline range-and-bearing - `$0D5B`, `$116B`, `$1575`, one per enemy class - turns the enemy
+toward the bearing and fires a missile when it lines up. Unlike the range and bearing above,
+**these three are not copies**: they are the same shape with four real differences, and every
+one is a detail a port written from one copy would get wrong in the other two.
+
+What they share. Dropping two redundant stores that only class 1 has, all three run the **same
+58 opcodes in the same order**, bar one - the typo below.
+
+```
+$0D5B  LDX $0938 / BEQ                    the cooldown: while it runs, do not look
+$0D63  LDY $090B / LDA OBJ1.heading
+       CMP $9801,Y / BEQ                   aligned -> fire
+$0D6E  INC OBJ1.heading / CMP / BEQ        aligned now -> fire
+$0D79  BCS                                 past it -> three decrements
+$0D7B  DEC / $0D7E INC INC                 short of it -> back one, then up two
+$0D90  DEC DEC DEC                         (the decrement path)
+$0DA5  LDX OBJ4.count / BEQ                one missile at a time
+$0DAD  launch
+```
+
+**The turn is a probe, not a comparison.** It increments the heading, *writes it*, and compares
+again, so an enemy that lines up on the second test fires from the incremented heading and
+keeps it - measured on 21 of 336 cases. Only if neither test hits does it pick a direction, and
+then from the already-incremented value: `BCS` runs three decrements, two below where it
+started, and the other path decrements once to undo the probe and then adds two. The compare is
+unsigned, which shows at the wrap: a heading of 200 against a bearing of 10 turns **down**.
+
+The scope twin is written by the two turn paths and **not** by the launch, so a missile firing
+leaves object 13, 14 or 15 holding the heading from the previous pass.
+
+**The cooldown branch is a label, not a signed turn.** `$0D5B`'s `BEQ` falls into the increment
+path and the other two copies jump to the decrement path - and neither entry has had the
+probing increment applied. So the same code gives **+2 for class 1 and -3 for classes 2 and
+3**, where the probe's own paths give +2 and -2. A cooling class 1 at heading 50 comes out at
+52; a cooling class 2 at 47. Transliterating the labels is the only way to get both.
+
+The four instructions that run the cooldown back down are `$0E23`, `$122D` and `$1637`, in the
+region below - after the collision test and before the enemy's own movement.
+
+**The other three differences:**
+
+- **Class 3's cooldown is 15 frames**, classes 1 and 2 are 20.
+- **Classes 2 and 3 share one missile**, object 5 and its twin 17, along with its position and
+  step entries. Either firing blocks the other, and a blocked launch changes **nothing at all**
+  - not even the heading. Class 1 has object 4 to itself.
+- **Class 3's launch-sound flag gets the heading instead of 1.** `$15C9` is `LDX #$01` followed
+  by `STA $0945` where the other two copies have `STX`, so the `LDX` is dead and the flag takes
+  the accumulator - which, arriving by `BEQ` from the compare, is the enemy's heading. The three
+  flags are read at `$186E`, `$187B` and `$1888`, each tested for non-zero, played through
+  `$1F8E` and cleared, so the typo is invisible **except at heading 0, where class 3 launches
+  silently**.
+
+**The launch** copies the enemy's position into the missile's entries, saves the heading into
+`$0949`, calls `$1AE8` to turn it into step components, divides each by the missile's own speed
+entry and parks the missile ten units below the plane. That entry holds **383** against the
+ship's 1280, and both are divisors, so a missile covers 3.34 times the ground per pass.
+
+One interaction worth recording: `$1AE8` always writes the entries named by `$0915` and `$0916`,
+which are the *ship's* step operands. A launch therefore overwrites them, and that is harmless
+only because the movement block rebuilds them before every use.
+
 ### The binary loads late, and a probe can measure the fill
 
 Found while writing `probe_geometry.mjs`, and it invalidated a finding already in this file.
@@ -1407,7 +1471,10 @@ promoted to fact.
     binary and by nothing else. 241 of its 243 bytes are deterministic. **What still has no
     answer is which code builds it** - 18 indexed stores in `.OBJ0` are the only writers
     found and none of them is on the setup path, so the port starts from a capture.
-14. **The game's state at `$0900`-`$0950`**, now mostly read. `$0901` and `$0903` are the
+14. **The game's state at `$0900`-`$0950`**, now mostly read. The dispatch added
+    `$0911`-`$0914` (the two missiles' position entries), `$0919` (the missile speed divisor),
+    `$0927`-`$092A` (their step entries), `$0938`-`$093A` (the three firing cooldowns) and
+    `$0943`-`$0945` (the three launch-sound flags). `$0901` and `$0903` are the
     ship's position indices; `$0908`-`$090C` are the range and bearing block's working
     entries - dx, dz, range, bearing, scratch; `$090D`-`$0910` and `$0930`-`$0931` index the
     three enemy classes' positions; `$0915`-`$0917` are the movement operands; `$091F`-`$0924`

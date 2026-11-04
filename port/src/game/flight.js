@@ -44,6 +44,39 @@ export const WARP_EMPTY = 0xC7;
 /** $0AA8 - frames per unit of warp burned, from `CPX #$37`. */
 export const WARP_FRAMES_PER_UNIT = 0x37;
 
+/**
+ * $1AE8 - build the two step operands from a heading.
+ *
+ * Shared, because two blocks call it: the movement block at $09DC, and the enemy dispatch
+ * when it launches a missile. The routine reads the heading out of $0949 and always writes
+ * the entries named by $0915 and $0916, so a launch overwrites the ship's step operands -
+ * which is harmless only because the movement block rebuilds them before every use.
+ *
+ * Each component is one signed byte out of HEADING DATA, written into a 3-byte entry as the
+ * MIDDLE byte with a zero low byte and a sign-extended high byte. So the entry is the
+ * component times 256, which is the whole-number part of a coordinate with no fraction.
+ *
+ * The sign extension is done by hand and the test is worth keeping exactly: `CMP #$7F` then
+ * `BCC`/`BEQ` to the zero branch, otherwise $FF. That makes $7F positive and $80 negative,
+ * which is the ordinary boundary - but it is spelled as two branches rather than a BMI, and
+ * $7F is handled by the equality branch, so a transliteration should not collapse it into
+ * something that merely agrees on these tables.
+ *
+ * @param {Math24} math
+ * @param {number} heading the byte $1AE8 finds in $0949
+ */
+export function buildStepOperands(math, heading) {
+  for (const [component, index] of [
+    [HEADING_X(heading), VAR.stepX],
+    [HEADING_Z(heading), VAR.stepZ],
+  ]) {
+    const byte = component & 0xff;
+    math.table[(index + 1) & 0xff] = byte;
+    math.table[(index + 2) & 0xff] = byte >= 0x80 ? 0xFF : 0x00;
+    math.table[index & 0xff] = 0x00;
+  }
+}
+
 export class Flight {
   constructor() {
     this.math = new Math24();
@@ -73,30 +106,9 @@ export class Flight {
 
   get positionZ() { return this.math.read(VAR.posZ); }
 
-  /**
-   * $1AE8 - build the two step operands from the heading.
-   *
-   * Each component is one signed byte out of HEADING DATA, written into a 3-byte entry as
-   * the MIDDLE byte with a zero low byte and a sign-extended high byte. So the entry is the
-   * component times 256, which is the whole-number part of a coordinate with no fraction.
-   *
-   * The sign extension is done by hand and the test is worth keeping exactly: `CMP #$7F`
-   * then `BCC`/`BEQ` to the zero branch, otherwise $FF. That makes $7F positive and $80
-   * negative, which is the ordinary boundary - but it is spelled as two branches rather than
-   * a BMI, and $7F is handled by the equality branch, so a transliteration should not
-   * collapse it into something that merely agrees on these tables.
-   */
+  /** $09DC - `JSR $1AE8`, with the heading this pass saved into $0949. */
   buildSteps() {
-    const m = this.math;
-    for (const [component, index] of [
-      [HEADING_X(this.heading), VAR.stepX],
-      [HEADING_Z(this.heading), VAR.stepZ],
-    ]) {
-      const byte = component & 0xff;
-      m.table[(index + 1) & 0xff] = byte;
-      m.table[(index + 2) & 0xff] = byte >= 0x80 ? 0xFF : 0x00;
-      m.table[index & 0xff] = 0x00;
-    }
+    buildStepOperands(this.math, this.heading);
   }
 
   /**
