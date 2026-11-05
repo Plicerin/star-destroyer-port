@@ -142,9 +142,41 @@ export function buildMatrix(pitch, bank, heading, scales) {
 }
 
 /** d = p - viewer, then v = (M . d) << 3. */
-export function transform(M, point, viewer) {
+export function transform(M, point, viewer, { mode29 = 0 } = {}) {
   const d = [point[0] - viewer[0], point[1] - viewer[1], point[2] - viewer[2]];
+  halveIfWide(d, mode29);
   return [0, 1, 2].map((i) => (mul(d[0], M[i][0]) + mul(d[1], M[i][1]) + mul(d[2], M[i][2])) * 8);
+}
+
+/**
+ * $688D-$68C4 - halve all three deltas if any of them will not fit in fourteen bits.
+ *
+ * The test is on each delta's HIGH byte and two bits of it: `AND #$C0`, then clear or $C0
+ * passes. Both bits clear means the value is 0 to 16383 and both set means -16384 to -1, so
+ * anything else is a value the rotation's 16-bit multiplies cannot take. One bad delta halves
+ * all three, by `ROL A` to get the sign into the carry and then `ROR` down the pair - an
+ * arithmetic shift, so a negative stays negative.
+ *
+ * The result is NOT scaled back up, so a point that trips this is drawn at half its true
+ * offset from the viewer. Crude, and only distant geometry reaches it - but it IS reached.
+ * This port said "no geometry on this disk reaches it" and threw instead, which held for the
+ * display lists parity_frame.mjs tests and not for the list the game mutates in flight: a
+ * respawned enemy gets a Z high byte of $96, which is a coordinate of 38,400, and $1E98 writes
+ * that straight into the object's operand before the movement block ever wraps it.
+ * parity_loop.mjs is what found it, on its first pass.
+ *
+ * Opcode 29's mode byte at $621E disables it: with that non-zero, the wide delta goes into the
+ * rotation as it is.
+ */
+export function halveIfWide(d, mode29 = 0) {
+  const wide = d.some((v) => {
+    const high = (v >> 8) & 0xff;
+    const bits = high & 0xC0;
+    return bits !== 0 && bits !== 0xC0;
+  });
+  if (!wide || mode29 !== 0) return false;
+  for (let i = 0; i < 3; i++) d[i] = d[i] >> 1;
+  return true;
 }
 
 /**

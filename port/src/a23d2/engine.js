@@ -129,20 +129,13 @@ export class Engine {
   /**
    * $684D: fetch three 16-bit operands, subtract the viewer, rotate, and shift left three.
    *
-   * The engine halves the point first when a coordinate will not fit in fourteen bits,
-   * which only arises for very distant geometry; the scene on this disk never does it, so
-   * the port says so rather than pretending.
+   * A delta too wide for fourteen bits halves all three first - see `halveIfWide` in view.js.
+   * This port used to throw there, on the grounds that no geometry on the disk reached it;
+   * parity_loop.mjs found that a respawned enemy does, every time, so it is modelled.
    */
   fetchPoint(at) {
-    const d = [this.word(at) - this.viewer[0], this.word(at + 2) - this.viewer[1],
-      this.word(at + 4) - this.viewer[2]];
-    for (const v of d) {
-      if (v >= 16384 || v < -16384) {
-        throw new Error('a coordinate needs $684D\'s halving path, which is not ported '
-          + '- no geometry on this disk reaches it');
-      }
-    }
-    return transform(this.M, [this.word(at), this.word(at + 2), this.word(at + 4)], this.viewer);
+    return transform(this.M, [this.word(at), this.word(at + 2), this.word(at + 4)],
+      this.viewer, { mode29: this.mode621E });
   }
 
   /** $624B: read into slot 1. Does NOT touch the saved previous point. */

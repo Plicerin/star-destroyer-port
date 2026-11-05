@@ -401,9 +401,30 @@ Suggested order:
    double-buffer page selection), $18D6-$193B (the tail) and the once-only setup at
    $0957-$09A2.
 
-   **What that leaves for a playable port** is a frame driver: nothing yet composes the twelve
-   modules into one pass in the loop's order. That is the next thing, and the harness for it
-   writes itself - run N passes in both and compare the whole machine.
+   **The frame driver is written.** `port/src/game/loop.js`, held by `parity_loop.mjs` (9
+   checks). It composes all thirteen modules in the loop's traced order, and it closes the
+   three blocks that were left: the double-buffer page selection, the loop's tail with its two
+   exits, and the once-only setup. `Game.setup()` then `Game.pass(input)`, and the renderer is
+   called where $1851 calls it, because the renderer is what decrements every object's count.
+
+   **The state parity is exact.** Over 24 passes seeded once and never resynchronised, every
+   byte of MATH's table, the display list and the binary's state agrees with the machine's.
+   The harness captures what PREAD actually returned rather than modelling paddle timing.
+
+   **It found three gaps on its first run**, each a block nobody had read:
+
+   - `controls.js` was half of $09A3: the block also scrolls all seven scope blips three steps
+     the other way, with a wrap that jumps the gap between $43 and $BC
+   - the renderer's 14-bit halving at $688D, which the port threw on with the comment "no
+     geometry on this disk reaches it", is reached on **63 of 138 points a pass** - a
+     respawned enemy's Z operand is $9600, which signed is -27,136
+   - the warp gate has to be written back to $0948, not only cleared
+
+   **What it has not closed**, and is recorded as an open question rather than given a
+   tolerance: the renderer's output on the live display list. The page a pass did not draw
+   agrees exactly; the page it drew differs by 15 to 217 bytes out of 8,192, and the rows that
+   differ every time point at how a 2-D point is plotted when its X is in the two halves of the
+   blips' range. That is the next thing, and it is renderer work rather than game work.
 
    ~~**Phase 6 is now the biggest gap**~~ **Phase 6's sound is done**, bar one sequence.
    `port/src/game/sound.js` and the generated `sounds.js`, held by `parity_sound.mjs` (13

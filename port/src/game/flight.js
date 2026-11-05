@@ -114,9 +114,13 @@ export function wrapPosition(math, x, z) {
 }
 
 export class Flight {
-  constructor() {
-    this.math = new Math24();
-    this.math.table.set(TABLE_INIT, 0);
+  /**
+   * @param {Math24} [math] the one MATH the rest of the loop shares. Left out, it makes its own
+   *   and seeds it from TABLE_INIT, which is what the standalone harnesses want.
+   */
+  constructor(math = null) {
+    this.math = math || new Math24();
+    if (!math) this.math.table.set(TABLE_INIT, 0);
     /** $0948, the gate. */
     this.gate = 0;
     /** $0956, the counter that paces warp consumption. */

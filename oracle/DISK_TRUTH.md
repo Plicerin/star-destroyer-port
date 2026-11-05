@@ -1720,8 +1720,55 @@ $1895  the awards                $18BC  the damage
 $18D6  ...                       $193C  back to the top
 ```
 
-Everything in that list is ported except `$0AB7`-`$0ADA` (the double-buffer page selection),
-`$18D6`-`$193B` (the tail) and `$0957`-`$09A2`, which runs once before the loop starts.
+All of it is now ported, including the three pieces that were left: the double-buffer page
+selection at `$0ABC`-`$0ADA`, the tail at `$18D6`-`$193B`, and the once-only setup at
+`$0957`-`$09A2`. `port/src/game/loop.js` is the driver and `parity_loop.mjs` holds it.
+
+**The double buffer.** `$0947` is the toggle. `$0ABC` writes `$54` or `$55` into the DISPLAY
+operand - the low bytes of the two page soft switches - and the opposite of the toggle into
+CLEAR and DRAW, so the game shows one page while building the other. `$1854` flips the toggle
+after the render, with `INX / CPX #$02`, an equality rather than a bound.
+
+**Two ways out of the loop, and they share a door.** `$18D6` leaves if zero page `$00` holds
+`$4D`, which `$1F64` - inside the destroyed sound - is what puts there. And `$18DD` leaves,
+after one `INC $1FFE`, when all three wave counters are zero, all three enemy classes are
+switched off and no debris is still animating: three counts of three, with two of them
+short-circuiting on their last item. Death and wave-clear, both returning to the BASIC above.
+
+**The pause is a key.** `$1929` sees a pending key, clears the strobe, then spins until another
+key is pending. Press to pause, press to resume.
+
+**The setup** primes both hi-res pages by rendering to each in turn, clears the page toggle,
+spawns one class-1 and one class-2 enemy - not class 3, which only ever arrives through class
+2's cascade or a kill - and publishes the ship's position.
+
+**Three things about the order that are not obvious**, and that only a whole-loop harness can
+check. An enemy whose cooldown is running **always moves**, because `$0E2C` jumps straight past
+the hold test. A class with no object alive skips its whole region **including the two
+shot-hit tests**, straight to its missile. And the debris ticks run **before** the awards,
+which is what makes a kill score once.
+
+#### What the whole-loop harness found
+
+Three gaps that no per-block harness could see, because each was a block nobody had read.
+
+1. **`controls.js` was half the block.** `$09A3` sets the heading and then calls `$1BD5` or
+   `$1B95`, and each of those scrolls all seven scope blips three steps the other way, with a
+   wrap that jumps the gap between `$43` and `$BC`. Found as `$8222` three out on the first
+   pass.
+2. **The renderer's 14-bit halving is reached.** `$688D` halves all three deltas when any will
+   not fit in fourteen bits, and the port threw there with the comment "no geometry on this
+   disk reaches it". It is reached on **63 of 138 points a pass**: a respawned enemy's Z
+   operand is `$9600`, which as a signed 16-bit coordinate is -27,136. Now modelled, in
+   `halveIfWide`.
+3. **The warp gate has to be written back.** `$0A9D` stores `$FF` into `$0948` when warp
+   engages and `$0AB7` stores zero when it does not, so the byte and `Flight`'s own copy are
+   one thing. The driver wrote only the zero.
+
+What it has **not** closed is the renderer's output on the live display list, and that is
+recorded as an open question below rather than given a tolerance: every byte of game state
+agrees, and the page the pass did not draw agrees, but the page it drew comes out between 15
+and 217 bytes different out of 8,192.
 
 ## The sound is a cycle count
 
@@ -1835,21 +1882,34 @@ promoted to fact.
 7. ~~**What is resident at `$6000`.**~~ Answered for flight: A2-3D2. Not established for
    the title, the demo or the end sequence, where the music loads over the same address.
 8. ~~**The `.OBJ0` overlays at `$08EF`.**~~ Answered, below.
-9. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
+9. **The renderer's output on the live display list.** `parity_loop.mjs` reports it rather
+   than asserting it. Every byte of game state agrees over 24 unsynchronised passes, and the
+   hi-res page the pass did not draw agrees exactly - so the port writes nowhere it should
+   not - but the page it drew differs by 15 to 217 bytes out of 8,192.
+
+   Where to look, measured: the rows that differ on **every** pass are 15, 25, 35, 45, 85 and
+   95. They are ten apart and all end in five, which is the band and the spacing of the seven
+   scope blips - but it is six of the seven, not all of them, so "every blip is wrong" is not
+   the answer. The blips' own operands agree to the byte, so whatever is wrong is in how a
+   2-D point is plotted when its X is in `$BC`-`$FF` or `$00`-`$43`, the two halves of the
+   range the scroll walks it round. `parity_screen.mjs` and `parity_frame.mjs` both pass, so
+   the shipped values never reach it. The rest of the difference varies pass to pass and is in
+   the object rows, which is where the halved coordinates land.
+10. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
    measured about when or in what format.
-10. **The `DEMO` path**, never walked.
-11. ~~**The world-to-view transform.**~~ Derived, above, and both routines under it are
+11. **The `DEMO` path**, never walked.
+12. ~~**The world-to-view transform.**~~ Derived, above, and both routines under it are
     now transliterated and held by `parity_math.mjs` and `parity_view.mjs`.
-12. ~~**`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).**~~ Both answered, below. `MATH` is a
+13. ~~**`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).**~~ Both answered, below. `MATH` is a
     24-bit accumulator machine with nine entry points; `HEADING DATA` is a sine and cosine
     pair of amplitude 100 that `$1AE8` reads to build the ship's step. Ported and held by
     `parity_gamemath.mjs` and `parity_flight.mjs`.
-13. ~~**The table at `$9800`.**~~ Answered as far as it needs to be, below: `MATH`'s own
+14. ~~**The table at `$9800`.**~~ Answered as far as it needs to be, below: `MATH`'s own
     storage, `$9800`-`$98F2`, byte-indexed through a directory at `$08F2`, written by the
     binary and by nothing else. 241 of its 243 bytes are deterministic. **What still has no
     answer is which code builds it** - 18 indexed stores in `.OBJ0` are the only writers
     found and none of them is on the setup path, so the port starts from a capture.
-14. **The game's state at `$0900`-`$0950`**, now mostly read. The dispatch added
+15. **The game's state at `$0900`-`$0950`**, now mostly read. The dispatch added
     `$0911`-`$0914` (the two missiles' position entries), `$0919` (the missile speed divisor),
     `$0927`-`$092A` (their step entries), `$0938`-`$093A` (the three firing cooldowns) and
     `$0943`-`$0945` (the three launch-sound flags). `$0901` and `$0903` are the
