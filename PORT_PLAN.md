@@ -387,9 +387,30 @@ Suggested order:
    region at $0957-$0AE0 the controls and movement came out of, which has unread parts, and the
    spawn and wave logic around $1FF9-$1FFE that the BASIC writes.
 
-   **Phase 6 is now the biggest gap**: every sound this port reaches returns the address it
-   would have called. They all go through $1D52 with a parameter block at $1D4A-$1D51, filled
-   in by $1DD3, $1E03, $1E21, $1E40, $1F2B, $1F8E and $1FA9.
+   ~~**Phase 6 is now the biggest gap**~~ **Phase 6's sound is done**, bar one sequence.
+   `port/src/game/sound.js` and the generated `sounds.js`, held by `parity_sound.mjs` (13
+   checks) over `probe_sound.mjs` (12).
+
+   There is no sound chip: $C030 is a soft switch, every access flips the speaker, and a sound
+   IS a list of cycle numbers. So the port is an interpreter of the generator at $1D52 - forty
+   instructions with their cycle costs - rather than a synthesiser, and parity compares the
+   complete list of cycle numbers, not a summary of it. It came out exact first time over 176
+   runs.
+
+   It had to be modelled rather than captured, and that is the finding: $1D52 keeps a 16-bit
+   shift register at $1D4B-$1D4C that **nothing initialises**, so a sound depends on where the
+   last sound left it. Over five seeds all six of its sounds change in length as well as
+   timbre - 108 toggles against 158 for the same routine. A captured waveform would have been
+   one performance.
+
+   The seventh, $1FB2 through $1D9F, has no shift register and looked capturable. It was not,
+   twice over: $1DA5 is both the instruction after the speaker access and a branch target, so
+   detecting a toggle by where control lands counted 16,253 where there are 85; and $1D9F opens
+   with `JSR $FF4A`, which ends `TSX`, so the first period is **the stack pointer**. Modelled
+   too, with the two ROM routines' costs measured (38 and 31 cycles).
+
+   **Still not ported**: $1DBA, the third generator, and the six-note sequence at $1E40 that
+   drives it - gated by a byte inside the code to fire once a game.
 
    **A hazard fixed on the way**, in `exercise.mjs`: `toFlight` could return before DOS had
    finished loading the binary, leaving everything above `$17EB` holding the power-on fill.

@@ -1,0 +1,153 @@
+// Generate port/src/game/sounds.js: what each sound routine puts in the parameter block.
+//
+// The six routines that drive $1D52 are straight-line stores of constants, so what they set is
+// a table - and a table is better captured than transcribed. Each is run through in the
+// machine and the eight bytes at $1D4A-$1D51 read off at every engine call it makes. Two of
+// them make more than one, so a sound is a sequence of stages.
+//
+// Y is captured too, because the engine's pitch sweep decrements it and none of the routines
+// sets it, so what the caller happened to leave there is part of the sound.
+//
+// $1FB2 is different and is captured differently: it drives $1D9F, which has no feedback
+// register, so its waveform does not depend on anything carried in - probe_sound.mjs measures
+// that over five seeds - and the toggle timeline itself can be embedded.
+import { openDisk, DISK } from './dsk.mjs';
+import { openOracle } from './a2.mjs';
+import { toFlight, arm, OBJ0 } from './exercise.mjs';
+import { disasmRange } from './disasm6502.mjs';
+import fs from 'fs';
+
+const hx = (v, n = 4) => '$' + v.toString(16).toUpperCase().padStart(n, '0');
+const d = openDisk(DISK);
+const obj = d.read(d.files.find((x) => x.name === OBJ0));
+const image = [];
+for (let i = 0; i < obj.len; i++) image[obj.addr + i] = obj.data[i];
+const ls = disasmRange(image, obj.addr, obj.addr + obj.len);
+
+/** The six routines that drive $1D52, with what calls each. */
+const SOUNDS = [
+  { name: 'kill', at: 0x1DD3, from: 'the award blocks at $189C, $18A9 and $18B6' },
+  { name: 'shieldHeld', at: 0x1E03, from: '$1CC9, when the shield absorbed a hit' },
+  { name: 'systemsHit', at: 0x1E21, from: '$1CF5, when it did not' },
+  { name: 'destroyed', at: 0x1F2B, from: '$1CF2, the fourth hit on the systems' },
+  { name: 'playerShot', at: 0x1F73, from: '$1866' },
+  { name: 'enemyLaunch', at: 0x1F8E, from: '$1873, $1880 and $188D' },
+  { name: 'warpBuzz', at: 0x1FB2, engine: 0x1D9F,
+    from: '$0AEA, every pass on which the missile bar is not empty' },
+];
+
+const a2 = await openOracle();
+await toFlight(a2);
+await arm(a2);
+
+await a2.ev(`(() => {
+  // One run of the routine, recording the block at every engine call it makes.
+  window.M.soundBlock = (addr, calls, end) => {
+    const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+    const before = cpu.getState();
+    const snap = []; for (let a = 0x1D4A; a <= 0x1D51; a++) snap.push(rd(a));
+    const st = cpu.getState();
+    st.pc = addr;
+    cpu.setState(st);
+    const want = new Set(calls);
+    const stages = [];
+    let ok = false, prev = addr, pending = null;
+    cpu.stepCyclesDebug(40000000, () => {
+      const pc = cpu.getPC();
+      if (want.has(pc)) {
+        const block = []; for (let a = 0x1D4A; a <= 0x1D51; a++) block.push(rd(a));
+        pending = { at: pc, block, y: cpu.getState().y, x: null };
+        stages.push(pending);
+      }
+      // $1D9F's period counter starts from whatever $FF4A leaves in X, which is the stack
+      // pointer four pushes deep. Rather than work that out, it is read where it is used:
+      // the first time control reaches $1DA5 having just come through the speaker access.
+      if (pending && pending.x === null && prev === 0x1DA2 && pc === 0x1DA5) {
+        pending.x = cpu.getState().x;
+      }
+      prev = pc;
+      if (pc === end) { ok = true; return true; }
+    });
+    for (let a = 0x1D4A; a <= 0x1D51; a++) wr(a, snap[a - 0x1D4A]);
+    cpu.setState(before);
+    return { ok, stages };
+  };
+  return 'ok';
+})()`);
+
+/** Every engine call in a routine, and where it ends, taken from the listing. */
+const walk = (at) => {
+  let i = ls.findIndex((l) => l.addr === at);
+  const calls = [];
+  for (; i < ls.length; i++) {
+    if (ls[i].op === 'JSR' && (ls[i].target === 0x1D52 || ls[i].target === 0x1D9F)) {
+      calls.push(ls[i].addr);
+    }
+    if (ls[i].op === 'RTS') return { calls, end: ls[i].addr };
+  }
+  throw new Error('no RTS after ' + hx(at));
+};
+
+const captured = [];
+for (const s of SOUNDS) {
+  const { calls, end } = walk(s.at);
+  const r = JSON.parse(await a2.ev('JSON.stringify(window.M.soundBlock(' + s.at + ','
+    + JSON.stringify(calls) + ',' + end + '))'));
+  if (!r.ok) throw new Error(s.name + ' never reached its RTS');
+  if (r.stages.length !== calls.length) {
+    throw new Error(`${s.name}: ${calls.length} calls in the listing, ${r.stages.length} run`);
+  }
+  captured.push({ ...s, stages: r.stages });
+  console.log(`  ${s.name.padEnd(12)} ${hx(s.at)}  ${r.stages.length} stage(s)`);
+  for (const st of r.stages) {
+    console.log(`      ${hx(st.at)}  block `
+      + st.block.map((v) => String(v).padStart(3)).join(' ')
+      + `  Y=${st.y}` + (st.x === null ? '' : `  X=${st.x}`));
+  }
+}
+
+const lines = [];
+const say = (t) => lines.push(t);
+say("// What each sound puts in the engine's parameter block.");
+say('//');
+say('// GENERATED by oracle/gen_sound.mjs. Do not edit by hand.');
+say('//');
+say('// Each routine is straight-line stores of constants, so what it sets is a table, and it is');
+say('// captured from the machine rather than transcribed: the routine is run through and the');
+say('// eight bytes at $1D4A-$1D51 read off at every engine call it makes. Three of the seven');
+say('// make more than one call, so a sound is a sequence of stages.');
+say('//');
+say('// The registers are captured too, because both engines read registers nothing sets:');
+say('//');
+say("//   y    $1D52's pitch sweep decrements Y, and $1D9F's duration counts on it");
+say('//   x    $1D9F opens with JSR $FF4A, which leaves the stack pointer in X, so a');
+say('//        tone\'s FIRST period is however deep the stack happened to be and only the');
+say('//        ones after it come from $1D4A. Read where it is used, not worked out.');
+say('');
+say("/** The parameter block's base, so an index into `block` reads as an address. */");
+say('export const BLOCK = 0x1D4A;');
+say('');
+say('/** The seven sounds, by the routine that produces each. */');
+say('export const SOUNDS = [');
+for (const c of captured) {
+  say('  {');
+  say(`    name: '${c.name}',`);
+  say(`    /** ${hx(c.at)}, called from ${c.from}. */`);
+  say(`    at: 0x${c.at.toString(16).toUpperCase()},`);
+  say(`    /** ${hx(c.engine || 0x1D52)}, the generator this one drives. */`);
+  say(`    engine: 0x${(c.engine || 0x1D52).toString(16).toUpperCase()},`);
+  say('    stages: [');
+  for (const st of c.stages) {
+    say(`      /** the call at ${hx(st.at)} */`);
+    say(`      { block: [${st.block.join(', ')}], y: ${st.y}`
+      + (st.x === null ? '' : `, x: ${st.x}`) + ' },');
+  }
+  say('    ],');
+  say('  },');
+}
+say('];');
+say('');
+fs.writeFileSync('../port/src/game/sounds.js', lines.join('\n'));
+console.log(`\nwrote port/src/game/sounds.js: ${captured.length} sounds,`
+  + ` ${captured.reduce((n, c) => n + c.stages.length, 0)} stages`);
+process.exit(0);
