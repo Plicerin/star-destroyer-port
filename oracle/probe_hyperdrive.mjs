@@ -169,9 +169,21 @@ try {
     const start = cpu.getCycles();
     let toggles = 0, prev = 0, romCalls = 0;
     const seen = new Set();
+    // Counted rather than read off the branch structure, because reading it off gave the
+    // wrong answer: see the checks below.
+    const n = { clear: 0, plot: 0, colour: 0, sound: 0, frame: 0, pass: 0 };
+    let passEnd = 0;
     cpu.stepCyclesDebug(8000000, () => {
       const pc = cpu.getPC();
       if (pc >= 0xF000) { romCalls++; }
+      if (pc === 0x0E41) n.clear++;
+      if (pc === 0xF457) n.plot++;
+      if (pc === 0xF6F0) n.colour++;
+      if (pc === 0x0FBE) n.sound++;
+      if (pc === 0x0EF5) n.frame++;
+      if (pc === 0x0F1A && !passEnd) { passEnd = 1; n.pass = 1;
+        n.atPass = { plot: n.plot, sound: n.sound, frame: n.frame, clear: n.clear,
+          colour: n.colour }; }
       if (prev === 0x0F52 || prev === 0x0F8D) toggles++;
       if (pc >= ${HYPER.addr} && pc <= ${HYPER.addr + HYPER.len - 1}) seen.add(pc);
       prev = pc;
@@ -182,7 +194,7 @@ try {
       if (v !== 0x55) changed++;
       if (v !== 0) lit++;
     }
-    return JSON.stringify({ cycles: cpu.getCycles() - start, toggles, romCalls,
+    return JSON.stringify({ cycles: cpu.getCycles() - start, toggles, romCalls, n,
       covered: seen.size, changed, lit,
       stars: { posLo: rd(0x08F2), posHi: rd(0x096C), velLo: rd(0x09E6), velHi: rd(0x0A23) } });
   })()`));
@@ -208,6 +220,28 @@ try {
   check('it spends real time in the ROM, which is why those routines matter',
     live.romCalls > 1000,
     `${live.romCalls} instructions executed at or above $F000`);
+
+  // The first drawing pass, counted. These are here because reading them off the branches
+  // gave the wrong numbers: `CPX #$0A` at $0F0E looks like a ten-frame cap and the pass
+  // runs fourteen, and the sound block looks like forty calls and makes a hundred and
+  // seventy-four. A transliteration has to match these, and the next one starts from them
+  // rather than from the branch structure.
+  const p = live.n.atPass ?? {};
+  console.log(`  the first drawing pass: ${p.frame} frames, ${p.plot} plots,`
+    + ` ${p.sound} sound calls, ${p.clear} clear, ${p.colour} colour set`);
+  check('the first pass draws 62 stars for 14 frames - not the 10 the compare suggests',
+    p.plot === 868 && p.frame === 14 && p.plot === 62 * 14,
+    `${p.plot} plots is 62 x 14, and $0EF5 was reached ${p.frame} times - so whatever`
+      + ' `CPX #$0A` at $0F0E is counting, it is not frames of this loop');
+  check('and the screen is cleared once and the colour set once in that pass',
+    p.clear === 1 && p.colour === 1,
+    'one clear and one JSR $F6F0, so the white pass sets its colour once and draws'
+      + ' everything in it');
+  check('the sound routine is entered 174 times in the pass, not the 40 the loop shows',
+    p.sound === 174,
+    'the block after the clear is forty iterations of JSR $0FBE and there is one more per'
+      + ' frame, which is 54 - so $0FBE is reached another 120 times by a path this probe'
+      + ' has not accounted for, and that is an open question rather than a guess');
 }
 
 console.log('');

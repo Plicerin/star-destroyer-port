@@ -2151,6 +2151,29 @@ already ported. It is not a blocker and it does not need the ROM reimplemented: 
 has to reproduce is the sequence's **effect on the page**, which is measurable, rather than
 those routines' insides, which are not this disk's to explain.
 
+### The branches lie about the loop, so it is counted instead
+
+A first transliteration read the loop off the branch structure and got it wrong twice. Both
+are now counted on the machine instead, and both are in the probe:
+
+| | what the branches suggest | what the machine does |
+|---|---|---|
+| frames in the first pass | 10, from `CPX #$0A` at `$0F0E` | **14** |
+| plots | 62 x 10 | **868**, which is 62 x 14 |
+| entries to the sound routine | 40 after the clear, 1 a frame - 54 | **174** |
+
+The frame count is the more interesting of the two: `$0A60` is incremented once per pass
+through the star loop at `$0EF5`, and `CPX #$0A` compares against it, so ten is what the
+code appears to say and fourteen is what happens. **Nothing here explains that yet**, and
+the 120 unaccounted entries to `$0FBE` are the same kind of gap. Both are recorded as
+measurements rather than guessed at, and a transliteration has to match them before it
+means anything.
+
+The tables the setup builds *are* settled: `oracle/gen_hyperdrive.mjs` captures them into
+`port/src/game/hyperdrive-tables.js`, 62 stars with a step each, and they come out as a disc
+of direction vectors - `-1..1`, then `-2..2`, then `-3..3` and so on outward, which is what a
+starfield needs.
+
 ---
 
 ## Open questions

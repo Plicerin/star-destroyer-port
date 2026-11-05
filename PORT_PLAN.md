@@ -627,6 +627,18 @@ throughout.
   ported**: `$F6F0` and `$F457` are ROM. The plan is not to reimplement them but to hold the
   port to the sequence's effect on the hi-res page, which is what a player sees and what the
   oracle can measure.
+
+  The setup's tables are captured - `oracle/gen_hyperdrive.mjs` into
+  `port/src/game/hyperdrive-tables.js`, 62 stars and a step each, the same treatment MATH's
+  table gets, because nine hundred bytes of unrolled stores are a worse thing to transcribe
+  than to read off the machine.
+
+  **The transliteration is not done, and one attempt has been thrown away.** It read the
+  loop off the branch structure: `CPX #$0A` at `$0F0E` says ten frames and the machine does
+  fourteen, and the sound block says 54 entries and the machine makes 174. Those counts are
+  now checks in the probe. What is still unexplained is *why*, and until that is understood
+  there is nothing worth writing - so the next pass starts by accounting for the extra four
+  frames and the extra 120 sound calls.
 - ~~`PLAYER.MODULE`, 208 bytes — the music, CALLed by SELECT, MONOLITH and WIN.~~ **Done**:
   `port/src/game/music.js`, held by `parity_music.mjs` (5 checks) over `probe_music.mjs`
   (10). Two voices, square waves, three bytes a tune record - duration, voice 1's period,
