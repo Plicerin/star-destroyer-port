@@ -2057,6 +2057,52 @@ not work rather than the game.
 
 ---
 
+## The music is two voices and three bytes a note
+
+`probe_music.mjs` (10 checks), `parity_music.mjs` (5).
+
+`PLAYER.MODULE` is 208 bytes at `$0300`, and `SELECT`, `MONOLITH` and `WIN` all use it the
+same way: BLOAD the player, BLOAD a tune at `$6000`, `POKE 30,0: POKE 31,96` to point
+`$1E`/`$1F` at it, `CALL 768`. That is the whole of the game's music.
+
+**A tune is three bytes a record.**
+
+| | |
+|---|---|
+| `00 .. ..` | the end |
+| `01 a b` | not a note - set the two voices' octave shifts |
+| `dd p1 p2` | a duration, voice 1's period, voice 2's period; a period of 0 is a rest |
+
+`M.STAR DESTROYER` is 330 records - 326 notes and 4 control - and `M.END` is 329, of which
+35 are control and 3 have a rest in one voice. Both end in a terminator with two bytes to
+spare.
+
+**The player patches itself, and that is the mechanism.** Each voice has one instruction
+that flips its bit of the waveform byte, `EOR #$40` at `$0383` and `EOR #$80` at `$03BB`,
+and the player writes `$C9` - CMP, which changes nothing - over the opcode to rest a voice
+and `$49` to sound it. The periods go into the operands of `CPY #$00` at `$037B` and
+`CPX #$00` at `$03B3`. Four self-modifying sites. A, X and Y are the state and survive each
+note: A carries both square waves in bits 6 and 7, Y counts voice 1 and X counts voice 2,
+and all three are pushed before a note is decoded and pulled back after.
+
+**The NOPs are load-bearing.** The branch tree at `$0387`-`$0394` has every path padded to
+the same cost, so the loop takes the same number of cycles whichever way the two voices
+happen to be swinging. A transliteration that dropped them as dead code would be wrong by a
+few cycles a pass, which is a pitch error rather than a crash.
+
+**A key stops it.** `$0371 BIT $C000` and the `BMI` after it leave through the RTS, which is
+why `SELECT` does not make you sit through the whole tune before choosing a difficulty.
+
+### What the port got wrong first
+
+The loop does not come back to its top. `$03BD BVS $0362` and `$03C0 BVC $0365` both land
+*below* the `BNE $0365` at `$0360`, so that test runs once on the way in and never again.
+Treating `$0360` as the top of the loop cost three cycles an iteration and put the very
+first toggle three cycles late - which the parity harness reported as "machine 225, port
+228" before anything else had a chance to go wrong.
+
+---
+
 ## Open questions
 
 Things this pass did **not** establish. None of them should be guessed at later and quietly

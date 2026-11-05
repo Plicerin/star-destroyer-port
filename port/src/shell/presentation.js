@@ -112,6 +112,7 @@ export class Presentation {
         }
         continue;
       }
+      // Anything else - a CALL the host wants waited on, for instance - goes back as it is.
       return { waiting: this.waiting, program: this.program, ...r };
     }
   }

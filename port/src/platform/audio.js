@@ -97,6 +97,38 @@ export class Audio {
     return played;
   }
 
+  /**
+    * Play a waveform straight - a list of cycle numbers and how long it runs.
+    *
+    * The music comes this way rather than through `one()`: `music.js` produces the same
+    * shape `sound.js` does, so the same renderer turns it into samples, but it is not one
+    * of the seven effects and has no parameter block.
+    *
+    * @param {{cycles: number, toggles: number[]}} wave
+    * @returns {number} how many seconds it will take, so a caller can wait it out
+    */
+  waveform(wave, { name = 'music' } = {}) {
+    const seconds = wave.cycles / this.cpuHz;
+    this.log.push(name);
+    if (this.log.length > 12) this.log.shift();
+    if (!this.ctx || this.muted || !wave.toggles.length) return seconds;
+    const samples = render(wave, { sampleRate: this.ctx.sampleRate, cpuHz: this.cpuHz });
+    const buffer = this.ctx.createBuffer(1, samples.length, this.ctx.sampleRate);
+    buffer.copyToChannel(samples, 0);
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(this.gain);
+    src.start();
+    this.playing = src;
+    return seconds;
+  }
+
+  /** Cut whatever is playing short, which is what a keypress does to a tune. */
+  cut() {
+    if (this.playing) { try { this.playing.stop(); } catch (e) { /* already done */ } }
+    this.playing = null;
+  }
+
   /** Between games. The register is not reset by the disk either, but a reload is a reload. */
   reset() {
     this.state = null;

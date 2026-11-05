@@ -613,7 +613,16 @@ throughout.
 - `TITLE.OBJ0`, 1,792 bytes — the title animation, CALLed by LOGO1.
 - `HYPERDRIVE.OBJ0`, 2,048 bytes, with `CLS`, 250 — the warp sequence between flights.
   `CLS` is cheaper than it looks: `CLS DATA` on the disk is its source, in BASIC.
-- `PLAYER.MODULE`, 208 bytes — the music, CALLed by SELECT, MONOLITH and WIN.
+- ~~`PLAYER.MODULE`, 208 bytes — the music, CALLed by SELECT, MONOLITH and WIN.~~ **Done**:
+  `port/src/game/music.js`, held by `parity_music.mjs` (5 checks) over `probe_music.mjs`
+  (10). Two voices, square waves, three bytes a tune record - duration, voice 1's period,
+  voice 2's period - with a duration of 1 meaning a pair of octave shifts and 0 the end.
+  It patches its own two toggle instructions between `EOR` and `CMP` to rest a voice, and
+  stores the periods into the operands of two compares; all four sites are checked against
+  the disk. Parity compares **every toggle's cycle number** against the machine, 400 per
+  tune, because for a square-wave player the cycle numbers are the sound. It also blocks
+  the chain for the length of the tune and lets a key cut it short, which is what
+  `$0371 BIT $C000` is for.
 
 ## Phase 7 — the switches
 

@@ -9,11 +9,15 @@
 // as fast as Applesoft did, which for these programs is "faster than anyone notices"; a flight
 // is 389 ms a pass. So the chain is stepped until it needs something, and a flight is paced.
 import { Presentation, WAITING } from './presentation.js';
+import { YIELD } from '../game/applesoft.js';
+
+const YIELD_CALL = YIELD.call;
 import { Game } from '../game/loop.js';
 import { paint, HGR_W, HGR_H } from '../platform/hgr.js';
 import { Input } from '../platform/input.js';
 import { Audio } from '../platform/audio.js';
 import { FRAME_MS, DISK_FPS } from './main.js';
+import { play as playTune } from '../game/music.js';
 
 /** How long a screen that is only a picture stays up before the chain moves on. */
 export const PAUSE_MS = 2500;
@@ -33,7 +37,24 @@ export class Boot {
     this.fps = fps;
     this.tint = tint;
 
-    this.show = new Presentation(image, { rnd });
+    this.show = new Presentation(image, { rnd, calls: {
+      /**
+       * `CALL 768` - PLAYER.MODULE. The three programs that play music BLOAD a tune at
+       * $6000 and point $1E/$1F at it, so the tune is read from the image rather than
+       * being passed in.
+       *
+       * The original blocks until the tune ends or a key is pressed, so this does too:
+       * it returns how long the tune takes and the chain holds there. That is why the
+       * key test at $0371 exists, and why the difficulty screen is bearable.
+       */
+      0x0300: (host) => {
+        const at = host.mem[0x1E] | (host.mem[0x1F] << 8);
+        if (!at) { host.note('CALL $300', 'no tune pointer at $1E/$1F'); return null; }
+        const wave = playTune(host.mem.subarray(at, at + 4096));
+        const seconds = this.audio.waveform(wave, { name: 'tune' });
+        return { async: true, seconds };
+      },
+    } });
     this.input = new Input(window).attach();
     this.audio = new Audio();
     this.game = null;
@@ -92,7 +113,16 @@ export class Boot {
   }
 
   chainStep(now) {
-    if (now < this.holdUntil) return;
+    if (now < this.holdUntil) {
+      // A key cuts a tune short, as it does on the machine.
+      if (this.musicUntil && this.input.held.size > 0) {
+        this.audio.cut();
+        this.holdUntil = 0;
+        this.musicUntil = 0;
+      }
+      return;
+    }
+    this.musicUntil = 0;
     let r;
     try {
       // Zero, not one: run() chains internally before it reports, so maxChains 1 walked
@@ -109,6 +139,13 @@ export class Boot {
     }
     if (r.waiting === WAITING.key) {
       // The program is asking; the latch is filled from the keyboard above, so just wait.
+      return;
+    }
+    if (r.yield === YIELD_CALL && r.seconds) {
+      // A tune is playing. Hold the chain where the machine would hold it, and let a key
+      // cut it short the way $0371 does.
+      this.holdUntil = now + r.seconds * 1000;
+      this.musicUntil = this.holdUntil;
       return;
     }
     if (r.next) {
