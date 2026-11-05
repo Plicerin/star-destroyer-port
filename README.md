@@ -5,8 +5,8 @@ author as *Space Vikings*, one year later, built on subLOGIC's **A2-3D2** 3-D gr
 package instead of hand-rolled `HPLOT`.
 
 **The flight loop is ported and it runs.** Open `port/index.html` from a local server and
-you get the game: the wireframe view, the instrument panel, the radar scope, the controls
-and the speaker, at the disk's own 2.57 frames a second. What is not ported yet is the
+you get the game: the wireframe view in colour, the instrument panel, the radar scope, the
+controls and the speaker, at the disk's own 2.57 frames a second. What is not ported yet is the
 presentation around it - the title, the difficulty screen, the starbase, the hyperdrive
 sequences, the high scores - and the final mission's binary.
 
@@ -50,11 +50,17 @@ python -m http.server 8124
 Then open <http://localhost:8124/port/index.html>. Arrows turn, up or shift engages warp,
 space fires, P pauses.
 
-Two switches on the page, both defaulting to the disk's behaviour: **speed**, which is 2.57
-frames a second because that is what one game frame costs on an Apple II, and **repair the
-interface**, which puts back the wave counters that `BRUN STAR DESTROYER.OBJ0` runs over.
-The second needs explaining and the page explains it; the short version is that it is this
-disk image's fault and not the game's.
+Three switches on the page, all defaulting to the disk's behaviour:
+
+- **frames/sec**, which starts at 2.57 because that is what one game frame costs on an
+  Apple II. Raising it speeds the whole game up rather than smoothing it: a pass is a full
+  tick of game state as well as a frame, so everything scales together.
+- **display**, which starts in colour, because the game is in colour — A2-3D2's COLOUR
+  opcode, not Applesoft's `HCOLOR`. Green, amber and white screens are there for anyone who
+  had that monitor.
+- **repair the interface**, which puts back the wave counters that
+  `BRUN STAR DESTROYER.OBJ0` runs over. The page explains it; the short version is that it
+  is this disk image's fault and not the game's.
 
 ## Running the oracle
 

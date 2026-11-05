@@ -113,18 +113,15 @@
       <option value="3">3 &mdash; hard</option>
     </select>
   </label>
-  <label>speed
-    <select id="rate">
-      <option value="1">1&times; &mdash; the disk</option>
-      <option value="2">2&times;</option>
-      <option value="4">4&times;</option>
-    </select>
+  <label>frames/sec
+    <select id="fps"></select>
   </label>
-  <label>phosphor
+  <label>display
     <select id="tint">
-      <option value="green">green</option>
-      <option value="amber">amber</option>
-      <option value="white">white</option>
+      <option value="colour">colour</option>
+      <option value="green">green screen</option>
+      <option value="amber">amber screen</option>
+      <option value="white">white screen</option>
     </select>
   </label>
   <label><input type="checkbox" id="mute"> mute</label>
@@ -132,6 +129,7 @@
 </div>
 
 <div class="help" id="help"></div>
+<div class="help" id="fps-note"></div>
 <div class="over" id="over"></div>
 
 <div class="row">
@@ -157,7 +155,7 @@
 <div class="note" id="note"></div>
 
 <script type="module">
-import { Shell, HELP } from './src/shell/main.js';
+import { Shell, HELP, FPS_CHOICES, DISK_FPS } from './src/shell/main.js';
 
 const canvas = document.getElementById('screen');
 const $ = (id) => document.getElementById(id);
@@ -166,6 +164,18 @@ let image = null;
 
 $('help').innerHTML = HELP
   .map(([k, what]) => `<kbd>${k}</kbd> ${what}`).join(' &nbsp; ');
+
+$('fps').innerHTML = FPS_CHOICES.map(({ fps, label }) =>
+  `<option value="${fps}">${fps.toFixed(fps < 10 ? 2 : 0)} &mdash; ${label}</option>`).join('');
+$('fps').value = String(DISK_FPS);
+
+const fpsNote = () => {
+  const fps = Number($('fps').value);
+  $('fps-note').textContent = fps <= DISK_FPS + 0.01
+    ? 'the original: one pass is 397,000 cycles, of which 80% is the renderer'
+    : `${(fps / DISK_FPS).toFixed(1)}× the original speed — a pass is a whole tick of `
+      + 'game state as well as a frame, so this speeds the game up rather than smoothing it';
+};
 
 const show = (s) => {
   // The three gauges are the far end of a bar in the display list, not a percentage: a hit
@@ -222,7 +232,7 @@ async function fly() {
     const img = await loadImage();
     shell.stop();
     shell = new Shell(canvas, {
-      rate: Number($('rate').value),
+      fps: Number($('fps').value),
       tint: $('tint').value,
       honest: !$('repair').checked,
     });
@@ -251,7 +261,11 @@ $('pause').addEventListener('click', () => {
 });
 $('mute').addEventListener('change', (e) => shell.audio.setMuted(e.target.checked));
 $('tint').addEventListener('change', (e) => { shell.tint = e.target.value; shell.draw(); });
-$('rate').addEventListener('change', (e) => { shell.rate = Number(e.target.value); });
+$('fps').addEventListener('change', (e) => {
+  shell.fps = Number(e.target.value);
+  fpsNote();
+});
+fpsNote();
 $('repair').addEventListener('change', () => {
   if (shell.game) $('over').textContent = 'click "Reload and fly again" to apply';
 });

@@ -26,19 +26,46 @@ import { SHLD, WARP, MSL, HITS, EMPTY, STEP, FATAL } from '../game/damage.js';
 /** 397,000 cycles at 1,020,484 Hz. The disk's own frame time. */
 export const FRAME_MS = 389;
 
+/** What the disk runs at: 1000 / 389. */
+export const DISK_FPS = 1000 / FRAME_MS;
+
+/**
+ * The frame-rate choices, and why this is not a smoothing control.
+ *
+ * **A pass is a rendered frame and a full tick of game state at once.** There is no separate
+ * update and draw - `Game.pass` steers, moves the ship, runs all three enemy classes, ticks
+ * the debris, renders, and ages every object by one, in that order, because that is the order
+ * the binary does them in. So running passes more often does not make the same game smoother;
+ * it makes the whole game faster. Everything scales together - the ship's speed, the enemies',
+ * the cooldowns, how long warp lasts in seconds - so the result is coherent, just quicker.
+ *
+ * Anything else would be an invention. Interpolating between passes would draw positions the
+ * original never computed, and re-timing the internals would change the game rather than
+ * present it. Neither is on offer here.
+ */
+export const FPS_CHOICES = [
+  { fps: DISK_FPS, label: 'the disk' },
+  { fps: 5, label: 'brisk' },
+  { fps: 10, label: 'fast' },
+  { fps: 15, label: 'faster' },
+  { fps: 30, label: 'very fast' },
+  { fps: 60, label: 'absurd' },
+];
+
 export class Shell {
   /**
    * @param {HTMLCanvasElement} canvas
-   * @param {object} [opts] `rate` a multiplier on the frame time - 1 is the disk;
-   *   `tint` the phosphor; `honest` false to repair the interface DOS corrupts
+   * @param {object} [opts] `fps` passes a second - the disk's 2.57 by default, and see
+   *   FPS_CHOICES for what raising it actually does; `tint` 'colour' or a monochrome
+   *   phosphor; `honest` false to repair the interface DOS corrupts
    */
-  constructor(canvas, { rate = 1, tint = 'green', honest = true } = {}) {
+  constructor(canvas, { fps = DISK_FPS, tint = 'colour', honest = true } = {}) {
     this.canvas = canvas;
     canvas.width = HGR_W;
     canvas.height = HGR_H;
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.frame = this.ctx.createImageData(HGR_W, HGR_H);
-    this.rate = rate;
+    this.fps = fps;
     this.tint = tint;
     this.honest = honest;
 
@@ -133,7 +160,7 @@ export class Shell {
         return;
       }
       this.accumulator += dt;
-      const period = FRAME_MS / this.rate;
+      const period = 1000 / this.fps;
       // One pass per tick at most: a pass is 389 ms of work on the original and tens of
       // milliseconds here, but catching up several at once would still stutter rather than
       // help, and the game has no notion of elapsed time to correct against.

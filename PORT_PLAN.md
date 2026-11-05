@@ -545,9 +545,15 @@ assumed a front end would appear. It did not, so this is it.
 - `platform/boot.js` — the 64K image, built by **replaying the loads the BASIC performs in
   the order it performs them**, through `game/dos.js`. Placing four files at four addresses
   would be wrong: two of those loads are repairs for the one before.
-- `platform/hgr.js` — the page onto a canvas. Monochrome, because every program sets
-  `HCOLOR=7` and hi-res colour is an artefact of the signal rather than something the game
-  asks for. The phosphor tint is the monitor's and is a menu.
+- `platform/hgr.js` — the page onto a canvas, **in colour**, held by `probe_hires.mjs`
+  (11 checks). This was monochrome in the first version on the reasoning that every
+  Applesoft program sets `HCOLOR=7`, so the game must be white lines. Wrong, and DISK_TRUTH
+  already had the measurement: `HCOLOR` is the BASIC's own shape-table text, the game is
+  drawn by A2-3D2's COLOUR opcode, and the display list uses 1 to 4 — the four hi-res hues.
+  Colour 0 is the white one and the game barely uses it. Driving the real engine with each
+  colour reproduces DISK_TRUTH's byte table and the port turns those bytes into green,
+  violet, blue and orange, which is why the instrument panel has three colours in it.
+  Monochrome phosphors stay as a menu, for anyone who had that monitor.
 - `platform/input.js` — keyboard, pointer or gamepad, turned into the paddle bytes PREAD
   would have returned. Any mapping here is a substitution and the file says so; for
   *steering* it loses nothing, because the turn is three units a frame however far a paddle
@@ -566,8 +572,11 @@ the viewer's, the trigger produces `$1F73`, and both of the loop's exits report
 Only now, and all defaulting to off: save states, frame rate, gamepad. Each one measured
 against the fidelity baseline so the difference is a choice rather than a drift.
 
-Three are already in the shell, all defaulting to the disk: **frame rate** (1x is 389 ms a
-pass), **analogue steering** (`Input`'s `analogue`, which is the gamepad switch's
+Three are already in the shell, all defaulting to the disk: **frame rate** (a menu from the
+disk's 2.57 passes a second up to 60, and raising it speeds the whole game up rather than
+smoothing it, because a pass is a full tick of game state as well as a frame — there is no
+interpolation on offer and inventing one would draw positions the original never computed),
+**analogue steering** (`Input`'s `analogue`, which is the gamepad switch's
 groundwork), and **repair the interface** (`boot`'s `honest: false`), which is the odd one
 out - it does not improve on the original, it undoes what this disk image does to it, and
 on a clean dump it would be a no-op.

@@ -549,11 +549,25 @@ colour at all. Measured by plotting eight cells in each colour and reading the b
 There are five, not eight. The pattern alternates between even and odd bytes because seven
 bits to a byte is odd, which is the Apple II's usual arithmetic.
 
+`probe_hires.mjs` (11 checks) re-runs this measurement and then carries it through to the
+screen: the port's renderer turns those bytes into **green, violet, blue and orange** for
+colours 1, 2, 3 and 4, and white for 0. Four hues, which is why the instrument panel has
+three colours in it. The shell shipped monochrome first, on the reasoning that every
+Applesoft program sets `HCOLOR=7` so the game must be white lines — but `HCOLOR` is the
+BASIC's own shape-table text, and this table was already here saying otherwise. Recorded
+rather than quietly fixed, because the mistake was reasoning past a measurement that was
+already in this file.
+
 And one artifact a port has to carry: **20 of the 140 cells straddle a byte boundary**
 (x = 3, 10, 17, 24 ...). Their mask has bit 7 set, so the engine ORs the mask into one byte
 and `$01` into the next - and bit 7 of a hires byte is not a pixel, it is the palette
 select. Plotting at one of those x values flips that byte's colour as a side effect. It is
 the engine's behaviour, not a misreading of it.
+
+And it is **visible**: eight cells in colour 2 light nine bits, not eight, and three of the
+resulting pixels come out white rather than violet, because the straddle puts three lit
+pixels in a row across the byte boundary and three in a row fills two cells. A monochrome
+renderer cannot show that at all, which is the second reason the first one was wrong.
 
 ### Calling the engine with a list of our own
 
