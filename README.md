@@ -4,10 +4,16 @@
 author as *Space Vikings*, one year later, built on subLOGIC's **A2-3D2** 3-D graphics
 package instead of hand-rolled `HPLOT`.
 
-This repository is at the **preparation** stage. Nothing is ported. What exists is the
-oracle: the original disk running under emulation, drivable from a script, so that anything
-the port later claims can be checked against the machine rather than against someone's
-notes.
+**The flight loop is ported and it runs.** Open `port/index.html` from a local server and
+you get the game: the wireframe view, the instrument panel, the radar scope, the controls
+and the speaker, at the disk's own 2.57 frames a second. What is not ported yet is the
+presentation around it - the title, the difficulty screen, the starbase, the hyperdrive
+sequences, the high scores - and the final mission's binary.
+
+Everything under `port/src/game` and `port/src/a23d2` is held to the original by the
+oracle: the disk running under emulation, drivable from a script, so that anything the
+port claims is checked against the machine rather than against someone's notes.
+**45 harnesses**, `cd oracle && node run_all.mjs`.
 
 ---
 
@@ -15,6 +21,12 @@ notes.
 
 ```
 disk/STAR_DESTROYER.dsk   the image everything is measured against
+port/
+  index.html              the shell - open this to play
+  src/a23d2/              subLOGIC's 3-D package, reimplemented
+  src/game/               the flight loop, block by block
+  src/platform/           disk, hi-res, input, audio - the host, not the game
+  src/shell/main.js       canvas, clock and keyboard; the only file with no harness
 oracle/                   the arbiter
   DISK_TRUTH.md           the only findings document to trust
   a2.mjs                  the disk in apple2js, driven from Node
@@ -27,7 +39,24 @@ oracle/                   the arbiter
   captured/               what the probes saw
 ```
 
-## Running it
+## Playing it
+
+Any static server over the repository root, because the page fetches the disk image:
+
+```bash
+python -m http.server 8124
+```
+
+Then open <http://localhost:8124/port/index.html>. Arrows turn, up or shift engages warp,
+space fires, P pauses.
+
+Two switches on the page, both defaulting to the disk's behaviour: **speed**, which is 2.57
+frames a second because that is what one game frame costs on an Apple II, and **repair the
+interface**, which puts back the wave counters that `BRUN STAR DESTROYER.OBJ0` runs over.
+The second needs explaining and the page explains it; the short version is that it is this
+disk image's fault and not the game's.
+
+## Running the oracle
 
 ```bash
 cd oracle && npm install
@@ -41,11 +70,14 @@ node probe_catalog.mjs
 node probe_play.mjs
 ```
 
-`probe_catalog.mjs` and `probe_chain.mjs` read the image directly and are instant.
-`probe_boot.mjs`, `probe_pics.mjs` and `probe_play.mjs` run the machine and take a few
-minutes. `run_all.mjs` runs everything named `*_parity.mjs` or `*_check.mjs` and exits with
-the number of failures; there are none of those yet, because there is nothing to compare
-against.
+`probe_catalog.mjs` and `probe_chain.mjs` read the image directly and are instant; the
+rest drive the machine. `run_all.mjs` discovers every `probe_*.mjs` and `parity_*.mjs`,
+runs the probes first, refuses to report success on an empty suite, and exits with the
+number of failures.
+
+**One known flake:** `probe_boot.mjs`'s "two different power-on fills converge on the same
+machine" failed once in about six runs and has passed every time since. It is timing
+dependent and it has not been chased.
 
 Playwright is pinned to **1.59.1** deliberately — it is the version whose Chromium is
 already on this machine, and a floating range downloads a new one.

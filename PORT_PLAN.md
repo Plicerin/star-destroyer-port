@@ -533,10 +533,46 @@ Sound (`PLAYER.MODULE` at `$0300`, tunes BLOADed to `$6000`), high scores
 walked. All three are open questions in DISK_TRUTH; establish them with probes before
 porting them.
 
+## Phase 6.5 — the shell  ✅ done
+
+Not in the original plan, which went straight from the disk to the switches and quietly
+assumed a front end would appear. It did not, so this is it.
+
+`port/index.html` plus `port/src/platform/` and `port/src/shell/main.js`:
+
+- `platform/dsk.js` — a DOS 3.3 catalogue, read in the browser. A second implementation of
+  `oracle/dsk.mjs` on purpose: the port is not allowed to depend on the arbiter.
+- `platform/boot.js` — the 64K image, built by **replaying the loads the BASIC performs in
+  the order it performs them**, through `game/dos.js`. Placing four files at four addresses
+  would be wrong: two of those loads are repairs for the one before.
+- `platform/hgr.js` — the page onto a canvas. Monochrome, because every program sets
+  `HCOLOR=7` and hi-res colour is an artefact of the signal rather than something the game
+  asks for. The phosphor tint is the monitor's and is a menu.
+- `platform/input.js` — keyboard, pointer or gamepad, turned into the paddle bytes PREAD
+  would have returned. Any mapping here is a substitution and the file says so; for
+  *steering* it loses nothing, because the turn is three units a frame however far a paddle
+  is over.
+- `platform/audio.js` — WebAudio. Carries `$1D52`'s shift register across the whole session,
+  because nothing initialises it and a sound depends on where the last one left it.
+- `shell/main.js` — canvas, clock, keyboard. The only file in the port with no harness, and
+  there is nothing in it for a harness to check.
+
+Verified in the browser: the turn is exactly three units a pass, object 12's heading tracks
+the viewer's, the trigger produces `$1F73`, and both of the loop's exits report
+(`$00` = `$4D`, and wave clear).
+
 ## Phase 7 — the switches
 
 Only now, and all defaulting to off: save states, frame rate, gamepad. Each one measured
 against the fidelity baseline so the difference is a choice rather than a drift.
+
+Three are already in the shell, all defaulting to the disk: **frame rate** (1x is 389 ms a
+pass), **analogue steering** (`Input`'s `analogue`, which is the gamepad switch's
+groundwork), and **repair the interface** (`boot`'s `honest: false`), which is the odd one
+out - it does not improve on the original, it undoes what this disk image does to it, and
+on a clean dump it would be a no-op.
+
+Still to do: save states.
 
 ---
 

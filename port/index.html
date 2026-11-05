@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Star Destroyer</title>
+<style>
+  :root {
+    --bg: #0b0d0b;
+    --panel: #141814;
+    --line: #2a332a;
+    --ink: #cfe8cf;
+    --dim: #7d8f7d;
+    --warn: #e8b04a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin: 4px 0 2px;
+  }
+  .sub { color: var(--dim); font-size: 11px; margin-bottom: 14px; text-align: center; }
+  .stage {
+    background: #000;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 10px;
+    line-height: 0;
+    max-width: 100%;
+  }
+  canvas {
+    display: block;
+    width: 840px;
+    max-width: calc(100vw - 54px);
+    height: auto;
+    aspect-ratio: 280 / 192;
+    image-rendering: pixelated;
+    background: #000;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 12px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 9px 12px;
+    min-width: 150px;
+  }
+  .card h2 {
+    font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--dim); margin: 0 0 6px; font-weight: 600;
+  }
+  .kv { display: flex; justify-content: space-between; gap: 14px; }
+  .kv span:last-child { color: #fff; }
+  button, select {
+    font: inherit; color: var(--ink); background: var(--panel);
+    border: 1px solid var(--line); border-radius: 3px; padding: 6px 12px; cursor: pointer;
+  }
+  button:hover, select:hover { border-color: var(--dim); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  label { color: var(--dim); display: inline-flex; gap: 6px; align-items: center; }
+  .note {
+    margin-top: 14px; max-width: 840px; color: var(--dim); font-size: 11px;
+    border-left: 2px solid var(--line); padding-left: 10px;
+  }
+  .note b { color: var(--warn); font-weight: 600; }
+  .over {
+    margin-top: 10px; color: var(--warn); min-height: 1.5em; text-align: center;
+    max-width: 840px;
+  }
+  .help { color: var(--dim); font-size: 11px; margin-top: 8px; }
+  .help kbd {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 2px;
+    padding: 1px 5px; color: var(--ink);
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f4f5f3; --panel: #fff; --line: #d7dcd5; --ink: #1d231d; --dim: #5d6a5d;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>Star Destroyer</h1>
+<div class="sub">
+  Harvest Time Software, &copy; 1983 Mitchell Robbins &mdash; the port's flight loop,
+  running at the disk's own 2.57 frames a second
+</div>
+
+<div class="stage"><canvas id="screen" width="280" height="192"></canvas></div>
+
+<div class="controls">
+  <button id="start">Load disk and fly</button>
+  <button id="pause" disabled>Pause</button>
+  <label>difficulty
+    <select id="difficulty">
+      <option value="1">1 &mdash; easy</option>
+      <option value="2">2 &mdash; medium</option>
+      <option value="3">3 &mdash; hard</option>
+    </select>
+  </label>
+  <label>speed
+    <select id="rate">
+      <option value="1">1&times; &mdash; the disk</option>
+      <option value="2">2&times;</option>
+      <option value="4">4&times;</option>
+    </select>
+  </label>
+  <label>phosphor
+    <select id="tint">
+      <option value="green">green</option>
+      <option value="amber">amber</option>
+      <option value="white">white</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="mute"> mute</label>
+  <label><input type="checkbox" id="repair"> repair the interface</label>
+</div>
+
+<div class="help" id="help"></div>
+<div class="over" id="over"></div>
+
+<div class="row">
+  <div class="card">
+    <h2>ship</h2>
+    <div class="kv"><span>shields</span><span id="s-shields">&mdash;</span></div>
+    <div class="kv"><span>warp</span><span id="s-warp">&mdash;</span></div>
+    <div class="kv"><span>missiles</span><span id="s-missiles">&mdash;</span></div>
+    <div class="kv"><span>hits taken</span><span id="s-hits">&mdash;</span></div>
+  </div>
+  <div class="card">
+    <h2>wave</h2>
+    <div class="kv"><span>left to send</span><span id="s-waves">&mdash;</span></div>
+    <div class="kv"><span>kills</span><span id="s-kills">&mdash;</span></div>
+    <div class="kv"><span>passes</span><span id="s-passes">&mdash;</span></div>
+  </div>
+  <div class="card">
+    <h2>speaker</h2>
+    <div class="kv"><span>last</span><span id="s-sounds">&mdash;</span></div>
+  </div>
+</div>
+
+<div class="note" id="note"></div>
+
+<script type="module">
+import { Shell, HELP } from './src/shell/main.js';
+
+const canvas = document.getElementById('screen');
+const $ = (id) => document.getElementById(id);
+let shell = new Shell(canvas);
+let image = null;
+
+$('help').innerHTML = HELP
+  .map(([k, what]) => `<kbd>${k}</kbd> ${what}`).join(' &nbsp; ');
+
+const show = (s) => {
+  // The three gauges are the far end of a bar in the display list, not a percentage: a hit
+  // shrinks one by STEP and EMPTY is where it bottoms out. Showing both the operand and the
+  // steps left keeps the panel honest about what is actually in memory.
+  const gauge = (v) => (v === 0 ? 'empty'
+    : `${v} · ${Math.max(0, Math.floor((v - s.empty) / s.step))} left`);
+  $('s-shields').textContent = gauge(s.shields);
+  $('s-warp').textContent = gauge(s.warp);
+  $('s-missiles').textContent = gauge(s.missiles);
+  $('s-hits').textContent = `${s.hits} of ${s.fatal}`;
+  $('s-waves').textContent = s.waves.join(' / ');
+  $('s-kills').textContent = s.kills.join(' / ');
+  $('s-passes').textContent = s.passes;
+  $('s-sounds').textContent = s.sounds.length ? s.sounds.join(', ') : '—';
+  $('pause').textContent = s.paused ? 'Resume' : 'Pause';
+  const why = shell.reason();
+  $('over').textContent = why ? why : (s.paused ? 'paused' : '');
+};
+
+const note = (s) => {
+  if (!s || !s.corrupted) { $('note').textContent = ''; return; }
+  if (s.repaired) {
+    $('note').innerHTML =
+      `<b>Repaired.</b> The <code>BRUN</code> ran 250 bytes of its own last sector's slack `
+      + `over the thirteen bytes the BASIC and the binary talk through, as it does on this `
+      + `image, and the switch put back the target of ${s.intended.target} flights and the `
+      + `waves of ${s.intended.waves.join('/')} that SELECT and SD PART2 rolled. Untick it `
+      + `for what the disk actually does.`;
+    return;
+  }
+  $('note').innerHTML =
+    `<b>The wave counters on screen are not the ones the BASIC rolled.</b> `
+    + `SELECT and SD PART2 set a target of ${s.intended.target} flights and waves of `
+    + `${s.intended.waves.join('/')}, and then <code>BRUN STAR DESTROYER.OBJ0</code> wrote 250 `
+    + `bytes of its own last sector's slack over them, because DOS 3.3 reads a file's final `
+    + `sector straight to the destination. That is this disk image, not the port &mdash; see `
+    + `<code>oracle/DISK_TRUTH.md</code>, &ldquo;A BLOAD writes past the end of the file&rdquo;. `
+    + `Tick <em>repair the interface</em> to play with the numbers the BASIC intended.`;
+};
+
+async function loadImage() {
+  if (image) return image;
+  const r = await fetch('../disk/STAR_DESTROYER.dsk');
+  if (!r.ok) throw new Error(`could not fetch the disk image: ${r.status} ${r.statusText}`);
+  image = new Uint8Array(await r.arrayBuffer());
+  return image;
+}
+
+async function fly() {
+  $('start').disabled = true;
+  $('start').textContent = 'Loading…';
+  try {
+    const img = await loadImage();
+    shell.stop();
+    shell = new Shell(canvas, {
+      rate: Number($('rate').value),
+      tint: $('tint').value,
+      honest: !$('repair').checked,
+    });
+    shell.audio.setMuted($('mute').checked);
+    shell.onStatus = (s) => show(s);
+    const info = shell.load(img, Number($('difficulty').value));
+    note(shell.status());
+    show(shell.status());
+    shell.start();
+    $('pause').disabled = false;
+    $('start').textContent = 'Reload and fly again';
+    console.log('loaded, in order:', info.loaded);
+  } catch (e) {
+    $('over').textContent = String(e.message || e);
+    console.error(e);
+  } finally {
+    $('start').disabled = false;
+  }
+}
+
+$('start').addEventListener('click', fly);
+$('pause').addEventListener('click', () => {
+  shell.paused = !shell.paused;
+  shell.audio.resume();
+  show(shell.status());
+});
+$('mute').addEventListener('change', (e) => shell.audio.setMuted(e.target.checked));
+$('tint').addEventListener('change', (e) => { shell.tint = e.target.value; shell.draw(); });
+$('rate').addEventListener('change', (e) => { shell.rate = Number(e.target.value); });
+$('repair').addEventListener('change', () => {
+  if (shell.game) $('over').textContent = 'click "Reload and fly again" to apply';
+});
+
+// For poking at it from the console, and for a harness later.
+window.__sd = { get shell() { return shell; } };
+</script>
+</body>
+</html>
