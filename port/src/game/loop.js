@@ -153,7 +153,11 @@ export class Game {
     this.math = new Math24();
     this.math.table.set(TABLE_INIT, 0);
     this.flight = new Flight(this.math);
-    this.engine = render ? new Engine(mem) : null;
+    // The hi-res pages are memory, so the renderer draws straight into the image rather
+    // than into a buffer of its own: $2000 and $4000, where the machine has them.
+    this.engine = render
+      ? new Engine(mem, { pages: [mem.subarray(0x2000, 0x4000), mem.subarray(0x4000, 0x6000)] })
+      : null;
     /** What the last pass asked the sound to play, in order. Phase 6 is not wired up. */
     this.sounds = [];
   }

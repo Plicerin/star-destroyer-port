@@ -420,11 +420,21 @@ Suggested order:
      respawned enemy's Z operand is $9600, which signed is -27,136
    - the warp gate has to be written back to $0948, not only cleared
 
-   **What it has not closed**, and is recorded as an open question rather than given a
-   tolerance: the renderer's output on the live display list. The page a pass did not draw
-   agrees exactly; the page it drew differs by 15 to 217 bytes out of 8,192, and the rows that
-   differ every time point at how a 2-D point is plotted when its X is in the two halves of the
-   blips' range. That is the next thing, and it is renderer work rather than game work.
+   **And the screen agrees too**, which took one more round and a retraction. The first run
+   reported the drawn hi-res page as 15 to 217 bytes different and that went into DISK_TRUTH as
+   open question 9. It was the harness's mistake: `Screen` kept its own pair of 8K buffers, so
+   the comparison was against the copy the harness had synced in, and the bytes that "differed"
+   were the ones that had changed since the previous frame - which is why they looked like the
+   blips and the moving objects. `Screen` now takes the pages it draws into and the driver
+   hands it views on $2000 and $4000 of the one image.
+
+   **So the port runs the game.** Over 24 passes, seeded once and never resynchronised, every
+   byte of MATH's table, the display list, the binary's state AND both 8K hi-res pages agrees
+   with the machine's.
+
+   What is left of Phase 5 is the Applesoft around the flight loop - the title, the difficulty
+   screen, the starbase, hyperdrive, the high scores and the never-walked DEMO path - and then
+   Phase 7's QoL switches, all default off.
 
    ~~**Phase 6 is now the biggest gap**~~ **Phase 6's sound is done**, bar one sequence.
    `port/src/game/sound.js` and the generated `sounds.js`, held by `parity_sound.mjs` (13

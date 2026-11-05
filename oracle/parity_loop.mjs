@@ -167,16 +167,13 @@ function diff(engine, game, { page = false, was = null } = {}) {
       if (bad.length > 5) return bad;
     }
   }
-  // The hires pages, split: the one this pass did not draw has to agree exactly, because a
-  // difference there would mean the port wrote somewhere it should not have. The one it DID
-  // draw is counted rather than asserted - see `pageReport`.
+  // Both hi-res pages, every byte. The port's renderer draws into views on $2000 and $4000
+  // of the same image, exactly as the machine does, so there is nothing to split out.
   if (page && engine.page) {
-    const drawn = game.mem[DRAW_PAGE] === 0 ? 0x2000 : 0x4000;
-    const quiet = drawn === 0x2000 ? 0x4000 : 0x2000;
-    for (let a = quiet; a < quiet + 0x2000; a++) {
+    for (let a = 0x2000; a < 0x6000; a++) {
       if (engine.page[a - 0x2000] !== game.mem[a]) {
-        bad.push(`${hx(a)} on the page this pass did NOT draw: machine`
-          + ` ${engine.page[a - 0x2000]}, port ${game.mem[a]}`);
+        bad.push(`${hx(a)} on the hi-res page: machine ${engine.page[a - 0x2000]},`
+          + ` port ${game.mem[a]}`);
         return bad;
       }
     }
@@ -309,7 +306,7 @@ console.log('\n=== one pass, synced each time ===');
     if (d.length) bad.push(`pass ${i} (${JSON.stringify(input)}): ${d[0]}`);
     pages.push(pageReport(engine, game));
   }
-  check('every pass agrees: the display list, the state, the table, and the untouched page',
+  check('every pass agrees: the display list, the state and the table',
     bad.length === 0 && passes === SCRIPT.length, bad.slice(0, 2).join('; ')
       || `${passes} passes over a scripted input, ${fired} firing, ${warped} under warp`);
 
@@ -317,27 +314,11 @@ console.log('\n=== one pass, synced each time ===');
   // suite does not have green, and it is the renderer's, not the loop's: the game state
   // agrees to the byte on every pass above. parity_frame.mjs holds the renderer on three
   // scenes and passes; the live list in flight is a fourth it does not cover.
-  // The page each pass DREW does not agree, and that is reported rather than dressed up. It
-  // is the renderer's gap, not the loop's: every byte of game state above agrees exactly, and
-  // the page the pass did not draw agrees exactly too, so the port writes nothing it should
-  // not. What it draws into the live list differs, and the rows say where to look.
-  console.log(`  the page each pass DREW came out ${pages.map((p) => p.total).join(', ')}`
-    + ' bytes apart out of 8,192');
-  const always = [...pages[0].rows.keys()].filter((r) => pages.every((p) => p.rows.has(r)));
-  console.log('  rows that differ on EVERY pass: ' + always.join(', '));
-  check('the disagreement is confined to the page the pass drew - the other is byte-exact',
-    bad.length === 0,
-    'so the port is not writing outside the page it was told to draw into; what it draws'
-      + ' there is an open gap, recorded in DISK_TRUTH');
-  // Where to look. The rows that differ on every pass are all ten apart and all end in 5,
-  // which is the band and the spacing of the seven scope blips - but not all seven of them,
-  // so "every blip is wrong" is NOT the finding. The blip operands agree to the byte, so
-  // whatever is wrong is in how a 2-D point with an X in $BC-$FF or $00-$43 is plotted.
-  check('and the rows that always differ have the blips spacing, though not all of them',
-    always.length >= 4 && always.every((r) => r % 10 === 5)
-      && always.every((r) => r >= 15 && r <= 95),
-    `rows ${always.join(', ')} - ${always.length} of the seven blip rows, so some plot`
-      + ' correctly and some do not, which is the shape of the thing to go and find');
+  const drew = pages.reduce((n, p) => n + p.total, 0);
+  check('and so does every byte of both hi-res pages, on every pass',
+    drew === 0,
+    `16,384 bytes of screen compared ${pages.length} times, ${drew} differing - the renderer`
+      + ' draws into views on $2000 and $4000 of the same image, as the machine does');
 }
 
 // --- seeded once, and left to run ---------------------------------------------------------------
@@ -355,10 +336,7 @@ console.log('\n=== seeded once, then run forward together ===');
     const p0 = [128, 255, 255, 128, 0, 0, 128][i % 7];
     const p1 = i % 4 === 0 ? 255 : 0;
     const b = i % 3 !== 0;
-    // No page comparison here. Once the drawn page differs at all, the error alternates onto
-    // the other page with the buffer flip, so after the first pass neither page can be
-    // compared - and the thing this run is for is whether the STATE drifts, which it does not.
-    const engine = await machinePass(p0, p1, b, false);
+    const engine = await machinePass(p0, p1, b, true);
     const r = game.pass({
       paddle0: engine.read0 === null ? 128 : engine.read0,
       paddle1: engine.read1 === null ? 255 : engine.read1,
@@ -367,7 +345,7 @@ console.log('\n=== seeded once, then run forward together ===');
     ran++;
     if (r.sounds.includes(0x1F73)) fired++;
     if (engine.exit !== 0x09A3) exits++;
-    const d = diff(engine, game, { page: false, was: prev });
+    const d = diff(engine, game, { page: true, was: prev });
     if (d.length) {
       bad.push(`pass ${i}: ${d.join(' | ')}`);
       break;
@@ -377,7 +355,8 @@ console.log('\n=== seeded once, then run forward together ===');
   check('and they stay together, with nothing resynchronised after the first pass',
     bad.length === 0 && ran === PASSES, bad.slice(0, 2).join('; ')
       || `${ran} passes, ${fired} of them firing, ${exits} that left the loop early -`
-        + ' every byte of the display list, the state and the table, after every one');
+        + ' every byte of the display list, the state, the table AND both hi-res pages,'
+        + ' after every one');
 }
 
 // --- the controls -------------------------------------------------------------------------------

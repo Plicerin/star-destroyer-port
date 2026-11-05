@@ -34,10 +34,16 @@ export const LEN = {
 export const END = 121;
 
 export class Engine {
-  /** @param mem a 64K byte array with the engine's data files loaded where DOS puts them */
-  constructor(mem) {
+  /**
+   * @param mem a 64K byte array with the engine's data files loaded where DOS puts them
+   * @param {object} [options]
+   * @param {Uint8Array[]} [options.pages] the two hi-res pages to draw into. Pass views into
+   *   `mem` at $2000 and $4000 and the pixels go where they go on the machine; leave it out
+   *   and the screen keeps its own pair, which is all the renderer's own harnesses need.
+   */
+  constructor(mem, { pages = null } = {}) {
     this.mem = mem;
-    this.screen = new Screen();
+    this.screen = new Screen(pages);
     this.reset();
   }
 

@@ -56,8 +56,14 @@ export const COLOURS = {
 const colourOf = (c) => (c >= 4 ? COLOURS[4] : COLOURS[c]);
 
 export class Screen {
-  constructor() {
-    this.pages = [new Uint8Array(PAGE_BYTES), new Uint8Array(PAGE_BYTES)];
+  /**
+   * @param {Uint8Array[]} [pages] the two 8K pages to draw into. On the machine these ARE
+   *   memory, at $2000 and $4000, so a caller that holds a 64K image passes views into it and
+   *   the pixels land where the rest of the port can see them. Left out, the screen keeps its
+   *   own pair, which is what the renderer's own harnesses want.
+   */
+  constructor(pages = null) {
+    this.pages = pages || [new Uint8Array(PAGE_BYTES), new Uint8Array(PAGE_BYTES)];
     this.drawPage = 0;        // opcode 9 - 0 is $2000, anything else is $4000
     this.colour = 0;          // opcode 18
     this.eor = false;         // opcode 12

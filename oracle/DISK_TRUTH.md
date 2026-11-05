@@ -1765,10 +1765,17 @@ Three gaps that no per-block harness could see, because each was a block nobody 
    engages and `$0AB7` stores zero when it does not, so the byte and `Flight`'s own copy are
    one thing. The driver wrote only the zero.
 
-What it has **not** closed is the renderer's output on the live display list, and that is
-recorded as an open question below rather than given a tolerance: every byte of game state
-agrees, and the page the pass did not draw agrees, but the page it drew comes out between 15
-and 217 bytes different out of 8,192.
+And it closes the renderer too, which took one more round. The first run of it reported the
+drawn hi-res page as 15 to 217 bytes different and that was recorded as an open question; the
+difference was the harness's, not the port's. `Screen` held its own pair of 8K buffers, so the
+comparison was against the copy the harness had synced in rather than against anything the port
+had drawn - the "differing" bytes were the ones that had changed since the previous frame.
+`Screen` now takes the pages it draws into and the driver gives it views on `$2000` and `$4000`
+of the same image, as the machine has them.
+
+**So the whole machine agrees.** Over 24 passes, seeded once and never resynchronised: every
+byte of MATH's table, of the display list, of the binary's state, and of both 8K hi-res
+pages.
 
 ## The sound is a cycle count
 
@@ -1882,19 +1889,19 @@ promoted to fact.
 7. ~~**What is resident at `$6000`.**~~ Answered for flight: A2-3D2. Not established for
    the title, the demo or the end sequence, where the music loads over the same address.
 8. ~~**The `.OBJ0` overlays at `$08EF`.**~~ Answered, below.
-9. **The renderer's output on the live display list.** `parity_loop.mjs` reports it rather
-   than asserting it. Every byte of game state agrees over 24 unsynchronised passes, and the
-   hi-res page the pass did not draw agrees exactly - so the port writes nowhere it should
-   not - but the page it drew differs by 15 to 217 bytes out of 8,192.
-
-   Where to look, measured: the rows that differ on **every** pass are 15, 25, 35, 45, 85 and
-   95. They are ten apart and all end in five, which is the band and the spacing of the seven
-   scope blips - but it is six of the seven, not all of them, so "every blip is wrong" is not
-   the answer. The blips' own operands agree to the byte, so whatever is wrong is in how a
-   2-D point is plotted when its X is in `$BC`-`$FF` or `$00`-`$43`, the two halves of the
-   range the scroll walks it round. `parity_screen.mjs` and `parity_frame.mjs` both pass, so
-   the shipped values never reach it. The rest of the difference varies pass to pass and is in
-   the object rows, which is where the halved coordinates land.
+9. ~~**The renderer's output on the live display list.**~~ **Answered, and the question was
+   wrong.** The last commit recorded this as a gap: the hi-res page the pass drew came out 15
+   to 217 bytes different out of 8,192, and six rows ten apart pointed at the scope blips.
+   There is no gap. `Screen` kept its own pair of 8K buffers, so `parity_loop.mjs` was
+   comparing the machine's freshly rendered page against the stale copy it had synced in -
+   and the bytes that "differed" were simply the bytes that had changed since the previous
+   frame, which is why they were the blips and the moving objects and why the count varied
+   with how much had moved.
+   `Screen` now takes the two pages it draws into, the driver hands it views on `$2000` and
+   `$4000` of the one image, and **both 8K pages agree byte for byte on every pass** - 24 of
+   them, seeded once and never resynchronised. Recorded rather than quietly deleted, because
+   the shape of the mistake is worth keeping: a harness that compares against something it
+   supplied itself will tell you whatever you put there.
 10. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
    measured about when or in what format.
 11. **The `DEMO` path**, never walked.
