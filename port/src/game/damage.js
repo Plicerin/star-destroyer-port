@@ -65,6 +65,10 @@ export const SOUND = {
   systems: [0x1E21, 0x1E40],
   destroyed: 0x1F2B,
   enemyLaunch: 0x1F8E,
+  /** $1FB2 - the three-note buzz $0AEA plays when the trigger finds the bar empty. */
+  outOfMissiles: 0x1FB2,
+  /** $1F73 - the player's own shot, from $1866 in the loop's tail. */
+  playerShot: 0x1F73,
 };
 
 /**

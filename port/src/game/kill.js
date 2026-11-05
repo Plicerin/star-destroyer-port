@@ -66,6 +66,12 @@ export const SHOTS = [
     pos: [dir(0x0904), dir(0x0906)],
     offAt: 0x1F67,
     aimAt: 0x1A8B,
+    /** $1B2B - the publish, and $0B6A the movement. See weapon.js. */
+    publishAt: 0x1B2B,
+    moveAt: 0x0B6A,
+    moveExit: 0x0BB7,
+    /** The object whose Y $1B2B writes, which is NOT this shot's. See weapon.js. */
+    publishedY: 4,
   },
   {
     name: 'shot 2',
@@ -74,6 +80,10 @@ export const SHOTS = [
     pos: [dir(0x0905), dir(0x0907)],
     offAt: 0x1F6D,
     aimAt: 0x1AC7,
+    publishAt: 0x1B60,
+    moveAt: 0x0BB7,
+    moveExit: 0x0C04,
+    publishedY: 5,
   },
 ];
 

@@ -383,9 +383,27 @@ Suggested order:
    on is caught by $1CB1's own guard. Recorded as a measured redundancy over 405 shield states
    rather than left as a control that silently never fires.
 
-   **With that, the five big loop regions are done.** What is left of the frame loop is the
-   region at $0957-$0AE0 the controls and movement came out of, which has unread parts, and the
-   spawn and wave logic around $1FF9-$1FFE that the BASIC writes.
+   **With that, the five big loop regions are done.**
+
+   **The player's weapon is ported.** `port/src/game/weapon.js`, held by `parity_weapon.mjs`
+   (10 checks) over `probe_weapon.mjs` (12): the trigger at $0ADB, the two shots' flight at
+   $0B6A and $0BB7, and the publishes at $1B2B and $1B60. Three findings, each a control:
+
+   - a slot may fire only if it is empty **and the other slot's count is below 11**, which is
+     a rate limit expressed through the other barrel
+   - **only slot 1 spends a missile**, so half the shots are free - and the cost is one unit,
+     not four, because $0B26 enters $1C89's loop at $1C8B with Y already at 4
+   - **the publish writes the wrong object's Y**: $1B2B sets OBJ4.y, the enemy missile's, and
+     never OBJ6.y. Nothing in the binary ever sets a player shot's Y at all
+
+   **The loop's own shape is traced** and is in DISK_TRUTH under "The loop's own shape":
+   $09A3 to $193C, region by region. Everything in it is ported except $0AB7-$0ADA (the
+   double-buffer page selection), $18D6-$193B (the tail) and the once-only setup at
+   $0957-$09A2.
+
+   **What that leaves for a playable port** is a frame driver: nothing yet composes the twelve
+   modules into one pass in the loop's order. That is the next thing, and the harness for it
+   writes itself - run N passes in both and compare the whole machine.
 
    ~~**Phase 6 is now the biggest gap**~~ **Phase 6's sound is done**, bar one sequence.
    `port/src/game/sound.js` and the generated `sounds.js`, held by `parity_sound.mjs` (13
