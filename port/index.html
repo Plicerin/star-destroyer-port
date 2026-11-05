@@ -104,7 +104,8 @@
 <div class="stage"><canvas id="screen" width="280" height="192"></canvas></div>
 
 <div class="controls">
-  <button id="start">Load disk and fly</button>
+  <button id="boot">Boot the disk</button>
+  <button id="start">Skip to a flight</button>
   <button id="pause" disabled>Pause</button>
   <label>difficulty
     <select id="difficulty">
@@ -142,9 +143,9 @@
   </div>
   <div class="card">
     <h2>wave</h2>
-    <div class="kv"><span>left to send</span><span id="s-waves">&mdash;</span></div>
-    <div class="kv"><span>kills</span><span id="s-kills">&mdash;</span></div>
-    <div class="kv"><span>passes</span><span id="s-passes">&mdash;</span></div>
+    <div class="kv"><span id="l-waves">left to send</span><span id="s-waves">&mdash;</span></div>
+    <div class="kv"><span id="l-kills">kills</span><span id="s-kills">&mdash;</span></div>
+    <div class="kv"><span id="l-passes">passes</span><span id="s-passes">&mdash;</span></div>
   </div>
   <div class="card">
     <h2>speaker</h2>
@@ -156,10 +157,12 @@
 
 <script type="module">
 import { Shell, HELP, FPS_CHOICES, DISK_FPS } from './src/shell/main.js';
+import { Boot } from './src/shell/boot.js';
 
 const canvas = document.getElementById('screen');
 const $ = (id) => document.getElementById(id);
 let shell = new Shell(canvas);
+let boot = null;
 let image = null;
 
 $('help').innerHTML = HELP
@@ -253,6 +256,47 @@ async function fly() {
   }
 }
 
+async function bootDisk() {
+  $('boot').disabled = true;
+  $('boot').textContent = 'Booting…';
+  try {
+    const img = await loadImage();
+    shell.stop();
+    if (boot) boot.stop();
+    boot = new Boot(canvas, img, {
+      fps: Number($('fps').value),
+      tint: $('tint').value,
+    });
+    boot.onStatus = (s) => {
+      // The flight panel's labels do not describe a presentation screen, so say what these
+      // actually are rather than leaving "kills: hires page 1 full" on the screen.
+      $('l-waves').textContent = 'program';
+      $('l-kills').textContent = 'display';
+      $('l-passes').textContent = 'flights';
+      $('s-waves').textContent = s.program ?? '—';
+      $('s-kills').textContent = s.display ?? '—';
+      $('s-passes').textContent = s.flights;
+      $('s-sounds').textContent = s.state;
+      $('over').textContent = s.error ? s.error
+        : (s.waiting === 'key' ? 'press a key' : '');
+      const gaps = s.unimplemented || [];
+      $('note').innerHTML = gaps.length
+        ? '<b>Not ported yet, and reached:</b> '
+          + gaps.map((g) => `${g.what} (${g.n}×)`).join('; ')
+        : '';
+    };
+    boot.start();
+    $('pause').disabled = true;
+    $('boot').textContent = 'Reboot';
+  } catch (e) {
+    $('over').textContent = String(e.message || e);
+    console.error(e);
+  } finally {
+    $('boot').disabled = false;
+  }
+}
+
+$('boot').addEventListener('click', bootDisk);
 $('start').addEventListener('click', fly);
 $('pause').addEventListener('click', () => {
   shell.paused = !shell.paused;
@@ -271,7 +315,7 @@ $('repair').addEventListener('change', () => {
 });
 
 // For poking at it from the console, and for a harness later.
-window.__sd = { get shell() { return shell; } };
+window.__sd = { get shell() { return shell; }, get boot() { return boot; } };
 </script>
 </body>
 </html>

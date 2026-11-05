@@ -85,6 +85,8 @@ export const YIELD = {
   end: 3,
   /** A `CALL` the host runs asynchronously - music, an animation. */
   call: 4,
+  /** A `BRUN` of something that is not BASIC: the caller runs it and then resumes. */
+  run: 5,
 };
 
 export class Applesoft {
@@ -403,15 +405,36 @@ export class Applesoft {
     return { yield: YIELD.key };
   }
 
+  /**
+    * INPUT, which on this disk reads the high-score file as often as the keyboard.
+    *
+    * `INITIALS` line 18 is `INPUT N$(J): INPUT S(J)` - into array elements, with a DOS READ
+    * in front of it, so the values come from `INITIALS.DAT` rather than from anyone typing.
+    * A first version took a bare variable name and died on the subscript.
+    */
   doInput() {
-    // The disk uses INPUT only for the player's initials, and the host supplies it.
     this.skipSpaces();
     if (this.peekByte() === 0x22) this.string();     // a prompt, if there is one
     this.skipSpaces();
     if (this.peekByte() === 0x3B || this.peekByte() === 0x2C) this.pc.at++;
-    const { name, sigil } = this.varName();
-    const v = this.host.input();
-    this.setVar(name, sigil, sigil === '$' ? String(v) : Number(v) || 0);
+    for (;;) {
+      const { name, sigil } = this.varName();
+      let subs = null;
+      this.skipSpaces();
+      if (this.peekByte() === 0x28) {
+        this.pc.at++;
+        subs = [this.num()];
+        while (this.peekByte() === 0x2C) { this.pc.at++; subs.push(this.num()); }
+        this.expect(0x29);
+      }
+      const raw = this.host.input();
+      const v = sigil === '$' ? String(raw) : (Number(raw) || 0);
+      if (subs) this.setArray(name, sigil, subs, v);
+      else this.setVar(name, sigil, v);
+      this.skipSpaces();
+      if (this.peekByte() !== 0x2C) break;
+      this.pc.at++;
+    }
     return { yield: YIELD.none };
   }
 
@@ -500,7 +523,11 @@ export class Applesoft {
       out += typeof v === 'string' ? v : formatNumber(v);
       newline = true;
     }
-    this.emit(out, newline);
+    // A line that begins with Ctrl-D is DOS's, and DOS takes it off the screen driver rather
+    // than letting it through - which is why the game's loading does not scribble filenames
+    // over the title. Emitting it first put `BLOAD SV DATA` across the picture.
+    const isDos = this.isDosLine(out);
+    if (!isDos) this.emit(out, newline);
     return this.afterPrint(out);
   }
 
@@ -511,6 +538,11 @@ export class Applesoft {
    * DOS watches them, and a line that begins with $04 is taken as a command. Every load,
    * every chain and every file on this disk goes through it.
    */
+  /** DOS watches the screen driver for a line starting with Ctrl-D. */
+  isDosLine(text) {
+    return text.replace(/^[\r\n]+/, '').charCodeAt(0) === 4;
+  }
+
   afterPrint(text) {
     const cmd = text.replace(/^\n+/, '');
     if (!cmd.startsWith('\u0004')) return { yield: YIELD.none };
@@ -519,6 +551,12 @@ export class Applesoft {
     if (r && r.chain) {
       this.done = true;
       return { yield: YIELD.chain, program: r.chain };
+    }
+    // A BRUN loads and then *runs*. The BASIC is still there and carries on afterwards -
+    // `SD PART2` line 164 BRUNs the game and line 172 reads what it left behind - so this
+    // hands control out and the next `step` picks up where it was.
+    if (r && r.run !== undefined) {
+      return { yield: YIELD.run, addr: r.run, program: r.name };
     }
     return { yield: YIELD.none };
   }

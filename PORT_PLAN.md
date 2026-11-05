@@ -567,6 +567,46 @@ Verified in the browser: the turn is exactly three units a pass, object 12's hea
 the viewer's, the trigger produces `$1F73`, and both of the loop's exits report
 (`$00` = `$4D`, and wave clear).
 
+## Phase 6.6 — the presentation  (part done)
+
+The twelve programs between the flights. **They are run, not transliterated**: they are
+Applesoft, they are on the disk, and an interpreter cannot drift from them the way twelve
+hand-translations would. The four pieces that are *not* BASIC are a different matter and
+are below.
+
+Done:
+
+- `port/src/game/applesoft.js` — the interpreter, over `probe_applesoft.mjs` (7 checks).
+  54 tokens used on this disk, all 54 implemented, and the port parses the same 380 lines
+  as the oracle's reader.
+- `port/src/platform/display.js` — the eight soft switches, watched through POKE.
+- `port/src/platform/text.js` — the 40x24 page, its interleave and three styles. The glyph
+  shapes are a stand-in: the real ones are in a character ROM, not on this disk.
+- `port/src/platform/host.js` — POKE/PEEK, the text cursor, Applesoft's HPLOT, the DOS
+  commands, the keyboard, the high-score file. Unimplemented CALLs are recorded and shown
+  rather than being fatal or silent.
+- `port/src/shell/presentation.js` and `boot.js` — the chain, and the handover to the
+  flight loop at `BRUN STAR DESTROYER.OBJ0`.
+
+**It boots.** START, LOGO1, the difficulty screen from the disk's own DIFFICULTY.PIC, SD,
+SD START, SD PART2, the flight, MONOLITH, INITIALS - in the browser, one screen at a time.
+
+Still to do here: the Applesoft shape table, which `INITIALS` and `STARBASE` draw their
+text with (105 DRAW calls in one pass through the high scores); writing the high-score
+file somewhere it survives; and `$FC42`, a monitor routine three programs CALL that this
+repository has not identified.
+
+## Phase 6.7 — the four that are not BASIC
+
+The owner's call, taken 2026-11-05: **transliterate each, the way the flight loop was**,
+rather than running them under a 6502 interpreter. Same method and same evidence standard
+throughout.
+
+- `TITLE.OBJ0`, 1,792 bytes — the title animation, CALLed by LOGO1.
+- `HYPERDRIVE.OBJ0`, 2,048 bytes, with `CLS`, 250 — the warp sequence between flights.
+  `CLS` is cheaper than it looks: `CLS DATA` on the disk is its source, in BASIC.
+- `PLAYER.MODULE`, 208 bytes — the music, CALLed by SELECT, MONOLITH and WIN.
+
 ## Phase 7 — the switches
 
 Only now, and all defaulting to off: save states, frame rate, gamepad. Each one measured
