@@ -485,6 +485,22 @@ Suggested order:
    against it over the whole state space those lines can see, rather than against my reading
    of them.
 
+4. **And then how those twenty programs load anything at all**: `port/src/game/dos.js`,
+   held by `parity_overshoot.mjs` (9 checks) over `probe_overshoot.mjs` (17).
+
+   A DOS 3.3 `BLOAD` writes up to 255 bytes past the end of the file, because every sector
+   after the first is read straight to the destination. Every binary on this disk overshoots,
+   and the game is built around it - `SD START` line 2 loads A2-3D2 then SV DATA because
+   A2-3D2's one byte lands on the display list's first byte, and MAIN DATA then HEADING DATA
+   because MAIN DATA's 213 bytes land inside it. The load order is a repair list.
+
+   One overshoot has no repair: `STAR DESTROYER.OBJ0` ends at `$1FF0` and runs 250 bytes over
+   the interface, so the waves the BASIC rolled as 2/2/5 reach the binary as 32/51/51 and the
+   target of 7 reaches it as 217. The finale's binary has the same overshoot and all-zero
+   slack, which is what says neither was intended. The port models the load rather than
+   working around it, so a clean dump fixes it without a change here - the same decision as
+   the title pages.
+
    **Still not ported**: the *presentation* around those decisions - the title (`START`,
    `LOGO1`), `SELECT`'s keyboard handling, `STARBASE` itself, the hyperdrive animation
    (`HYPERDRIVE.OBJ0` + `CLS`), `INITIALS`, `WIN`, `MONOLITH`, and `DEMO`. And
@@ -525,6 +541,14 @@ against the fidelity baseline so the difference is a choice rather than a drift.
 ---
 
 ## What a clean dump would change
+
+Two things now, and the second is testable the moment one exists:
+
+1. The two title pictures come back and `START` needs no change.
+2. If bytes 5,894-6,143 of `STAR DESTROYER.OBJ0`'s sector chain are zeros on a clean dump,
+   then the interface survives its own `BRUN` there and the game plays as designed - and this
+   image, not the game, is why it does not. See DISK_TRUTH, "A BLOAD writes past the end of
+   the file".
 
 The owner is looking for one. If it arrives:
 

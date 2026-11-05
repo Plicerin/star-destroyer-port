@@ -1863,10 +1863,14 @@ rather than on seconds.
 `probe_progression.mjs` (22 checks), `parity_progression.mjs` (11).
 
 Everything outside the flight loop is Applesoft, and everything the Applesoft and the binary say
-to each other goes through **`$1FF3`-`$1FFF`** - the last thirteen bytes of
-`STAR DESTROYER.OBJ0`'s own image, which is why they survive a `BRUN` and why the next program
-in the chain can read them. That is the whole interface. There is no file, no DOS buffer and no
-second channel.
+to each other goes through **`$1FF3`-`$1FFF`** - the thirteen bytes just **above**
+`STAR DESTROYER.OBJ0`, which ends at `$1FF0`. Being outside every binary's image is what lets
+them carry state from one program in the chain to the next. That is the whole interface. There
+is no file, no DOS buffer and no second channel.
+
+Correcting this section as first written, which said they were the last thirteen bytes *of* the
+binary's image. They are above it, and they do **not** survive the `BRUN` - see the next
+section, which is what finding that out turned into.
 
 | | written by | read by |
 |---|---|---|
@@ -1874,13 +1878,19 @@ second channel.
 | `$1FF4` | `SELECT`, `STARBASE` | `STARBASE`, `INITIALS` |
 | `$1FF5` | **the binary**, at `$09A0 INC $1FF5` | `SD PART2`, `STARBASE` |
 | `$1FF6` | `SELECT` | `SD PART2` |
-| `$1FF7` | `SD START2` | **nothing** |
+| `$1FF7` | `SD START2` | **`BASE STAR.OBJ0`** - see below |
 | `$1FF8` | `SELECT` | `SD PART2` |
 | `$1FF9`-`$1FFB` | `SD PART2`, and the binary counts them down | `SD PART2` |
 | `$1FFC`-`$1FFE` | the binary's three award blocks | `STARBASE`, `INITIALS` |
 | `$1FFF` | `BASE STAR.OBJ0` | `SD PART3`, `INITIALS` |
 
-`$1FF5` is the one worth stating plainly, because it is the only one the binary keeps: the
+`$1FF7` was recorded here as written and never read. That is true of the twenty Applesoft
+programs, which is all the scan that produced it could see, and false of the game: the finale's
+binary zeroes it at `$0962`, increments it at `$0F53` and `$0F9B`, and at `$10ED` compares it
+against fifteen, then calls two blocks, resets it and puts 4 in `$093E`. It is that binary's
+progress counter through the final mission, and `SD START2`'s `POKE` is its initialisation.
+
+`$1FF5` is the one worth stating plainly, because it is the only one the main binary keeps: the
 increment is at `$09A0`, inside the once-only setup rather than the frame loop, so **it counts
 flights, not passes**. Four passes of the loop leave it at 0.
 
@@ -1937,6 +1947,90 @@ against it over the whole of the state space those lines can see - 720 states fo
 two lines and every value of the byte for the other two. A transcription error cannot survive
 that, because the thing the port is compared against was never transcribed. Then complete games
 are played in the port and their shape checked against what the lines say it should be.
+
+---
+
+## A BLOAD writes past the end of the file
+
+`probe_overshoot.mjs` (17 checks), `parity_overshoot.mjs` (9).
+
+The section above says a game is thirteen bytes. It is - and on this disk those thirteen bytes
+are destroyed by the `BRUN` that is supposed to read them.
+
+DOS 3.3 does not copy a binary file out of a staging buffer. It reads the first sector into a
+buffer, because the file manager has to find the load address and length in its first four
+bytes before it knows where the file goes, and then reads **every sector after that straight to
+the destination** - all 256 bytes of each, the last one included. So the sectors land on a grid
+that starts four bytes below the load address, nothing is written below the load address itself,
+and a load writes up to 255 bytes past the end of the file. What it writes there is whatever was
+left in that sector on the disk when the file was saved.
+
+The model is one line - *a load writes the file's sector chain, less its header, at `addr`* -
+and it predicts **all sixteen bytes at `$1FF0`-`$1FFF` from the disk image alone**, checked
+against the running machine. `parity_overshoot.mjs` then replays every load on the path from
+the boot to a flight, extracted from the detokenised programs rather than transcribed, and
+reproduces 9,328 bytes of the machine's memory.
+
+Every binary on the disk overshoots. The amount follows from the length:
+
+    bytes = 256 x ceil((4 + len) / 256) - 4 - len
+
+| | ends at | also writes | bytes |
+|---|---|---|---|
+| A2-3D2 | `$80FA` | `$80FB` | 1 |
+| CLS | `$1FCB` | `$1FCC`-`$1FCD` | 2 |
+| SV DATA, SV DATA2 | `$82E5` | `$82E6`-`$82F6` | 17 |
+| MAIN DATA and its two variants | `$89D4` | `$89D5`-`$8AA9` | 213 |
+| STAR DESTROYER.OBJ0, BASE STAR.OBJ0 | `$1FF0` | `$1FF1`-`$20EA` | 250 |
+| MATH | `$9CF1` | `$9CF2`-`$9DEE` | 253 |
+
+### The load order is a repair list
+
+Four of those overshoots land on something the game needs, and three of them are repaired by
+the load that comes next. `SD START` line 2 is
+
+    BLOAD A2-3D2,A$6000 : BLOAD SV DATA : BLOAD MAIN DATA : BLOAD HEADING DATA,A35275
+
+A2-3D2's single byte lands on `$80FB`, which is the display list's first byte - and SV DATA
+starts exactly there, so loading it next is the repair. The overshoot would put `0` there; SV
+DATA puts `14`, which is the VIEWPORT opcode the whole scene begins with. Measured on the
+machine: `$80FB` is 14. Likewise MAIN DATA's 213 bytes land inside HEADING DATA, which is
+loaded after it. **The order in that line is doing work, and the author knew about this.**
+
+### The one that is not repaired
+
+`STAR DESTROYER.OBJ0` ends at `$1FF0`, so its last sector covers `$1FEB`-`$20EA` and runs over
+`$1FF3`-`$1FFF` - and the `BRUN` is the last thing `SD PART2` does before the binary takes
+over. There is no line after it.
+
+Measured, end to end, on the machine:
+
+| | the BASIC rolls | the binary reads |
+|---|---|---|
+| `$1FF8`, the target | 7 flights | 217 |
+| `$1FF9`-`$1FFB`, the waves | 2 / 2 / 5 - nine enemies | 32 / 51 / 51 - a hundred and thirty-four |
+
+The slack is a line of leftover high-score text - fourteen of the sixteen bytes are printable,
+and read `" 1     Y 33366"`. So on this image a flight spawns 134 enemies instead of 9, and when
+it ends `SD PART2` line 172 finds the wave counters nonzero and goes to `MONOLITH`. The binary
+is then seen doing exactly what it should with the wrong numbers: `$1E9D DEC $1FF9`,
+`$1ECE DEC $1FFA` and `$09A0 INC $1FF5`, three writes in three million instructions.
+
+**`BASE STAR.OBJ0` loads to the same address with the same length and its slack is all zeros.**
+Same program, same overshoot, harmless. That asymmetry is what says neither was intended: one
+file's slack breaks the game and the other's does not, and nothing chose either.
+
+### What the port does about it
+
+Nothing. `port/src/game/dos.js` loads the way DOS does, so the corruption happens for the same
+reason it happens on the disk, and a dump whose slack is zeros plays correctly with no change
+to the port. This is the same decision as the title pages: the defect lives in the data, and
+putting it there is how a clean dump fixes it.
+
+Which makes this the **second thing a clean dump would change**, and the more interesting one,
+because it is testable the moment one exists: load `STAR DESTROYER.OBJ0` from it, look at bytes
+5,894 to 6,143 of its sector chain, and if they are zeros then this image is why the game does
+not work rather than the game.
 
 ---
 
@@ -1998,7 +2092,9 @@ promoted to fact.
     storage, `$9800`-`$98F2`, byte-indexed through a directory at `$08F2`, written by the
     binary and by nothing else. 241 of its 243 bytes are deterministic. **What still has no
     answer is which code builds it** - 18 indexed stores in `.OBJ0` are the only writers
-    found and none of them is on the setup path, so the port starts from a capture.
+    found and none of them is on the setup path, so the port starts from a capture. **One
+    hypothesis is now ruled out**: no file's BLOAD overshoot reaches `$9800`. The nearest
+    below it is HEADING DATA's, which stops at `$8CC6`.
 15. **The game's state at `$0900`-`$0950`**, now mostly read. The dispatch added
     `$0911`-`$0914` (the two missiles' position entries), `$0919` (the missile speed divisor),
     `$0927`-`$092A` (their step entries), `$0938`-`$093A` (the three firing cooldowns) and

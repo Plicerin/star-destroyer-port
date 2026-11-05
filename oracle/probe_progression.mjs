@@ -70,9 +70,11 @@ console.log('\n=== the interface: $1FF3-$1FFF ===');
     [...touched.keys()].every((a) => names[a] !== undefined) && touched.size === 13,
     `${touched.size} addresses, every one of them in IFACE`);
 
-  // $1FF7 is written and never read. Worth saying, because it looks like state and is not.
-  check('$1FF7 is written by SD START2 and read by nothing at all',
-    touched.get(IFACE.unused).poke.size === 1 && touched.get(IFACE.unused).peek.size === 0,
+  // $1FF7 is written by one program and PEEKed by none of them. Scope that claim to the
+  // BASIC, which is all this scan can see: the finale's binary keeps its mission progress
+  // there, so "read by nothing" would be wrong about the game. See chain.js.
+  check('$1FF7 is written by SD START2 and read by no BASIC program',
+    touched.get(IFACE.finale).poke.size === 1 && touched.get(IFACE.finale).peek.size === 0,
     'so it is not state, it is a leftover');
 }
 

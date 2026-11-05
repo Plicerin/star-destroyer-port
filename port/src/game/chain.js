@@ -4,15 +4,25 @@
 // The flight loop is `loop.js` and it is one program among twenty. What decides whether you
 // fly again, dock at the starbase, go to the final mission or go to the high scores is a
 // handful of Applesoft lines spread across SELECT, SD PART2, STARBASE and SD PART3 - and all
-// of their state lives in **$1FF3-$1FFF**, the last thirteen bytes of `STAR DESTROYER.OBJ0`'s
-// own image. The binary writes some of them and the BASIC writes the rest, and that is the
-// whole interface.
+// of their state lives in **$1FF3-$1FFF**, the thirteen bytes just **above**
+// `STAR DESTROYER.OBJ0`, which ends at `$1FF0`. Being outside every binary's image is what
+// lets them carry state from one program in the chain to the next. The binary writes some of
+// them and the BASIC writes the rest, and that is the whole interface.
+//
+// Except that they do not survive the `BRUN` that is supposed to read them. DOS 3.3 reads a
+// file's last sector straight to the destination, all 256 bytes of it, so loading a binary
+// that ends at `$1FF0` writes 250 bytes of that sector's slack over `$1FF1`-`$20EA` - the
+// interface included. See `dos.js`, which models it, and `oracle/probe_overshoot.mjs`, which
+// measured it: on this image `SELECT` rolls a target of 7 and `SD PART2` rolls waves of 2/2/5,
+// and the binary reads 217 and 32/51/51. The port does not work around that; it loads the way
+// DOS does and lets the data decide, so a dump whose slack is zeros plays correctly with no
+// change here.
 //
 //     $1FF3  120 means "this was the last ordinary flight"   HYPERDRIVE 3 and 4 set it
 //     $1FF4  the running starbase-visit bonus, in units of 500
 //     $1FF5  how many flights have been flown. The BINARY increments it, at $09A0
 //     $1FF6  the difficulty, 1 to 3, as SELECT read it from the keyboard
-//     $1FF7  written once by SD START2 and never read by anything
+//     $1FF7  SD START2 zeroes it; BASE STAR.OBJ0 counts the final mission with it
 //     $1FF8  how many flights you have to survive. SELECT rolls it from the difficulty
 //     $1FF9  the class-1 wave counter. SD PART2 rolls it, the binary counts it down
 //     $1FFA  the class-2 wave counter
@@ -56,8 +66,17 @@ export const IFACE = {
   flights: 0x1FF5,
   /** $1FF6 - the difficulty, 1 to 3. */
   difficulty: 0x1FF6,
-  /** $1FF7 - written by SD START2, read by nothing. */
-  unused: 0x1FF7,
+  /**
+    * $1FF7 - no BASIC program reads it, but the finale's binary does.
+    *
+    * `BASE STAR.OBJ0` zeroes it at `$0962`, increments it at `$0F53` and `$0F9B`, and at
+    * `$10ED` compares it against fifteen - at which point it calls two blocks, resets it and
+    * puts 4 in `$093E`. So it is that binary's own progress counter through the final
+    * mission, and `SD START2`'s `POKE` is its initialisation. The last pass recorded this as
+    * written-and-never-read, which was true of the twenty Applesoft programs and not of the
+    * game.
+    */
+  finale: 0x1FF7,
   /** $1FF8 - how many flights have to be survived. */
   target: 0x1FF8,
   /** $1FF9-$1FFB - the three wave counters. */
@@ -195,12 +214,12 @@ export const CHAIN = {
 export const RESETS = {
   /** SELECT 21 - `FOR J = 8179 TO 8191: POKE J,0`, the whole interface. */
   SELECT: () => IFACE.waves.concat(IFACE.kills, [IFACE.lastFlight, IFACE.bonus,
-    IFACE.flights, IFACE.difficulty, IFACE.unused, IFACE.target, IFACE.baseStar]),
+    IFACE.flights, IFACE.difficulty, IFACE.finale, IFACE.target, IFACE.baseStar]),
   /** SD START 4 and 165. */
   'SD START': () => [IFACE.waves[0], IFACE.waves[1], ...IFACE.kills, IFACE.baseStar,
     IFACE.lastFlight],
   /** SD START2 4 - note it does NOT clear the third wave counter or the kills. */
-  'SD START2': () => [IFACE.waves[0], IFACE.waves[1], IFACE.unused, IFACE.baseStar],
+  'SD START2': () => [IFACE.waves[0], IFACE.waves[1], IFACE.finale, IFACE.baseStar],
 };
 
 /**
