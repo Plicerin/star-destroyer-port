@@ -1533,6 +1533,67 @@ routine - so with class 2's wave counter empty it does not return, it spawns a c
 and decrements that wave instead. Classes 1 and 3 branch to a local `CLC`/`RTS`. Measured
 directly: with `$1FFA` at 0 and `$1FFB` at 5, object 3 comes on and `$1FFB` goes to 4.
 
+### Taking damage: the shield absorbs, then the systems pay
+
+`probe_damage.mjs` (16 checks) and `parity_damage.mjs` (15). Three instrument-panel bars -
+`SHLD` at `$81DD`, `WARP` at `$81F3` and `MSL` at `$8209` - are single bytes in the display
+list, and they are **coordinates**, the bar's end. In flight all three read 244 and
+**`$C7` (199) is empty**, so each has 45 units of travel. `Flight.throttle` already knew that
+value, because warp will not engage at it.
+
+There is one primitive. `$1C89` shrinks a bar by up to four:
+
+```
+$1C89  LDY #$01
+$1C8B  DEX / CPX #$C7 / BEQ      bottomed out
+       CPY #$04 / BEQ            did four
+       INY / JMP $1C8B
+```
+
+The bar goes in and out in `X`, and `Y` says how far it got. Four steps always leave `Y` at 4,
+because the `CPX` is tested first; an early exit leaves 1, 2 or 3. **The floor only works from
+above** - a bar already at `$C7` steps straight past it and keeps going, measured: `$C7` comes
+back as 195. Nothing in the game ever raises a bar, so it cannot happen in play.
+
+It is called from six places: four on the shield and one each on the missile and warp bars.
+
+```
+$1C99  a ram:      SHLD -= 4, -= 4, store, -= 4, -= 4, store, sound $1E03
+$1CFC  a missile:  SHLD >= $C8 ? ( -= 4, -= 4, store, sound ) : the systems
+$1CCD  the systems: MSL -= 4, WARP -= 4, and $0933 += 1
+```
+
+**A ram costs sixteen and a missile costs eight**, and the moment the shield bottoms out
+control falls to `$1CCD` and the rest of the shield damage is abandoned. The two never both
+happen: either the shield took it or the systems did.
+
+**The store comes after the second shrink, not after each**, which is visible at the edge: a
+ram that empties the shield on its *first* four leaves the bar **unchanged** and goes straight
+to the systems. Measured at a shield of 202 - it stays 202.
+
+`$1CFC` jumps into the middle of `$1C99` at `$1CB1`, so the last eight of a ram and the whole
+of a missile hit are the same code.
+
+**`$0933` is the hit count and four is fatal.** `$1CEE` is `CPX #$04 / BCC`, so the fourth time
+the systems take damage the routine jumps to `$1F2B` and does not come back. That is the
+nearest thing the binary has to a lives counter. An empty system bar is skipped rather than
+wrapped, which is what the `CPX #$C7` guards at `$1CD0` and `$1CDD` are for.
+
+One redundancy, recorded because it was nearly mistaken for something the port had to get
+right: `$1CFC` tests `CPX #$C8` where `CPX #$C7` would have read more naturally, and the two
+**cannot be told apart**. The only value they disagree on is `$C7`, and `$1CB1`'s own first
+test sends that to the systems either way - checked over 405 shield states, 405 agreements.
+
+The flags are read at `$18BC` and `$18C9`, each tested for non-zero, acted on and cleared, the
+ram first. A pass in which both arrive therefore costs 24 and can tick the hit count twice. The
+three launch-sound flags just above them, at `$186E`, `$187B` and `$1888`, have the same shape
+and no damage - and class 3's holds its enemy's heading rather than 1, which makes no
+difference to a test for non-zero.
+
+Every sound this chain asks for - `$1E03` when the shield holds, `$1E21` and `$1E40` when it
+does not, `$1F2B` when the ship is destroyed, `$1F8E` for an enemy launch - is Phase 6. The
+port returns the address it would have called, so the chain is complete and the gap is named.
+
 #### The score, and why two blocks' order decides it
 
 `$1895`, `$18A2` and `$18AF` are `LDX counter / CPX #$03 / BCC past it / JSR $1DD3 / INC score`,

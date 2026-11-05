@@ -367,10 +367,29 @@ Suggested order:
    equality, not a range, so a debris counter above 4 falls through to the respawn. The first
    version read `>= 4`.
 
-   **What is left in the three regions** is the damage routines the two arrival flags trigger
-   ($1C99 and $1CFC, through $18BC and $18C9), which is the shield and the player's lives, and
-   then Phase 6's sound - $1D52 with its parameter block at $1D4A-$1D51, which $1DD3 and $1F8E
-   fill in.
+   **The damage model is ported.** `port/src/game/damage.js`, held by `parity_damage.mjs`
+   (15 checks) over `probe_damage.mjs` (16). One primitive, $1C89, shrinking a panel bar by up
+   to four and stopping at $C7; a ram costs sixteen of the shield and a missile eight; when the
+   shield runs out the missile and warp bars lose four each and $0933 ticks, and **four of
+   those is fatal** - the nearest thing the binary has to a lives counter.
+
+   Two edges worth the words. The shield is stored after the *second* shrink, not after each,
+   so a ram that empties it on the first four leaves the bar untouched. And the floor is an
+   equality, not a clamp, so a bar already at $C7 would step straight past it - which cannot
+   happen because nothing ever raises one.
+
+   One thing that looked like a control and is not: $1CFC tests `CPX #$C8` where `#$C7` would
+   read more naturally, and the two cannot be told apart, because the one value they disagree
+   on is caught by $1CB1's own guard. Recorded as a measured redundancy over 405 shield states
+   rather than left as a control that silently never fires.
+
+   **With that, the five big loop regions are done.** What is left of the frame loop is the
+   region at $0957-$0AE0 the controls and movement came out of, which has unread parts, and the
+   spawn and wave logic around $1FF9-$1FFE that the BASIC writes.
+
+   **Phase 6 is now the biggest gap**: every sound this port reaches returns the address it
+   would have called. They all go through $1D52 with a parameter block at $1D4A-$1D51, filled
+   in by $1DD3, $1E03, $1E21, $1E40, $1F2B, $1F8E and $1FA9.
 
    **A hazard fixed on the way**, in `exercise.mjs`: `toFlight` could return before DOS had
    finished loading the binary, leaving everything above `$17EB` holding the power-on fill.
