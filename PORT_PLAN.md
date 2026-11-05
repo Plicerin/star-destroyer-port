@@ -470,7 +470,26 @@ Suggested order:
    instructions, *i* in the main view and *i+12* in the scope, switched on and moved
    together. And the spawn counters at `$1FF9`-`$1FFB` are the interface between the
    BASIC's difficulty and the binary's waves.
-3. Then the Applesoft around it.
+3. ~~Then the Applesoft around it.~~ The **decisions** are done: `port/src/game/chain.js`,
+   held by `parity_progression.mjs` (11 checks) over `probe_progression.mjs` (22).
+
+   The whole interface between the BASIC and the binary is thirteen bytes, `$1FF3`-`$1FFF`,
+   inside the binary's own image. A game is 5-15 flights depending on difficulty, each a wave
+   that has to be cleared to the last enemy, with a starbase between each that banks an
+   accumulating bonus, and `BASE STAR.OBJ0` for the finale. `$1FF5` is the only one of the
+   thirteen the binary keeps, and its increment is at `$09A0` in the once-only setup - so it
+   counts flights, not passes.
+
+   Held without a machine, on purpose: the four decisions are four Applesoft lines, so the
+   harness parses each condition out of the detokenised program and compares the port's `next()`
+   against it over the whole state space those lines can see, rather than against my reading
+   of them.
+
+   **Still not ported**: the *presentation* around those decisions - the title (`START`,
+   `LOGO1`), `SELECT`'s keyboard handling, `STARBASE` itself, the hyperdrive animation
+   (`HYPERDRIVE.OBJ0` + `CLS`), `INITIALS`, `WIN`, `MONOLITH`, and `DEMO`. And
+   `BASE STAR.OBJ0`, the finale's binary, which loads at the same address as
+   `STAR DESTROYER.OBJ0` and is what writes `$1FFF`.
 
 ## Phase 5 notes — what the plan first said
 

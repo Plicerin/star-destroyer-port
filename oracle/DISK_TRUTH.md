@@ -1858,6 +1858,88 @@ rather than on seconds.
 
 ---
 
+## A game is thirteen bytes
+
+`probe_progression.mjs` (22 checks), `parity_progression.mjs` (11).
+
+Everything outside the flight loop is Applesoft, and everything the Applesoft and the binary say
+to each other goes through **`$1FF3`-`$1FFF`** - the last thirteen bytes of
+`STAR DESTROYER.OBJ0`'s own image, which is why they survive a `BRUN` and why the next program
+in the chain can read them. That is the whole interface. There is no file, no DOS buffer and no
+second channel.
+
+| | written by | read by |
+|---|---|---|
+| `$1FF3` | `HYPERDRIVE 3`, `HYPERDRIVE 4` - both `POKE 8179,120` | `STARBASE` |
+| `$1FF4` | `SELECT`, `STARBASE` | `STARBASE`, `INITIALS` |
+| `$1FF5` | **the binary**, at `$09A0 INC $1FF5` | `SD PART2`, `STARBASE` |
+| `$1FF6` | `SELECT` | `SD PART2` |
+| `$1FF7` | `SD START2` | **nothing** |
+| `$1FF8` | `SELECT` | `SD PART2` |
+| `$1FF9`-`$1FFB` | `SD PART2`, and the binary counts them down | `SD PART2` |
+| `$1FFC`-`$1FFE` | the binary's three award blocks | `STARBASE`, `INITIALS` |
+| `$1FFF` | `BASE STAR.OBJ0` | `SD PART3`, `INITIALS` |
+
+`$1FF5` is the one worth stating plainly, because it is the only one the binary keeps: the
+increment is at `$09A0`, inside the once-only setup rather than the frame loop, so **it counts
+flights, not passes**. Four passes of the loop leave it at 0.
+
+### The shape of a game
+
+```
+SELECT    rolls the target from the difficulty, and zeroes all thirteen bytes first
+SD START  zeroes the counters
+SD PART2  rolls three wave counters, BRUNs the binary, then decides:
+            a counter left, or $00 = 77    -> MONOLITH -> INITIALS      (dead)
+            flights => target              -> HYPERDRIVE 3 -> STARBASE  (the last one)
+            otherwise                      -> HYPERDRIVE1 -> STARBASE
+STARBASE  scores the visit, banks the bonus, then:
+            $1FF3 = 120 -> HYPERDRIVE 4 -> SD START2 -> SD PART3
+            otherwise   -> HYPERDRIVE2  -> SD PART2
+SD PART3  BRUNs BASE STAR.OBJ0, then $1FFF decides MONOLITH or WIN
+```
+
+So a game is **five to fifteen flights**, each a wave that has to be cleared to the last enemy,
+with a starbase between each and a different binary for the finale. `SELECT` rolls the target
+as `5 + RND*3`, `8 + RND*3` or `10 + RND*6`, and `POKE` truncates, so the three difficulties are
+5-7, 8-10 and 10-15 flights. `SD PART2` line 300 rolls each wave counter as
+`PEEK(8182) + ((RND(1)*4) + 1.5)` - the difficulty plus 1 to 5, weighted to the middle, because
+the fractional part lands in `[1.5, 5.5)` and the ends get half a unit each.
+
+Two details that read the wrong way round if you only glance at them. `SD PART2` line 175 is
+`IF PEEK(8181) = > PEEK(8184)`, Applesoft's spelling of `>=`, so flying *exactly* as many as
+asked for ends the run - a strict `>` would give every difficulty one flight too many. And
+`STARBASE` line 220 is an equality against 120, not a test for nonzero, so the flag is a value
+and not a boolean.
+
+### Scoring
+
+`SC = PEEK(8188)*300 + PEEK(8189)*600 + PEEK(8190)*800`, in both `STARBASE` and `INITIALS`.
+On top of it `STARBASE` line 2016 banks `min(PEEK(8181), 5)` into `$1FF4` and pays
+`PEEK(8180)*500`, so the bonus **accumulates across visits** - each visit adds the flights so
+far, capped at five, to a running total that every later visit and the high-score screen
+multiply again. `INITIALS` adds 10,000 if `$1FFF` is 1. A won game on hard comes out near
+180,000, and about two thirds of that is the accumulated bonus rather than the kills.
+
+### Three programs nothing names
+
+`SD RET`, `HYPERDRIVE0` and `CLEAR SCORES` are on the disk and no `RUN` anywhere reaches them.
+The first two chain somewhere sensible - `SD RET` sets up like `SD START`, `HYPERDRIVE0` runs
+`SD` - so they look like earlier versions left in place. `CLEAR SCORES` is two lines that reset
+`INITIALS.DAT` and was presumably run by hand.
+
+### How this one was held
+
+There is no machine in `parity_progression.mjs`, and that is deliberate. The four decisions are
+four Applesoft lines, so the harness **parses each condition out of the detokenised program**
+into a small expression tree, evaluates it independently, and compares the port's `next()`
+against it over the whole of the state space those lines can see - 720 states for `SD PART2`'s
+two lines and every value of the byte for the other two. A transcription error cannot survive
+that, because the thing the port is compared against was never transcribed. Then complete games
+are played in the port and their shape checked against what the lines say it should be.
+
+---
+
 ## Open questions
 
 Things this pass did **not** establish. None of them should be guessed at later and quietly
@@ -1904,7 +1986,8 @@ promoted to fact.
    supplied itself will tell you whatever you put there.
 10. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
    measured about when or in what format.
-11. **The `DEMO` path**, never walked.
+11. **The `DEMO` path**, never walked. The chain around it is now established (above);
+    what `DEMO` itself does is not.
 12. ~~**The world-to-view transform.**~~ Derived, above, and both routines under it are
     now transliterated and held by `parity_math.mjs` and `parity_view.mjs`.
 13. ~~**`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).**~~ Both answered, below. `MATH` is a
