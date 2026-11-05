@@ -601,8 +601,14 @@ SD START, SD PART2, the flight, MONOLITH, INITIALS - in the browser, one screen 
 - `oracle/probe_textscreen.mjs` (9 checks) — the layout, the three styles, and which way
   round a letter goes, that last one because it was wrong.
 
-Still to do here: writing the high-score file somewhere it survives, and `$FC42`, a
-monitor routine three programs CALL that this repository has not identified.
+**Both screens that draw with the shape table are confirmed working**, which was worth
+checking rather than assuming: `INITIALS` renders the high-score table, and `STARBASE` came
+up with its text and no starbase until `CALL 24576` was wired to the port's own A2-3D2.
+That call is not the flight loop's alone - `STARBASE` makes 33 of them and `DEMO` uses it
+too - so the renderer now belongs to `Presentation` rather than to one shell.
+
+Still to do here: writing the high-score file somewhere it survives, and `$FC42` and
+`$F3F2`, two routines three programs CALL that this repository has not identified.
 
 ## Phase 6.7 — the four that are not BASIC
 

@@ -11,6 +11,7 @@
 import { Applesoft, YIELD } from '../game/applesoft.js';
 import { Host } from '../platform/host.js';
 import { openDisk } from '../platform/dsk.js';
+import { Engine } from '../a23d2/engine.js';
 
 /** Where Applesoft keeps a program. */
 export const TXTTAB = 0x801;
@@ -32,7 +33,24 @@ export class Presentation {
   constructor(image, { rnd = Math.random, calls = {} } = {}) {
     this.disk = openDisk(image);
     this.mem = new Uint8Array(0x10000);
-    this.host = new Host(this.mem, this.disk, { rnd, calls });
+    /**
+     * A2-3D2, over the two hi-res pages where the machine has them.
+     *
+     * `CALL 24576` is not the flight loop's alone: `STARBASE` makes 33 of them to draw the
+     * docking scene and `DEMO` uses it too. Leaving it to the flight meant the starbase
+     * screen came up with its text and no starbase, which is what checking rather than
+     * assuming turned up.
+     */
+    this.engine = new Engine(this.mem, {
+      pages: [this.mem.subarray(0x2000, 0x4000), this.mem.subarray(0x4000, 0x6000)],
+    });
+    this.host = new Host(this.mem, this.disk, {
+      rnd,
+      calls: {
+        0x6000: () => { this.engine.reset(); this.engine.run(); return null; },
+        ...calls,
+      },
+    });
     this.basic = new Applesoft(this.mem, this.host);
     this.program = null;
     this.waiting = WAITING.nothing;

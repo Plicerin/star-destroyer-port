@@ -85,11 +85,11 @@ rest drive the machine. `run_all.mjs` discovers every `probe_*.mjs` and `parity_
 runs the probes first, refuses to report success on an empty suite, and exits with the
 number of failures.
 
-**One known flake, and it is getting annoying:** `probe_boot.mjs`'s "two different power-on
-fills converge on the same machine" has now failed three times in about a dozen suite runs
-and passed on every rerun. It is timing dependent. Three failures is past the point where
-"rerun it" is a reasonable answer - a suite that cries wolf is worth less than one harness -
-so this should be fixed rather than tolerated.
+**The `probe_boot.mjs` flake is fixed.** It sampled the machine at fixed times after
+power-on, and how far the boot had got when `coldStart` returned varied, so about one run in
+four compared different stages and three or four of its eight checks failed together. It now
+waits for the title to appear and measures everything from there - the same move
+`settleBinary` makes, for the same reason. Five runs in a row, and the suite, are green.
 
 Playwright is pinned to **1.59.1** deliberately — it is the version whose Chromium is
 already on this machine, and a floating range downloads a new one.
