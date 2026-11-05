@@ -13,6 +13,7 @@ import { Display } from './display.js';
 import { paintText, clear as clearText, encode, COLS, ROWS, rowOffset } from './text.js';
 import { bload } from '../game/dos.js';
 import { Unsupported } from '../game/applesoft.js';
+import { parseTable, drawShape } from './shapes.js';
 
 /** $C000 is the keyboard latch and $C010 clears its strobe. */
 export const KEYBOARD = 0xC000, STROBE = 0xC010;
@@ -204,9 +205,48 @@ export class Host {
 
   color() { /* lo-res, which this disk sets but never draws with */ }
   hlin() { /* likewise */ }
-  rot() {}
-  scale() {}
-  draw() { this.note('DRAW', 'the Applesoft shape table is not ported yet'); }
+  rot(n) { this.rotation = Math.trunc(n); }
+  scale(n) { this.scaling = Math.max(1, Math.trunc(n)); }
+
+  /**
+   * DRAW and XDRAW.
+   *
+   * The shape-table pointer is `$E8`/`$E9`, which the three programs that draw set with
+   * `POKE 232,251: POKE 233,26` - so the table is wherever those two bytes say, and this
+   * reads them rather than being told where it is. XDRAW inverts instead of plotting, which
+   * is how INITIALS erases its cursor and why drawing the same shape twice leaves no trace.
+   */
+  draw(shape, at, xor) {
+    const base = this.mem[0xE8] | (this.mem[0xE9] << 8);
+    if (!base) { this.note('DRAW', 'no shape table pointer at $E8/$E9'); return; }
+    const table = parseTable(this.mem, base);
+    if (!table.count) {
+      this.note('DRAW', 'the table the pointer names is empty');
+      return;
+    }
+    const [x, y] = at ?? this.lastPlot ?? [0, 0];
+    try {
+      drawShape(this.shapePlotter(), this.mem, table, Math.trunc(shape), x, y,
+        { scale: this.scaling ?? 1, rot: this.rotation ?? 0, xor });
+    } catch (e) {
+      this.note('DRAW', e.message);
+      return;
+    }
+    this.lastPlot = [x, y];
+  }
+
+  /** What `drawShape` draws through: the same plot as HPLOT, plus an XOR for XDRAW. */
+  shapePlotter() {
+    return {
+      plot: (x, y) => this.plot(x, y),
+      invert: (x, y) => {
+        if (x < 0 || x > 279 || y < 0 || y > 191) return;
+        const addr = this.display.hiresBase + (y & 7) * 0x400 + ((y >> 3) & 7) * 0x80
+          + (y >> 6) * 0x28 + Math.floor(x / 7);
+        this.mem[addr] ^= 1 << (x % 7);
+      },
+    };
+  }
 
   // ---------------------------------------------------------------- the rest --------------
   rnd() { return this.rndSource(); }

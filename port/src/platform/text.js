@@ -57,10 +57,11 @@ export function encode(ch, style = 'normal') {
 /**
  * A 5x7 stand-in for the Apple II character ROM, in a 7x8 cell.
  *
- * Each glyph is seven bytes, one per row, five bits wide in bits 0-4 with bit 0 leftmost -
- * the same order the hi-res page uses, so the drawing loop below reads the same way as the
- * one in `hgr.js`. Index is the character code minus 32, covering `$20` to `$5F`, which is
- * the whole of what the Apple II's primary set displays.
+ * Each glyph is seven bytes, one per row, five bits wide, **bit 4 leftmost** - so `0x1E` is
+ * `XXXX.` and the P below reads as a P when you squint at the hex. This is the opposite
+ * order to the hi-res page, where bit 0 is the leftmost pixel, and reading it the hi-res way
+ * drew every character mirrored. Index is the character code minus 32, covering `$20` to
+ * `$5F`, which is the whole of what the Apple II's primary set displays.
  */
 const GLYPHS = [
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // space
@@ -157,8 +158,10 @@ export function paintText(mem, out, { base = 0x400, fromRow = 0, toRow = ROWS,
       for (let y = 0; y < CELL_H; y++) {
         const bits = y < 7 ? g[y] : 0;
         for (let x = 0; x < CELL_W; x++) {
-          // The glyph is five wide in a seven-wide cell, so one column of padding each side.
-          const on = x >= 1 && x <= 5 ? (bits >> (x - 1)) & 1 : 0;
+          // Five wide in a seven-wide cell, one column of padding each side, and bit 4 is
+          // the leftmost of the five - not bit 0, which is how the hi-res page is ordered
+          // and which drew every character back to front.
+          const on = x >= 1 && x <= 5 ? (bits >> (5 - x)) & 1 : 0;
           const lit = inverse ? !on : on;
           const p = ((r * CELL_H + y) * W + c * CELL_W + x) * 4;
           px[p] = lit ? colour[0] : 0;

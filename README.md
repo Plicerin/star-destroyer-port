@@ -41,11 +41,15 @@ oracle/                   the arbiter
 
 ## Playing it
 
-Any static server over the repository root, because the page fetches the disk image:
-
 ```bash
-python -m http.server 8124
+node port/devserver.mjs
 ```
+
+Any static server over the repository root would do - the page just fetches the disk image -
+but that one sends `Cache-Control: no-store`, and a browser that caches an ES module will
+happily run an edit-old copy of the port while the file on disk is correct. An hour went
+into a fix that was right, was served correctly when fetched by hand, and was still wrong on
+the page.
 
 Then open <http://localhost:8124/port/index.html>. Arrows turn, up or shift engages warp,
 space fires, P pauses.
@@ -81,9 +85,11 @@ rest drive the machine. `run_all.mjs` discovers every `probe_*.mjs` and `parity_
 runs the probes first, refuses to report success on an empty suite, and exits with the
 number of failures.
 
-**One known flake:** `probe_boot.mjs`'s "two different power-on fills converge on the same
-machine" failed once in about six runs and has passed every time since. It is timing
-dependent and it has not been chased.
+**One known flake, and it is getting annoying:** `probe_boot.mjs`'s "two different power-on
+fills converge on the same machine" has now failed three times in about a dozen suite runs
+and passed on every rerun. It is timing dependent. Three failures is past the point where
+"rerun it" is a reasonable answer - a suite that cries wolf is worth less than one harness -
+so this should be fixed rather than tolerated.
 
 Playwright is pinned to **1.59.1** deliberately — it is the version whose Chromium is
 already on this machine, and a floating range downloads a new one.

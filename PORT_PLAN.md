@@ -591,10 +591,18 @@ Done:
 **It boots.** START, LOGO1, the difficulty screen from the disk's own DIFFICULTY.PIC, SD,
 SD START, SD PART2, the flight, MONOLITH, INITIALS - in the browser, one screen at a time.
 
-Still to do here: the Applesoft shape table, which `INITIALS` and `STARBASE` draw their
-text with (105 DRAW calls in one pass through the high scores); writing the high-score
-file somewhere it survives; and `$FC42`, a monitor routine three programs CALL that this
-repository has not identified.
+- `port/src/platform/shapes.js` — Applesoft shape tables, over `probe_shapetable.mjs`
+  (8 checks). One table on the disk, 43 shapes, and every word on the starbase and
+  high-score screens is drawn from it. The table's shape is read off the disk; the
+  renderer is held to the two properties the programs rely on - XDRAW is its own inverse,
+  which is how INITIALS erases its cursor, and a DRAW in HCOLOR 0 undoes a DRAW in
+  HCOLOR 7. SCALE and the four quadrant rotations are implemented and the other 60 angles
+  throw; the disk sets `ROT=0` and nothing else, which is checked rather than assumed.
+- `oracle/probe_textscreen.mjs` (9 checks) — the layout, the three styles, and which way
+  round a letter goes, that last one because it was wrong.
+
+Still to do here: writing the high-score file somewhere it survives, and `$FC42`, a
+monitor routine three programs CALL that this repository has not identified.
 
 ## Phase 6.7 — the four that are not BASIC
 
