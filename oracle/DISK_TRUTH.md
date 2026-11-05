@@ -2103,6 +2103,56 @@ first toggle three cycles late - which the parity harness reported as "machine 2
 
 ---
 
+## The hyperdrive is a starfield, and CLS is a table
+
+`probe_hyperdrive.mjs` (12 checks).
+
+Two files are BLOADed for the warp sequence between flights, and **only one of them is a
+program**.
+
+### CLS is data, and its source is on the disk
+
+250 bytes at `$1ED2`, and every one of them is accounted for: `CLS DATA`, one of the four
+programs nothing runs, is an Applesoft build tool whose DATA statements are a list of
+addresses and whose line 530 is `BSAVE CLS,A7890,L`. Regenerating the file from that
+program gives **the same 250 bytes**.
+
+What the list holds is 124 hi-res row addresses, sixteen-bit and little-endian, ending in
+`$7F`. Mapped back to rows they are **0 to 123, contiguous** - so the table is the sky and
+not the screen. The instrument panel below row 123 is left alone, which is why there are 124
+entries rather than 192, and 124 x 40 = **4,960 bytes**, which is exactly how many the
+machine changes when the sequence runs.
+
+So one of the four 6502 overlays needs no transliteration at all. It is a table, and the
+port can load it the way the game does.
+
+### HYPERDRIVE.OBJ0 is a starfield
+
+2,048 bytes, entry `$08EF`, which is a `JMP $0A63` over its own data. 610 instructions
+reachable, 605 of them executed.
+
+`$08F2`-`$0A62` is 369 zero bytes on the disk and holds four tables the code fills in -
+`$08F2`, `$096C`, `$09E6` and `$0A23`, which are each star's position and velocity, low byte
+and high. `$0EC9` adds the velocity to the position, and that is the animation.
+
+The screen clear at `$0E41` walks the CLS table two bytes at a time and **writes each address
+into the operand of its own `STA $2000,X`** at `$0E47`, then fills 40 bytes. Self-modifying
+code again, the same trick the music player uses, and the reason the table exists in that
+form.
+
+### What it needs that is not on the disk
+
+Four ROM entry points: `$F6F0` three times, `$F457` once, and `$FF4A`/`$FF3F`, the monitor's
+SAVE and RESTORE whose costs are already measured in the sound unit. 163,955 instructions of
+an eight-million-cycle run execute at or above `$F000`.
+
+This is the first thing in the port that depends on code which is neither on the disk nor
+already ported. It is not a blocker and it does not need the ROM reimplemented: what a port
+has to reproduce is the sequence's **effect on the page**, which is measurable, rather than
+those routines' insides, which are not this disk's to explain.
+
+---
+
 ## Open questions
 
 Things this pass did **not** establish. None of them should be guessed at later and quietly

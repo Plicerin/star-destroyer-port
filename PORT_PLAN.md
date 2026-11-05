@@ -612,7 +612,21 @@ throughout.
 
 - `TITLE.OBJ0`, 1,792 bytes — the title animation, CALLed by LOGO1.
 - `HYPERDRIVE.OBJ0`, 2,048 bytes, with `CLS`, 250 — the warp sequence between flights.
-  `CLS` is cheaper than it looks: `CLS DATA` on the disk is its source, in BASIC.
+  **Established**, by `probe_hyperdrive.mjs` (12 checks); the transliteration is next.
+
+  `CLS` turns out to need no porting: it is a table, not a program - 124 hi-res row
+  addresses, rows 0 to 123, which is the sky above the instrument panel - and regenerating
+  it from `CLS DATA`'s DATA statements gives the same 250 bytes.
+
+  `HYPERDRIVE.OBJ0` is a starfield: four tables of per-star position and velocity in the
+  zeroed region its entry jumps over, a screen clear that patches the operand of its own
+  `STA $2000,X` from the CLS table, and plotting through Applesoft ROM. It clears exactly
+  the 4,960 bytes the table addresses.
+
+  **It is the first thing in the port that needs code neither on the disk nor already
+  ported**: `$F6F0` and `$F457` are ROM. The plan is not to reimplement them but to hold the
+  port to the sequence's effect on the hi-res page, which is what a player sees and what the
+  oracle can measure.
 - ~~`PLAYER.MODULE`, 208 bytes — the music, CALLed by SELECT, MONOLITH and WIN.~~ **Done**:
   `port/src/game/music.js`, held by `parity_music.mjs` (5 checks) over `probe_music.mjs`
   (10). Two voices, square waves, three bytes a tune record - duration, voice 1's period,
