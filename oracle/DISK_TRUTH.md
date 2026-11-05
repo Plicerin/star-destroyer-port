@@ -1945,12 +1945,21 @@ far, capped at five, to a running total that every later visit and the high-scor
 multiply again. `INITIALS` adds 10,000 if `$1FFF` is 1. A won game on hard comes out near
 180,000, and about two thirds of that is the accumulated bonus rather than the kills.
 
-### Three programs nothing names
+### Four programs nothing names
 
-`SD RET`, `HYPERDRIVE0` and `CLEAR SCORES` are on the disk and no `RUN` anywhere reaches them.
-The first two chain somewhere sensible - `SD RET` sets up like `SD START`, `HYPERDRIVE0` runs
-`SD` - so they look like earlier versions left in place. `CLEAR SCORES` is two lines that reset
-`INITIALS.DAT` and was presumably run by hand.
+Correcting this: it said three. `SD RET`, `HYPERDRIVE0`, `CLEAR SCORES` **and `CLS DATA`** are
+on the disk and no `RUN` anywhere reaches them. The first two chain somewhere sensible -
+`SD RET` sets up like `SD START`, `HYPERDRIVE0` runs `SD` - so they look like earlier versions
+left in place, and `CLEAR SCORES` is two lines that reset `INITIALS.DAT` and was presumably run
+by hand.
+
+**`CLS DATA` is the interesting one**, and missing it was a real loss rather than a miscount.
+It is not a screen at all: it is the author's own build tool, and line 530 is
+`BSAVE CLS,A7890,L` - it **generates the `CLS` binary** that the hyperdrive animation BLOADs,
+out of its own `DATA` statements. So one of the four 6502 overlays has its source on this disk,
+in BASIC. It is also the only `BSAVE` anywhere on the disk, which is how it was found: a probe
+counting the DOS commands the presentation needs came back with eight where seven were
+expected.
 
 ### How this one was held
 

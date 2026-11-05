@@ -48,10 +48,13 @@
 // So a game is between five and fifteen flights, each a wave of enemies that has to be cleared
 // to the last one, with a starbase visit between each and a different binary for the finale.
 //
-// **Three programs on the disk are named by nothing**: `SD RET`, `HYPERDRIVE0` and
-// `CLEAR SCORES`. The first two chain somewhere sensible - SD RET sets up like SD START and
-// HYPERDRIVE0 runs SD - so they look like earlier versions left behind; `CLEAR SCORES` is a
-// two-line utility that resets `INITIALS.DAT` and was presumably run by hand.
+// **Four programs on the disk are named by nothing**: `SD RET`, `HYPERDRIVE0`,
+// `CLEAR SCORES` and `CLS DATA`. The first two chain somewhere sensible - SD RET sets up like
+// SD START and HYPERDRIVE0 runs SD - so they look like earlier versions left behind;
+// `CLEAR SCORES` is a two-line utility that resets `INITIALS.DAT` and was presumably run by
+// hand; and `CLS DATA` is the author's build tool, which BSAVEs the `CLS` binary the
+// hyperdrive animation uses out of its own DATA statements. This said three until
+// probe_applesoft.mjs counted the disk's DOS commands and found an eighth.
 //
 // Measured by oracle/probe_chain.mjs, which extracts the graph and the interface from the
 // detokenised programs on the disk rather than from this file.
