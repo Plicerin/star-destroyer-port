@@ -14,7 +14,15 @@
 // `addr + 252 + 256k`, which is the same thing from the second sector on, and that is the only
 // part that matters.
 //
-// That is not a quirk of this disk. It is DOS 3.3, and every binary on this one overshoots:
+// **This is a quirk of this disk, and the first version of this comment had it backwards.**
+// Stock DOS 3.3 buffers each sector and copies out; it does not overshoot. The routine that
+// walks the buffer through the destination is at T0/S6 of this image and is absent from a
+// DOS 3.3 System Master, from `dos33.dsk`, and from Space Vikings in 4am's crack - which has
+// the same file manager at the same sector offsets. Reading straight to the destination is
+// the classic speed patch, and this disk carries one.
+//
+// The port still models it, for the same reason as before: it is what this image does, and a
+// dump without the patch would simply not overshoot. Every binary on this one does:
 // one byte for A2-3D2, 253 for MATH. The game is built around it. `SD START` line 2 loads
 // A2-3D2 and then SV DATA, because A2-3D2's one byte of overshoot lands on `$80FB`, the
 // display list's first byte, which is exactly where SV DATA starts; and it loads MAIN DATA and

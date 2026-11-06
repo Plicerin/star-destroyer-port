@@ -1980,13 +1980,20 @@ are played in the port and their shape checked against what the lines say it sho
 The section above says a game is thirteen bytes. It is - and on this disk those thirteen bytes
 are destroyed by the `BRUN` that is supposed to read them.
 
-DOS 3.3 does not copy a binary file out of a staging buffer. It reads the first sector into a
-buffer, because the file manager has to find the load address and length in its first four
-bytes before it knows where the file goes, and then reads **every sector after that straight to
-the destination** - all 256 bytes of each, the last one included. So the sectors land on a grid
-that starts four bytes below the load address, nothing is written below the load address itself,
-and a load writes up to 255 bytes past the end of the file. What it writes there is whatever was
-left in that sector on the disk when the file was saved.
+**This disk's DOS** does not copy a binary file out of a staging buffer. It reads the first
+sector into a buffer, because the file manager has to find the load address and length in its
+first four bytes before it knows where the file goes, and then reads **every sector after that
+straight to the destination** - all 256 bytes of each, the last one included. So the sectors
+land on a grid that starts four bytes below the load address, nothing is written below the load
+address itself, and a load writes up to 255 bytes past the end of the file. What it writes there
+is whatever was left in that sector on the disk when the file was saved.
+
+**Corrected:** this section first said that was DOS 3.3's behaviour. It is not. Stock DOS 3.3
+buffers each sector and copies out, and does not overshoot; the routine that walks the buffer
+through the destination is a modification this disk carries and a System Master does not. See
+the open question below, which is now answered. The measurements in this section are unchanged
+- they were made on this disk and they still describe it - but the cause is a patched DOS and
+not the operating system.
 
 The model is one line - *a load writes the file's sector chain, less its header, at `addr`* -
 and it predicts **all sixteen bytes at `$1FF0`-`$1FFF` from the disk image alone**, checked
@@ -2250,57 +2257,42 @@ promoted to fact.
    so all of them carry a trimmed or partial DOS, which is what a commercial game does to get
    its memory back.
 
-   **The routine in question** is `$BC83`-`$BCB3`, and the instruction is
-   `$BC9B INC $B7F1`: it bumps the IOB's buffer one page per sector, so every sector after
-   the first is read straight to the destination, the last one included. That is the direct
-   cause of the thirteen interface bytes being destroyed, so whether the change put it there
-   is the difference between "this disk was broken by whoever made it" and "this is what DOS
-   does".
+   **ANSWERED.** The routine at `$BC83`-`$BCB3` is **not stock DOS 3.3**. It is a
+   modification carried by this disk and by nothing else to hand.
 
-   **Three candidate references were tried and all three are unusable.** The test for whether
-   a candidate is worth diffing takes one line - does its image contain `STA $B7EC`
-   (`8D EC B7`) in plain form anywhere? A DOS with a file manager must.
+   The instruction is `$BC9B INC $B7F1`: it bumps the IOB's buffer one page per sector, so
+   every sector after the first is read straight to the destination, the last one included.
+   Stock DOS does not do that. It reads each sector into a fixed buffer and copies out, which
+   is why a stock `BLOAD` does not overshoot.
 
-   | candidate | `STA $B7EC` | why it fails |
-   |---|---|---|
-   | `dos33.dsk` | none | 289 of 560 sectors blank; no IOB instruction anywhere |
-   | `dos33master.json`, labelled "DOS 3.3 Master" | none | plain sector data with a correct DOS boot sector, but track 2 holds 768 non-zero bytes - the DOS image is not all there |
-   | `Bolo.dsk`, `Neptune.dsk` | none / none | trimmed loaders, as a commercial game does to get its memory back |
+   | image | file manager | the setter at T1/S14+75 | `INC $B7F1` |
+   |---|---|---|---|
+   | Star Destroyer | T0/S1+22, +95; **T0/S6+160, +193**; T1/S13+226 | yes | **yes, T0/S6+155** |
+   | Space Vikings (4am release) | T0/S1+22, +95; T1/S13+226 | yes | no |
+   | DOS 3.3 System Master | T0/S1+22, +95; T1/S13+226 | yes | no |
+   | `dos33.dsk` | T0/S1+22, +95; T1/S13+226 | yes | no |
 
-   **The one useful comparison** is Space Vikings in 4am's release, which demonstrably shares a
-   DOS lineage with this disk: 19 of their 48 sectors on tracks 0-2 are byte-identical,
-   including `$BC4B LDA $B5C9 / STA $B7F0 / LDA $B5CA / STA $B7F1` at T1/S14, which is the
-   routine that **sets** the buffer once. Both disks have that. Only this one has the routine
-   that **walks** it, and Space Vikings has no `INC $B7F1` anywhere.
+   Every image has the file manager at the **same sector offsets**, and the setter -
+   `LDA $B5C9 / STA $B7F0 / LDA $B5CA / STA $B7F1`, which points the IOB once - at the same
+   offset in all four. Only this disk has a sector, T0/S6, holding a routine that then walks
+   that pointer. No other image has any buffer increment of any kind: not `INC $B7F1`, not
+   `INC $B7F0`, not `INC $B5C9` or `INC $B5CA`.
 
-   That is suggestive and it is not conclusive, in the direction people will not expect:
-   Space Vikings has *fewer* IOB instructions than this disk, 32 against 56, so the more
-   likely reading is that 4am replaced DOS with something smaller rather than that this disk
-   gained a routine. A change that strips DOS is ordinary; one that adds a file-manager
-   routine is not.
+   Reading sectors straight to the destination instead of buffering and copying is the
+   classic **speed patch**. It is what a fast-DOS does, and it is what makes this one
+   overshoot. Who applied it is not established - a this image's loader and a commercial fast
+   DOS such as Diversi-DOS or Pronto-DOS both look like this, and testing against those is
+   the obvious next step for anyone who wants a name.
 
-   So this stays open, and the next person needs **a complete DOS 3.3 image whose tracks 0-2
-   contain `STA $B7EC`**. None of the four images to hand does.
+   **Why this took four tries, and the thing to know before trying again.** A DOS 3.3 System
+   Master stores its DOS image **unrelocated**, assembled for the bottom of memory: the file
+   manager's page reads `$37` where a running 48K machine has `$B7`, and the bootstrap moves
+   it up on load. Searching a master for `$B7xx` operands finds nothing and looks exactly
+   like "this image has no DOS in it", which is what four images were wrongly written off as.
+   Search for **both** `8D EC B7` and `8D EC 37`. This disk is the odd one out for storing
+   DOS already relocated, which is itself consistent with its DOS having been saved from a
+   running machine rather than built the standard way.
 
-   **How to tell a usable candidate from another dead end**, in three steps and about a
-   minute:
-
-   1. Does the image contain `8D EC B7` (`STA $B7EC`) anywhere? If not, it has no file
-      manager and nothing else about it matters. All three "DOS" images tried here fail at
-      this step.
-   2. Is its **T1/S14** byte-identical to this disk's? That sector holds
-      `$BC4B LDA $B5C9 / STA $B7F0 / LDA $B5CA / STA $B7F1`, the routine that sets the IOB
-      buffer once, and it is byte-identical on this disk and on Space Vikings in 4am's release
-      - two different publishers, two different whoever did it. A candidate that matches it is the
-      same DOS lineage and its differences mean something. Its first twelve md5 hex digits
-      are **`00370d4751cd`**.
-   3. Then the question itself: does it contain `EE F1 B7` (`INC $B7F1`)? If yes, the
-      overshoot is stock DOS. If no, this disk's DOS has a routine a stock one does not.
-
-   For reference, the nineteen sectors on tracks 0-2 that this disk and Space Vikings hold
-   byte-identical - the DOS core two unrelated commercial disks agree on - are T0/S2, S3, S4,
-   S10, S11, S12, S14, S15; T1/S0, S1, S2, S7, S10, S11, S12, S14, S15; T2/S0, S1. The walk
-   at T0/S6 is **not** among them: the two disks differ there in 245 of 256 bytes.
 3. ~~**Opcode 3.**~~ Answered: a line back to the saved previous point, which it leaves
    in place. Handler `$62C0`.
 4. ~~**What `CALL $6000` does with all this.**~~ Answered above, and so is everything that
