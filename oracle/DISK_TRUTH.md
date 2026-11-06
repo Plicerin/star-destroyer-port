@@ -2284,6 +2284,30 @@ promoted to fact.
    DOS such as Diversi-DOS or Pronto-DOS both look like this, and testing against those is
    the obvious next step for anyone who wants a name.
 
+   **The Space Vikings comparison is stronger than it first looked, and in the opposite
+   direction to the one recorded here earlier.** 4am's release notes for that disk say what
+   was changed, and it is four bytes:
+
+       T00,S02,$FC: DA -> AD      T00,S03,$35: ED -> DE
+       T00,S02,$5D: DA -> AD      T00,S02,$9E: ED -> DE
+
+   Those are address and data epilogue marks - a nibble-level protection defeat - and none
+   of them is in the file manager. The notes also say the image was taken from an original
+   disk, lent at Kansasfest in 2017. So that image is **a preserved retail disk minus four
+   bytes**, and its DOS is what subLOGIC shipped in 1982. All four bytes read the same way on
+   this disk, and T0/S2 and T0/S3 are byte-identical between the two images.
+
+   This matters because it was hedged the wrong way at first: the note here used to reason
+   that Space Vikings has *fewer* file-manager instructions than this disk - 32 against 56 -
+   and so 4am had probably replaced DOS with something smaller. 4am replaced nothing. The
+   count runs the other way: **this disk's DOS carries about two dozen more file-manager
+   instructions than a preserved original**, and the extra includes the routine that
+   overshoots. Code was added here, not removed there.
+
+   One thing it does not establish: Space Vikings is subLOGIC and Star Destroyer is Harvest
+   Time Software, so this is not the same publisher's practice. It is the same author's
+   previous game, preserved from an original, shipping a DOS without the patch.
+
    **Why this took four tries, and the thing to know before trying again.** A DOS 3.3 System
    Master stores its DOS image **unrelocated**, assembled for the bottom of memory: the file
    manager's page reads `$37` where a running 48K machine has `$B7`, and the bootstrap moves
