@@ -42,7 +42,7 @@
 import { Math24 } from './math.js';
 import { TABLE_INIT, VAR } from './tables.js';
 import { Flight, GATE_OPEN } from './flight.js';
-import { steer, turnDirection, scrollScope, H1, OBJ12_HEADING } from './controls.js';
+import { steer, turnDirection, panStars, H1, OBJ12_HEADING } from './controls.js';
 import { field } from './objects.js';
 import { GEOM, rangeToTarget, bearing } from './geometry.js';
 import { CLASSES, dispatch, coolDown } from './dispatch.js';
@@ -234,12 +234,12 @@ export class Game {
     this.sounds = [];
 
     // $09A3 - the controls. The same byte goes to the viewer and to object 12, and turning
-    // also scrolls the seven dots on the scope the other way.
+    // also pans the seven stars the other way.
     const heading = steer(mem[H1], paddle0);
     const turn = turnDirection(paddle0);
     mem[H1] = heading;
     mem[OBJ12_HEADING] = heading;
-    if (turn !== 0) scrollScope(mem, turn);
+    if (turn !== 0) panStars(mem, turn);
 
     // $09D1 - the ship, gated on the warp the PREVIOUS pass set.
     this.flight.step(heading);

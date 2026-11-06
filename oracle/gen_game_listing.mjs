@@ -34,8 +34,8 @@ for (let i = 0; i < 24; i++) {
   sym[base] = `OBJ${i}`;
   for (let k = 0; k < 12; k++) sym[base + 1 + k] = `OBJ${i}.${FIELD[k]}`;
 }
-// The seven 2-D blips, S(1)..S(7) in the author's own names.
-for (let i = 0; i < 7; i++) { sym[0x8222 + i * 3] = `BLIP${i + 1}.x`; sym[0x8223 + i * 3] = `BLIP${i + 1}.y`; }
+// The seven 2-D stars, S(1)..S(7) in the author's own names.
+for (let i = 0; i < 7; i++) { sym[0x8222 + i * 3] = `STAR${i + 1}.x`; sym[0x8223 + i * 3] = `STAR${i + 1}.y`; }
 
 const { starts, calls } = traverse(mem, [LO], { lo: LO, hi: HI });
 // Call targets inside the overlay get a label, so the listing reads as routines.

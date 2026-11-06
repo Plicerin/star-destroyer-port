@@ -1659,49 +1659,49 @@ $1B8B                  B9 02 98   LDA $9802,Y
 $1B8E                  8D 85 81   STA OBJ7.z+1
 $1B91                  8D A9 82   STA OBJ19.z+1
 $1B94                  60         RTS
-$1B95  L1B95:          AE 22 82   LDX BLIP1.x
+$1B95  L1B95:          AE 22 82   LDX STAR1.x
 $1B98                  20 15 1C   JSR L1C15
-$1B9B                  8E 22 82   STX BLIP1.x
-$1B9E                  AE 25 82   LDX BLIP2.x
+$1B9B                  8E 22 82   STX STAR1.x
+$1B9E                  AE 25 82   LDX STAR2.x
 $1BA1                  20 15 1C   JSR L1C15
-$1BA4                  8E 25 82   STX BLIP2.x
-$1BA7                  AE 28 82   LDX BLIP3.x
+$1BA4                  8E 25 82   STX STAR2.x
+$1BA7                  AE 28 82   LDX STAR3.x
 $1BAA                  20 15 1C   JSR L1C15
-$1BAD                  8E 28 82   STX BLIP3.x
-$1BB0                  AE 2B 82   LDX BLIP4.x
+$1BAD                  8E 28 82   STX STAR3.x
+$1BB0                  AE 2B 82   LDX STAR4.x
 $1BB3                  20 15 1C   JSR L1C15
-$1BB6                  8E 2B 82   STX BLIP4.x
-$1BB9                  AE 2E 82   LDX BLIP5.x
+$1BB6                  8E 2B 82   STX STAR4.x
+$1BB9                  AE 2E 82   LDX STAR5.x
 $1BBC                  20 15 1C   JSR L1C15
-$1BBF                  8E 2E 82   STX BLIP5.x
-$1BC2                  AE 31 82   LDX BLIP6.x
+$1BBF                  8E 2E 82   STX STAR5.x
+$1BC2                  AE 31 82   LDX STAR6.x
 $1BC5                  20 15 1C   JSR L1C15
-$1BC8                  8E 31 82   STX BLIP6.x
-$1BCB                  AE 34 82   LDX BLIP7.x
+$1BC8                  8E 31 82   STX STAR6.x
+$1BCB                  AE 34 82   LDX STAR7.x
 $1BCE                  20 15 1C   JSR L1C15
-$1BD1                  8E 34 82   STX BLIP7.x
+$1BD1                  8E 34 82   STX STAR7.x
 $1BD4                  60         RTS
-$1BD5  L1BD5:          AE 22 82   LDX BLIP1.x
+$1BD5  L1BD5:          AE 22 82   LDX STAR1.x
 $1BD8                  20 29 1C   JSR L1C29
-$1BDB                  8E 22 82   STX BLIP1.x
-$1BDE                  AE 25 82   LDX BLIP2.x
+$1BDB                  8E 22 82   STX STAR1.x
+$1BDE                  AE 25 82   LDX STAR2.x
 $1BE1                  20 29 1C   JSR L1C29
-$1BE4                  8E 25 82   STX BLIP2.x
-$1BE7                  AE 28 82   LDX BLIP3.x
+$1BE4                  8E 25 82   STX STAR2.x
+$1BE7                  AE 28 82   LDX STAR3.x
 $1BEA                  20 29 1C   JSR L1C29
-$1BED                  8E 28 82   STX BLIP3.x
-$1BF0                  AE 2B 82   LDX BLIP4.x
+$1BED                  8E 28 82   STX STAR3.x
+$1BF0                  AE 2B 82   LDX STAR4.x
 $1BF3                  20 29 1C   JSR L1C29
-$1BF6                  8E 2B 82   STX BLIP4.x
-$1BF9                  AE 2E 82   LDX BLIP5.x
+$1BF6                  8E 2B 82   STX STAR4.x
+$1BF9                  AE 2E 82   LDX STAR5.x
 $1BFC                  20 29 1C   JSR L1C29
-$1BFF                  8E 2E 82   STX BLIP5.x
-$1C02                  AE 31 82   LDX BLIP6.x
+$1BFF                  8E 2E 82   STX STAR5.x
+$1C02                  AE 31 82   LDX STAR6.x
 $1C05                  20 29 1C   JSR L1C29
-$1C08                  8E 31 82   STX BLIP6.x
-$1C0B                  AE 34 82   LDX BLIP7.x
+$1C08                  8E 31 82   STX STAR6.x
+$1C0B                  AE 34 82   LDX STAR7.x
 $1C0E                  20 29 1C   JSR L1C29
-$1C11                  8E 34 82   STX BLIP7.x
+$1C11                  8E 34 82   STX STAR7.x
 $1C14                  60         RTS
 $1C15  L1C15:          E8         INX
 $1C16                  20 1E 1C   JSR L1C1E

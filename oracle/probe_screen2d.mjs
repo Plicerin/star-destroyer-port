@@ -1,6 +1,6 @@
 // What a 2-D coordinate means.
 //
-// The display list is full of them - every instrument-panel line, every blip, and the
+// The display list is full of them - every instrument-panel line, every star, and the
 // output of the engine's own 3-D projection - and nothing so far said what they map to.
 // The panel's y values run past 192 and its x values past 140, so they are plainly not
 // pixel coordinates.

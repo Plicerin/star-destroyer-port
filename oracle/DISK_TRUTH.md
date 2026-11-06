@@ -448,7 +448,13 @@ Several things the earlier passes had as addresses are now instructions:
 - `SHLD` `$81DD`, `WARP` `$81F3` and `MSL` `$8209` are each the **third operand byte of a
   2-D line** - the x of its far end. The three bar gauges are one line apiece, and the
   BASIC moves their right-hand ends.
-- `S(1)`..`S(7)` at `$8222`+3n are seven **2-D point** instructions: the blips.
+- `S(1)`..`S(7)` at `$8222`+3n are seven **2-D point** instructions: **the stars**. They are
+  white, they sit in the sky above the horizon, and they are drawn through the *main*
+  viewport, before the second one begins - so they are part of the view, not part of any
+  instrument. `$1B95` and `$1BD5` pan all seven sideways three steps per turn, against the
+  turn, and they wrap; nothing else moves them and they never move vertically. This file
+  called them "blips" for a long time, by association with the scope inset two lines below,
+  which is a different thing entirely.
 - The 136 bytes at `$81C0`-`$8247` that nothing accounted for are the whole instrument
   panel, plus a second viewport and viewpoint. The second `VIEWPORT` is small (scale 65x66
   at centre 32,195) and is followed by its own `VIEWER`, which is the scope inset.
@@ -506,7 +512,7 @@ Several things the earlier passes had as addresses are now instructions:
 ### What a 2-D coordinate means
 
 `probe_screen2d.mjs`, 13 checks. The display list is full of 2-D coordinates - every panel
-line, every blip, and whatever the 3-D projection produces - and the panel's run past 192
+line, every star, and whatever the 3-D projection produces - and the panel's run past 192
 and 140, so they are plainly not pixels.
 
 The answer is the 1,024 bytes at `$7223`-`$7622` that the renderer pass could only call "a
@@ -1007,7 +1013,7 @@ by routines in `MATH` (`$999B`, `$99D2`, `$9A65`, `$9C4B`, `$9C7A`). The same va
 
 The store at `$9800` is the binary's own, not Applesoft's: checked in flight, the running
 program has **no arrays at all** - `ARYTAB` and `STREND` are both `$0927`. Its contents
-include the seven radar-blip offsets (-20, -50, -10, -40, 20, 50, 60), which are the same
+include the seven stars' x offsets (-20, -50, -10, -40, 20, 50, 60), which are the same
 numbers `SD RET` and `SD START2` declare as `T%(1..7)`; the binary carries its own copy
 rather than reading the BASIC's.
 
@@ -1801,7 +1807,7 @@ which is what makes a kill score once.
 Three gaps that no per-block harness could see, because each was a block nobody had read.
 
 1. **`controls.js` was half the block.** `$09A3` sets the heading and then calls `$1BD5` or
-   `$1B95`, and each of those scrolls all seven scope blips three steps the other way, with a
+   `$1B95`, and each of those pans all seven stars three steps the other way, with a
    wrap that jumps the gap between `$43` and `$BC`. Found as `$8222` three out on the first
    pass.
 2. **The renderer's 14-bit halving is reached.** `$688D` halves all three deltas when any will
@@ -2489,11 +2495,11 @@ promoted to fact.
 8. ~~**The `.OBJ0` overlays at `$08EF`.**~~ Answered, below.
 9. ~~**The renderer's output on the live display list.**~~ **Answered, and the question was
    wrong.** The last commit recorded this as a gap: the hi-res page the pass drew came out 15
-   to 217 bytes different out of 8,192, and six rows ten apart pointed at the scope blips.
+   to 217 bytes different out of 8,192, and six rows ten apart pointed at the stars.
    There is no gap. `Screen` kept its own pair of 8K buffers, so `parity_loop.mjs` was
    comparing the machine's freshly rendered page against the stale copy it had synced in -
    and the bytes that "differed" were simply the bytes that had changed since the previous
-   frame, which is why they were the blips and the moving objects and why the count varied
+   frame, which is why they were the stars and the moving objects and why the count varied
    with how much had moved.
    `Screen` now takes the two pages it draws into, the driver hands it views on `$2000` and
    `$4000` of the one image, and **both 8K pages agree byte for byte on every pass** - 24 of

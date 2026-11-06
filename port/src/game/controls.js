@@ -45,42 +45,48 @@ export function steer(heading, paddle) {
 }
 
 /**
- * $8222 onward - the seven dots on the radar scope, three bytes apart.
+ * $8222 onward - the seven stars, three bytes apart.
  *
- * Each is a 2-D point's X operand, and turning the ship scrolls all seven the other way. This
- * was missing from the first version of this file, which read $09A3 as the heading and nothing
- * else: the block also calls $1BD5 or $1B95, and each of those puts every blip through a
- * three-step move. parity_loop.mjs is what found it, on its first pass, as $8222 three out.
+ * Each is a 2-D point's X operand, and turning the ship pans all seven the other way. They sit
+ * in the sky above the horizon, drawn in white through the main viewport, and they are the
+ * only thing in the view that shows the ship moving. This was missing from the first version
+ * of this file, which read $09A3 as the heading and nothing else: the block also calls $1BD5
+ * or $1B95, and each of those puts every star through a three-step move. parity_loop.mjs is
+ * what found it, on its first pass, as $8222 three out.
+ *
+ * They were called blips here for a long time, after the scope inset further down the display
+ * list. That is a different thing - a second, smaller viewport that redraws the enemies - and
+ * these have nothing to do with it.
  */
-export const BLIPS = [0x8222, 0x8225, 0x8228, 0x822B, 0x822E, 0x8231, 0x8234];
+export const STARS = [0x8222, 0x8225, 0x8228, 0x822B, 0x822E, 0x8231, 0x8234];
 
-/** `CPX #$7F` and `CPX #$44` / `CPX #$BC` - the two ends of the gap a blip jumps. */
-export const SCOPE_LOW = 0x44;
-export const SCOPE_HIGH = 0xBC;
+/** `CPX #$7F` and `CPX #$44` / `CPX #$BC` - the two ends of the gap a star jumps. */
+export const STAR_LOW = 0x44;
+export const STAR_HIGH = 0xBC;
 
 /**
  * $1C1E - one step up, and the wrap that goes with it.
  *
- * A blip's X lives in $BC-$FF and $00-$43, which is a circle of 136 values with a gap in the
+ * A star's X lives in $BC-$FF and $00-$43, which is a circle of 136 values with a gap in the
  * middle, and the check jumps the gap: anything that lands in $44-$7E is thrown forward to
  * $BC. Above $7F it is left alone, which is the other half of the gap and cannot be reached
  * from below.
  */
 const wrapUp = (x) => {
   if (x >= 0x7F) return x;
-  if (x < SCOPE_LOW) return x;
-  return SCOPE_HIGH;
+  if (x < STAR_LOW) return x;
+  return STAR_HIGH;
 };
 
 /** $1C32 - one step down, and the mirror of the same gap. */
 const wrapDown = (x) => {
   if (x < 0x7F) return x;
-  if (x >= SCOPE_HIGH) return x;
-  return SCOPE_LOW;
+  if (x >= STAR_HIGH) return x;
+  return STAR_LOW;
 };
 
 /**
- * $1B95 / $1BD5 - scroll the whole scope one turn's worth.
+ * $1B95 / $1BD5 - pan the whole starfield one turn's worth.
  *
  * Three steps, each followed by the wrap check - not three steps and then one check. The third
  * check is the routine falling into it rather than calling it, which is the same thing.
@@ -88,22 +94,22 @@ const wrapDown = (x) => {
  * @param {Uint8Array} mem
  * @param {number} direction +1 for $1B95, which the LEFT turn calls, and -1 for $1BD5
  */
-export function scrollScope(mem, direction) {
+export function panStars(mem, direction) {
   const step = direction > 0 ? 1 : -1;
   const wrap = direction > 0 ? wrapUp : wrapDown;
-  for (const blip of BLIPS) {
-    let x = mem[blip];
+  for (const star of STARS) {
+    let x = mem[star];
     for (let k = 0; k < 3; k++) x = wrap((x + step) & 0xff);
-    mem[blip] = x;
+    mem[star] = x;
   }
 }
 
 /**
- * Which way $09A3 turned, if it turned: +1 for left and -1 for right, matching `scrollScope`.
+ * Which way $09A3 turned, if it turned: +1 for left and -1 for right, matching `panStars`.
  *
- * The signs look backwards and are not: turning the ship right scrolls the scope left, so the
+ * The signs look backwards and are not: turning the ship right pans the stars left, so the
  * right-hand branch at $09AC - the one that adds three to the heading - calls $1BD5, which
- * decrements every blip.
+ * decrements every star.
  */
 export function turnDirection(paddle) {
   if (paddle >= 0x9B) return -1;
