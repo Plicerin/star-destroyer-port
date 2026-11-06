@@ -37,7 +37,8 @@
 // of leftover high-score text. So on this image a flight spawns 134 enemies instead of 9, and
 // when it ends `SD PART2` line 172 finds the counters nonzero and goes to the scores.
 //
-// `BASE STAR.OBJ0` loads to the same address with the same length and its slack is all zeros.
+// `BASE STAR.OBJ0` loads to the same address with the same length, and 249 of its 250 slack
+// bytes are zero - the one that is not falls below the interface and touches nothing.
 // Same program, same overshoot, harmless. **That asymmetry is what says neither was intended**
 // - and it is why this is modelled rather than worked around. The port writes the sector chain
 // the way DOS does, so a clean dump whose slack is zeros gives a working game with no change
