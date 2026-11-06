@@ -57,9 +57,8 @@ export class Shell {
    * @param {HTMLCanvasElement} canvas
    * @param {object} [opts] `fps` passes a second - the disk's 2.57 by default, and see
    *   FPS_CHOICES for what raising it actually does; `tint` 'colour' or a monochrome
-   *   phosphor; `corruptInterface` true to leave the BRUN's slack lying on the interface,
-   *   which is what this disk does and makes the game unfinishable - see the note above
-   *   `boot` in platform/boot.js for why that is the switch rather than the default
+   *   phosphor; `corruptInterface` true to skip the interface repair, which only the
+   *   harnesses have any use for - see the note above `boot` in platform/boot.js
    */
   constructor(canvas, { fps = DISK_FPS, tint = 'colour', corruptInterface = false } = {}) {
     this.canvas = canvas;

@@ -82,35 +82,33 @@ export function seedInterface(mem, difficulty, rnd = Math.random) {
 /**
  * A 64K image loaded for a flight, and what the interface held on either side of the BRUN.
  *
- * **The interface is repaired by default, and that is the one place this port does not do
- * what the disk does.** The reasoning, because it runs against every other decision here:
+ * **The interface is repaired, and it is the one place this port does not reproduce the copy
+ * it was built from byte for byte.** Do not remove it without reading this.
  *
- * Fidelity to *the game* and fidelity to *this disk image* are the same thing everywhere
- * else in this port, and opposite here. Keeping `STARBASE`'s `IF A = 8 THEN A = 9` preserves
- * something Mitchell Robbins wrote. Keeping this preserves a line of someone else's leftover
- * high-score text - `" 1     Y 33366"` - that happened to be lying in the sectors of this
- * particular copy. It is not authorship, it is damage, and `BASE STAR.OBJ0` is the proof:
- * same 5,890 bytes, same `$08EF`, same 250-byte overshoot, 249 of its 250 slack bytes zero
- * and the one that is not landing at `$1FF1`, below the interface. Two files with identical
- * geometry, one of which ends every run at the high scores and one of which does nothing at
- * all, and nothing in either chose which.
+ * `BRUN STAR DESTROYER.OBJ0` is the last thing `SD PART2` does, and the file ends at `$1FF0`,
+ * so the tail of its final sector lands on `$1FF3`-`$1FFF` - the thirteen bytes the BASIC and
+ * the binary talk through - with nothing loaded afterwards to put them back. On the copy this
+ * was built from those 250 bytes are not zeros, so the binary reads a target of 217 flights,
+ * a flight counter already at 32 and waves of 32/51/51 where the BASIC rolled nine enemies.
+ * `SD PART2` line 172 then finds the counters non-zero and the game cannot be finished at all.
  *
- * Left alone, the binary reads a target of 217 flights, a flight counter already at 32, and
- * waves of 32/51/51 where the BASIC rolled nine enemies - so `SD PART2` line 172 finds the
- * counters non-zero, goes to `MONOLITH`, and the game cannot be finished at all. Defaulting
- * to that would be preserving a this image's accident at the cost of the author's game.
+ * That the game was never built this way is not an opinion: `BASE STAR.OBJ0` is the same
+ * 5,890 bytes at the same `$08EF` with the same 250-byte overshoot, and 249 of its 250 slack
+ * bytes are zero - the one that is not falls at `$1FF1`, below the interface. Identical
+ * geometry, and it does nothing at all. The author relied on these overlaps deliberately
+ * elsewhere: `SD START` line 2 orders its four BLOADs so that each one's overshoot is repaired
+ * by the next.
  *
  * So the load model stays exact - `dos.js` still overshoots, `parity_overshoot.mjs` still
  * holds it against the machine over 9,328 bytes, and `actual` below still reports what the
- * slack wrote. Only the thirteen bytes are put back afterwards. Pass `corruptInterface: true`
- * to see the disk as it is. On a clean dump the repair is a no-op and this switch stops
- * meaning anything, which is the test named in DISK_TRUTH.
+ * slack wrote. Only those thirteen bytes are put back afterwards, and a harness check holds
+ * that the repair touches them and no other byte of the 64K. Given a copy whose slack is
+ * zeros the repair is a no-op and this code could simply be deleted.
  *
  * @param {Uint8Array|ArrayBuffer} image the .dsk
  * @param {object} [opts] `difficulty` 1-3, `rnd` a source of [0,1), `loads` to run the
- *   finale's sequence instead, `corruptInterface` true to leave the BRUN's slack lying on
- *   `$1FF3`-`$1FFF` the way this image does - see the note above `boot` for why that is a
- *   switch and not the default
+ *   finale's sequence instead, `corruptInterface` true to skip the repair, which only the
+ *   harnesses have any use for
  */
 export function boot(image, { difficulty = 1, rnd = Math.random, loads = FLIGHT_LOADS,
   corruptInterface = false } = {}) {

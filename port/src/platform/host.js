@@ -347,17 +347,17 @@ export class Host {
   /**
    * A file from the disk, or null if it is not there.
    *
-   * **The two title pictures are deliberately absent.** `SD.PIC1` and `SD.PIC2` are on this
-   * image but what they hold is this image's art, not Robbins's, and the decision for this
-   * port is that the opening is a *missing asset* rather than a removed feature: `START`
-   * still asks for two pictures and the port declines to supply them, so a clean dump
-   * restores the opening with no change to any code. Standing someone else's art where the
-   * author's was is the same fidelity problem as shipping the change.
+   * **The two title pictures are deliberately absent.** `SD.PIC1` and `SD.PIC2` exist on the
+   * copy this was built from, but what they hold is not Robbins's opening art. The decision
+   * for this port is that the opening is a *missing asset* rather than a removed feature:
+   * `START` still asks for two pictures and the port declines to supply them, so a copy that
+   * still carries them restores the opening with no change to any code. Standing anyone
+   * else's art where the author's belongs would be worse than showing nothing.
    */
   loadFile(name) {
     if (MISSING.has(name)) {
-      this.note(`${name}`, 'deliberately absent - the change overwrote the title art,'
-        + ' so the port treats it as a missing asset');
+      this.note(`${name}`, 'deliberately absent - the original title art has not survived on'
+        + ' this copy, so the port treats it as a missing asset');
       return null;
     }
     try {
