@@ -1610,6 +1610,38 @@ Every sound this chain asks for - `$1E03` when the shield holds, `$1E21` and `$1
 does not, `$1F2B` when the ship is destroyed, `$1F8E` for an enemy launch - is Phase 6. The
 port returns the address it would have called, so the chain is complete and the gap is named.
 
+**Except that `$1F2B` is not a sound routine, and reading it as one cost the port its death.**
+It is three things in a row:
+
+```
+$1F2B  JSR $1FA9        display teardown: STX $C054, STX $C056 - page 1, hi-res off
+$1F2E  ...              two bursts through $1D52
+$1F62  LDX #$4D
+$1F64  STX $00          <- this
+$1F66  RTS
+```
+
+That last write is the whole of the ship's death. `$18D6` is `LDX $00 / CPX #$4D / BNE $18DD`,
+so `$00` is the only thing that tells the loop to stop, and `SD PART2` line 172 reads the same
+byte to route to `MONOLITH`. Because the port treated `$1F2B` as nothing but a sound it never
+made the write: `$0933` was seen climbing to **6** in a live flight against a fatal four, and
+the ship simply could not be destroyed. `MONOLITH` was unreachable with it.
+
+**Two things had to be wrong at once for this to survive the harnesses**, and both are worth
+naming because the shape repeats:
+
+1. `parity_damage.mjs` compared the display list and `$0900`-`$095F` and **not zero page**, so
+   the one byte that changes was the one byte nobody looked at.
+2. Every case it swept seeded `$0933` at 0, so **no case ever reached the fourth hit** - the
+   fatal branch was never taken on either side.
+
+Both are fixed: `$0000`-`$0001` is in the compared range, the sweep runs the hit count at 0, 2
+and 3, and a control - a systems block that treats `$1F2B` as only a sound - now fails in 3 of
+3 cases. `probe_damage.mjs` holds the machine's side directly (the fourth hit writes `$4D`, the
+third leaves `$00` alone), and `parity_loop.mjs` holds the exit at `$18D6`, which had no check
+of any kind before. The display teardown at `$1FA9` is still not ported; the shell puts the
+display back its own way, and that is named in `damage.js` rather than dropped.
+
 #### The score, and why two blocks' order decides it
 
 `$1895`, `$18A2` and `$18AF` are `LDX counter / CPX #$03 / BCC past it / JSR $1DD3 / INC score`,

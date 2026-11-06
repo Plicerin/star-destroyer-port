@@ -19,7 +19,8 @@
 import { openOracle } from './a2.mjs';
 import { toFlight, arm } from './exercise.mjs';
 import { SHLD, WARP, MSL, EMPTY, HITS, FATAL, STEP, shrink, systems, shieldHeld, rammed,
-  missileHit, launchSounds, applyDamage } from '../port/src/game/damage.js';
+  missileHit, launchSounds, applyDamage, QUIT, QUIT_VALUE }
+  from '../port/src/game/damage.js';
 import { RAMMED, HIT } from '../port/src/game/entities.js';
 import { CLASSES } from '../port/src/game/dispatch.js';
 
@@ -31,6 +32,10 @@ const check = (what, ok, detail = '') => {
 const hx = (v, n = 4) => '$' + v.toString(16).toUpperCase().padStart(n, '0');
 
 const LIST = [0x80FB, 0x82E6], STATE = [0x0900, 0x0960];
+/** Zero page $00, where the fourth hit leaves the byte that ends the flight. */
+const QUIT_ZP = [0x0000, 0x0002];
+/** Everything seeded into the port and compared afterwards. */
+const RANGES = [QUIT_ZP, LIST, STATE];
 
 const a2 = await openOracle();
 const flight = await toFlight(a2);
@@ -40,7 +45,11 @@ check('the oracle reaches flight with the whole binary resident',
   `the last sectors landed ${flight.resident.seconds}s after the settle`);
 
 await a2.ev(`(() => {
-  const WATCH = [[0x80FB, 0x82E6], [0x0900, 0x0960]];
+  // Zero page $00 is watched because the fourth hit's only lasting effect is written there.
+  // It was missing from this list, so the comparison below ran green against a port whose
+  // ship could not be destroyed - the one byte that would have shown it was the one byte
+  // nobody was looking at.
+  const WATCH = [[0x0000, 0x0002], [0x80FB, 0x82E6], [0x0900, 0x0960]];
   window.M.damageParity = (addr, pokes, stop) => {
     const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
     const before = cpu.getState();
@@ -78,7 +87,7 @@ const runEngine = (addr, pokes, stop = 0) => a2.ev('JSON.stringify(window.M.dama
 
 function toPort(seeded) {
   const mem = new Uint8Array(65536);
-  for (const [lo, hi] of [LIST, STATE]) {
+  for (const [lo, hi] of RANGES) {
     for (let a = lo; a < hi; a++) mem[a] = seeded[a];
   }
   return mem;
@@ -86,7 +95,7 @@ function toPort(seeded) {
 
 function diff(engine, mem) {
   const bad = [];
-  for (const [lo, hi] of [LIST, STATE]) {
+  for (const [lo, hi] of RANGES) {
     for (let a = lo; a < hi; a++) {
       if (engine.after[a] !== mem[a]) {
         bad.push(`${hx(a)} ${engine.after[a]} vs ${mem[a]}`);
@@ -174,21 +183,51 @@ for (const [name, addr, fn] of [['$1C99 ram', 0x1C99, rammed],
 // --- the flag blocks ---------------------------------------------------------------------------
 console.log('\n=== the flag blocks that read them ===');
 {
+  // The hit count is swept as well as the shield. It used to be seeded at 0 and nothing
+  // else, so no case in this file ever reached the fourth hit, and the one effect the
+  // fourth hit has went unchecked for the life of the port. 2 and 3 put the ship one and
+  // two hits from the end; with both flags set, a single pass can take it from 2 to 4.
   const bad = [];
   for (const [ram, miss] of [[0, 0], [1, 0], [0, 1], [1, 1], [0x5A, 0x40]]) {
     for (const shield of [EMPTY, EMPTY + 1, EMPTY + 8, EMPTY + 16, 0xFF]) {
-      const pokes = { [RAMMED]: ram, [HIT]: miss, [SHLD]: shield,
-        [WARP]: 0xFF, [MSL]: 0xFF, [HITS]: 0 };
-      const engine = await runEngine(0x18BC, pokes, 0x18D6);
-      const mem = toPort(engine.seeded);
-      applyDamage(mem);
-      const d = diff(engine, mem);
-      if (d.length) bad.push(`ram ${ram} miss ${miss} shield ${shield}: ${d[0]}`);
+      for (const hits of [0, 2, 3]) {
+        const pokes = { [RAMMED]: ram, [HIT]: miss, [SHLD]: shield,
+          [WARP]: 0xFF, [MSL]: 0xFF, [HITS]: hits, [QUIT]: 0 };
+        const engine = await runEngine(0x18BC, pokes, 0x18D6);
+        const mem = toPort(engine.seeded);
+        applyDamage(mem);
+        const d = diff(engine, mem);
+        if (d.length) {
+          bad.push(`ram ${ram} miss ${miss} shield ${shield} hits ${hits}: ${d[0]}`);
+        }
+      }
     }
   }
   check('$18BC and $18C9 agree, including a pass in which both arrive',
     bad.length === 0, bad.slice(0, 2).join('; ')
-      || '25 cases - both flags, every shield boundary, and the flags left cleared');
+      || '75 cases - both flags, every shield boundary, three starting hit counts, and'
+        + ' zero page $00 among the bytes compared');
+
+  // What the sweep above now covers, stated on its own so a failure names itself.
+  const fatal = await runEngine(0x18BC,
+    { [RAMMED]: 1, [HIT]: 0, [SHLD]: EMPTY, [WARP]: 0xFF, [MSL]: 0xFF, [HITS]: FATAL - 1,
+      [QUIT]: 0 }, 0x18D6);
+  const fatalMem = toPort(fatal.seeded);
+  const fatalOut = applyDamage(fatalMem);
+  check('the fourth hit leaves $00 holding $4D in the port, as it does in the machine',
+    fatal.after[QUIT] === QUIT_VALUE && fatalMem[QUIT] === QUIT_VALUE
+      && fatalOut.ram.destroyed === true,
+    `machine ${hx(fatal.after[QUIT])}, port ${hx(fatalMem[QUIT])}`
+      + ' - which is the byte $18D6 reads to end the flight');
+
+  const lived = await runEngine(0x18BC,
+    { [RAMMED]: 1, [HIT]: 0, [SHLD]: EMPTY, [WARP]: 0xFF, [MSL]: 0xFF, [HITS]: FATAL - 2,
+      [QUIT]: 0 }, 0x18D6);
+  const livedMem = toPort(lived.seeded);
+  const livedOut = applyDamage(livedMem);
+  check('control: the third leaves it alone in both',
+    lived.after[QUIT] === 0 && livedMem[QUIT] === 0 && livedOut.ram.destroyed === false,
+    'so the check above is not passing on a byte that was always $4D');
 
   const flagBad = [];
   for (const set of [[0, 0, 0], [1, 1, 1], [1, 0, 0x40], [0, 0x7F, 0]]) {
@@ -246,6 +285,30 @@ console.log('\n=== controls: five plausible wrong ports, and one redundancy ==='
     }
     check(`control: ${name} fails`, caught > 0, `${caught} of ${total}`);
   }
+
+  // And the one this file actually shipped: a systems block that reads $1F2B as nothing but
+  // a sound and so never writes $00. It went green here for the life of the port, because
+  // no case in this file reached the fourth hit and zero page was not among the bytes
+  // compared. Both of those are fixed above; this is the control that proves it.
+  const forgetsTheWrite = (mem) => {
+    for (const bar of [MSL, WARP]) {
+      if (mem[bar] !== EMPTY) mem[bar] = shrink(mem[bar]).value;
+    }
+    mem[HITS] = (mem[HITS] + 1) & 0xff;
+    return { absorbed: false, destroyed: mem[HITS] >= FATAL };
+  };
+  let missed = 0, tried = 0;
+  for (const hits of [FATAL - 1, FATAL, FATAL + 1]) {
+    const pokes = { [SHLD]: EMPTY, [WARP]: 0xFF, [MSL]: 0xFF, [HITS]: hits, [QUIT]: 0 };
+    const engine = await runEngine(0x1CCD, pokes);
+    const mem = toPort(engine.seeded);
+    forgetsTheWrite(mem);
+    tried++;
+    if (diff(engine, mem).length) missed++;
+  }
+  check('control: a systems block that treats $1F2B as only a sound fails',
+    missed === tried,
+    `${missed} of ${tried} - the defect this harness used to let through`);
 }
 {
   // $1CFC tests `CPX #$C8`, and reading that as $C7 turns out to be UNOBSERVABLE: the only

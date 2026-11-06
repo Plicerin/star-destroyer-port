@@ -17,6 +17,7 @@ import { SHLD, WARP, MSL, EMPTY, HITS, FATAL, STEP, shrink }
   from '../port/src/game/damage.js';
 import { RAMMED, HIT } from '../port/src/game/entities.js';
 import { CLASSES } from '../port/src/game/dispatch.js';
+import { QUIT, QUIT_VALUE } from '../port/src/game/loop.js';
 
 const results = [];
 const check = (what, ok, detail = '') => {
@@ -66,7 +67,10 @@ check('the oracle reaches flight with the whole binary resident',
   `the last sectors landed ${flight.resident.seconds}s after the settle`);
 
 await a2.ev(`(() => {
-  const WATCH = [[0x80FB, 0x82E6], [0x0900, 0x0960]];
+  // Zero page $00 is in this list because the fourth hit's entire consequence is written
+  // there, and nothing else this file watches would ever show it. It was left out of the
+  // first version, which is how the port went a long time with a ship that could not die.
+  const WATCH = [[0x0000, 0x0002], [0x80FB, 0x82E6], [0x0900, 0x0960]];
   window.M.damageRun = (addr, pokes, x, stop) => {
     const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
     const before = cpu.getState();
@@ -202,6 +206,35 @@ console.log('\n=== the systems, and the fourth hit ===');
   check('the hit count rises, and the fourth one leaves through $1F2B instead of the sounds',
     wrong.length === 0, wrong.slice(0, 3).join('; ')
       || 'the nearest thing the binary has to a lives counter, and four is fatal');
+
+  // **What the fourth hit actually does**, which reaching $1F2B does not by itself say.
+  // $1F2B is almost entirely sound - two bursts through $1D52 - but its last two
+  // instructions are `LDX #$4D / STX $00`, and zero page $00 is the byte the main loop
+  // tests at $18D6 to leave the flight. That write is the death of the ship; everything
+  // else about $1F2B is noise.
+  const fatal = await run(0x1CCD, { [SHLD]: EMPTY, [WARP]: 0xFF, [MSL]: 0xFF, [HITS]: 3, 0: 0 });
+  const lived = await run(0x1CCD, { [SHLD]: EMPTY, [WARP]: 0xFF, [MSL]: 0xFF, [HITS]: 2, 0: 0 });
+  check('the fourth hit writes $4D into zero page $00 - the byte $18D6 leaves on',
+    fatal.after[QUIT] === QUIT_VALUE,
+    `$00 was 0 going in and ${hx(fatal.after[QUIT], 2)} coming out`);
+  check('control: the third hit leaves $00 alone',
+    lived.after[QUIT] === 0 && lived.after[HITS] === 3,
+    'so the flight carries on, and the check above cannot pass by accident');
+
+  // And the one instruction that does it, read off the binary rather than inferred.
+  const tail = disasmRange(image, 0x1F62, 0x1F67);
+  check('$1F2B ends with LDX #$4D then STX $00, and then returns',
+    tail.length === 3 && tail[0].op === 'LDX' && tail[0].bytes[1] === QUIT_VALUE
+      && tail[1].op === 'STX' && tail[1].bytes[1] === 0x00 && tail[2].op === 'RTS',
+    tail.map((l) => l.text ?? l.op).join(' / '));
+
+  // $1F2B opens with JSR $1FA9, which is display teardown and nothing else. Worth naming,
+  // because a port that reproduces the write without it has still left something out.
+  const teardown = disasmRange(image, 0x1FA9, 0x1FB2);
+  const switches = teardown.filter((l) => l.op === 'STX').map((l) => l.bytes[1] | (l.bytes[2] << 8));
+  check('and opens with $1FA9, which only touches the two display soft switches',
+    switches.length === 2 && switches.includes(0xC054) && switches.includes(0xC056),
+    `${switches.map((a) => hx(a, 4)).join(' and ')} - page 1, and hi-res off`);
 
   // Both bars drop by four, and an empty one is left alone rather than wrapped.
   const both = await run(0x1CCD, { [SHLD]: EMPTY, [WARP]: 0xFF, [MSL]: 0xFF, [HITS]: 0 });

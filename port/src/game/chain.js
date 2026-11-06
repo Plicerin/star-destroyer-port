@@ -90,8 +90,15 @@ export const IFACE = {
   baseStar: 0x1FFF,
 };
 
-/** $00 holding this is how the binary says the ship was destroyed. SD PART2 line 172. */
-export const DEAD = 77;
+/**
+ * $00 holding this is how the binary says the ship was destroyed. SD PART2 line 172.
+ *
+ * The same byte `damage.js` writes at the fourth systems hit and `loop.js` reads to leave the
+ * flight, taken from there rather than written out again: two spellings of 77 in two files
+ * that must agree is how they stop agreeing.
+ */
+import { QUIT_VALUE as DEAD } from './damage.js';
+export { DEAD };
 
 /** HYPERDRIVE 3 and 4's `POKE 8179,120`. */
 export const LAST_FLIGHT = 120;

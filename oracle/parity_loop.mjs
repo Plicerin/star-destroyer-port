@@ -267,6 +267,38 @@ console.log('\n=== the ship\'s publish, the page select, and the wave test ===')
     wrong.length === 0, wrong.slice(0, 2).join('; ')
       || 'nine bytes, all of them zero, and two of the three tests short-circuit on the third');
 }
+
+// --- the other way out, which had no check at all ----------------------------------------------
+// $18D6 is `LDX $00 / CPX #$4D / BNE $18DD`, so the ship's death is one byte and one branch,
+// and the port spells it `mem[QUIT] === QUIT_VALUE`. The wave-clear exit above has been held
+// since this file was written; this one never was, which is part of how the port shipped with
+// a ship that could not die - nothing wrote the byte and nothing noticed the exit was cold.
+{
+  const wrong = [];
+  for (const v of [0x00, 0x01, 0x4C, QUIT_VALUE, 0x4E, 0xFF]) {
+    const exit = Number(await a2.ev(`(() => {
+      const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+      const before = cpu.getState(), was = rd(${QUIT});
+      wr(${QUIT}, ${v});
+      const st = cpu.getState(); st.pc = 0x18D6; cpu.setState(st);
+      let where = 0;
+      cpu.stepCyclesDebug(10000, () => {
+        const pc = cpu.getPC();
+        if (pc === 0x18DC || pc === 0x18DD) { where = pc; return true; }
+      });
+      wr(${QUIT}, was); cpu.setState(before);
+      return where;
+    })()`));
+    const machineDied = exit === 0x18DC;
+    const mem = new Uint8Array(0x10000);
+    mem[QUIT] = v;
+    const portDied = mem[QUIT] === QUIT_VALUE;
+    if (machineDied !== portDied) wrong.push(`$00 = ${v}: machine ${machineDied}`);
+  }
+  check('and the destroyed exit agrees - $4D and nothing else ends the flight',
+    wrong.length === 0, wrong.slice(0, 2).join('; ')
+      || 'six values either side of $4D, including $4C and $4E');
+}
 function field2(i) {
   const RECORD = 13;
   return (i < 12 ? 0x8123 + i * RECORD : 0x8247 + (i - 12) * RECORD) + 1;

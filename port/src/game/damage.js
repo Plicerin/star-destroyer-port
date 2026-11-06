@@ -35,6 +35,12 @@
 // here returns the address it would have called instead, so the chain is complete and the gap
 // is named.
 //
+// **With one exception, and it cost the port the ability to die.** `$1F2B` is not only a
+// sound: its last two instructions are `LDX #$4D / STX $00`, and that byte is what `$18D6`
+// reads to end the flight. Treating the whole routine as a sound meant the write was never
+// made, the hit count climbed past four for ever and nothing could destroy the ship. The
+// write is done below; only the sound and the display teardown are still missing.
+//
 // Measured by oracle/probe_damage.mjs and held block-for-block by oracle/parity_damage.mjs.
 import { RAMMED, HIT } from './entities.js';
 
@@ -58,6 +64,18 @@ export const FATAL = 4;
 
 /** `CPY #$04` - the most steps one call of $1C89 will take. */
 export const STEP = 4;
+
+/**
+ * $00 - zero page, and the only thing the fourth hit leaves behind.
+ *
+ * `$18D6` reads it to decide whether the flight is over and `$1F64` is the one instruction
+ * that writes it. It is defined here rather than in `loop.js` because this is the file that
+ * puts it there; `loop.js` imports it back for the read and re-exports it.
+ */
+export const QUIT = 0x00;
+
+/** `LDX #$4D` at $1F62 - the value $18D6 compares against. */
+export const QUIT_VALUE = 0x4D;
 
 /** The sound each outcome asks for. None of them is ported. */
 export const SOUND = {
@@ -102,6 +120,16 @@ export function systems(mem) {
   }
   mem[HITS] = (mem[HITS] + 1) & 0xff;
   if (mem[HITS] >= FATAL) {
+    // $1CF2 `JMP $1F2B`, and **$1F2B is not only a sound**. It opens with `JSR $1FA9`
+    // (display teardown - $C054 and $C056, page 1 and hi-res off), plays two bursts, and
+    // then ends `LDX #$4D / STX $00`. That last write is what `$18D6` reads to leave the
+    // flight, so it is the whole of the ship's death and it belongs here rather than in the
+    // sound that is still missing. Without it the hit count simply climbed past four for
+    // ever and the ship could not be destroyed at all.
+    //
+    // The teardown is not done here: the shell owns the display and puts it back its own
+    // way. Named rather than silently dropped.
+    mem[QUIT] = QUIT_VALUE;
     return { absorbed: false, destroyed: true, sound: SOUND.destroyed };
   }
   return { absorbed: false, destroyed: false, sounds: SOUND.systems };

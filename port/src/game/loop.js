@@ -48,7 +48,8 @@ import { GEOM, rangeToTarget, bearing } from './geometry.js';
 import { CLASSES, dispatch, coolDown } from './dispatch.js';
 import { reach, hold, move, missile } from './entities.js';
 import { SHOTS, shotHit, debrisTick, award, respawn } from './kill.js';
-import { launchSounds, applyDamage, MSL, WARP, SHLD, HITS } from './damage.js';
+import { launchSounds, applyDamage, MSL, WARP, SHLD, HITS, QUIT, QUIT_VALUE }
+  from './damage.js';
 import { fire, moveShot, FIRED } from './weapon.js';
 import { Engine } from '../a23d2/engine.js';
 
@@ -68,9 +69,13 @@ export const PAGE = 0x0947;
 export const GATE = 0x0948;
 export const BURN = 0x0956;
 
-/** $00 - zero page. $4D in it ends the loop, and $1F64 is what puts it there. */
-export const QUIT = 0x00;
-export const QUIT_VALUE = 0x4D;
+/**
+ * $00 - zero page. $4D in it ends the loop, and `$1F64` is what puts it there.
+ *
+ * Defined in `damage.js`, because that is where it is written, and re-exported here because
+ * `$18D6` below is where it is read.
+ */
+export { QUIT, QUIT_VALUE };
 
 /** $1FF9-$1FFB - how many of each class the wave still has to send. */
 export const WAVES = [0x1FF9, 0x1FFA, 0x1FFB];
