@@ -126,7 +126,9 @@
     </select>
   </label>
   <label><input type="checkbox" id="mute"> mute</label>
-  <label><input type="checkbox" id="repair"> repair the interface</label>
+  <label title="Leave the BRUN's slack lying on $1FF3-$1FFF the way this disk image does. The
+    game then cannot be finished - see oracle/DISK_TRUTH.md."><input type="checkbox"
+    id="corrupt"> load this disk's broken interface</label>
 </div>
 
 <div class="help" id="help"></div>
@@ -203,21 +205,25 @@ const note = (s) => {
   if (!s || !s.corrupted) { $('note').textContent = ''; return; }
   if (s.repaired) {
     $('note').innerHTML =
-      `<b>Repaired.</b> The <code>BRUN</code> ran 250 bytes of its own last sector's slack `
-      + `over the thirteen bytes the BASIC and the binary talk through, as it does on this `
-      + `image, and the switch put back the target of ${s.intended.target} flights and the `
-      + `waves of ${s.intended.waves.join('/')} that SELECT and SD PART2 rolled. Untick it `
-      + `for what the disk actually does.`;
+      `<b>Playing the numbers the BASIC rolled:</b> a target of ${s.intended.target} flights `
+      + `and waves of ${s.intended.waves.join('/')}. On this disk image <code>BRUN STAR `
+      + `DESTROYER.OBJ0</code> runs 250 bytes of its own last sector's slack over the thirteen `
+      + `bytes the BASIC and the binary talk through, and those thirteen are put back `
+      + `afterwards &mdash; the only place this port does not do what the disk does, because `
+      + `the slack is a stranger's leftover high-score line rather than anything the author `
+      + `wrote. Tick the box to see the disk as it is.`;
     return;
   }
   $('note').innerHTML =
-    `<b>The wave counters on screen are not the ones the BASIC rolled.</b> `
+    `<b>This is the disk as it is, and the game cannot be finished like this.</b> `
     + `SELECT and SD PART2 set a target of ${s.intended.target} flights and waves of `
-    + `${s.intended.waves.join('/')}, and then <code>BRUN STAR DESTROYER.OBJ0</code> wrote 250 `
-    + `bytes of its own last sector's slack over them, because DOS 3.3 reads a file's final `
-    + `sector straight to the destination. That is this disk image, not the port &mdash; see `
+    + `${s.intended.waves.join('/')}; <code>BRUN STAR DESTROYER.OBJ0</code> then wrote 250 `
+    + `bytes of its own last sector's slack over them, so the binary reads a target of `
+    + `${s.actual ? s.actual.target : '217'} and waves of `
+    + `${s.actual ? s.actual.waves.join('/') : '32/51/51'} &mdash; and SD PART2 line `
+    + `172 finds the counters non-zero and goes straight to the high scores. See `
     + `<code>oracle/DISK_TRUTH.md</code>, &ldquo;A BLOAD writes past the end of the file&rdquo;. `
-    + `Tick <em>repair the interface</em> to play with the numbers the BASIC intended.`;
+    + `Untick the box to play.`;
 };
 
 async function loadImage() {
@@ -237,7 +243,7 @@ async function fly() {
     shell = new Shell(canvas, {
       fps: Number($('fps').value),
       tint: $('tint').value,
-      honest: !$('repair').checked,
+      corruptInterface: $('corrupt').checked,
     });
     shell.audio.setMuted($('mute').checked);
     shell.onStatus = (s) => show(s);
@@ -310,7 +316,7 @@ $('fps').addEventListener('change', (e) => {
   fpsNote();
 });
 fpsNote();
-$('repair').addEventListener('change', () => {
+$('corrupt').addEventListener('change', () => {
   if (shell.game) $('over').textContent = 'click "Reload and fly again" to apply';
 });
 

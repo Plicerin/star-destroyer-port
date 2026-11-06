@@ -247,6 +247,54 @@ console.log('\n=== controls ===');
       + ' $8BD8');
 }
 
+// ------------------------------------------- the one repair, and its blast radius ---------
+// `boot()` puts the thirteen interface bytes back after the BRUN, and that is the only place
+// this port departs from the disk. A departure needs a fence around it: these hold that the
+// switch does what it says, that the disk's own behaviour is still reachable and still agrees
+// with the machine, and - the one that matters - that the repair touches those thirteen bytes
+// and *nothing else*. Without the last check, "repair the interface" could quietly grow into
+// a licence to fix whatever else looked wrong.
+console.log('\n=== the interface repair ===');
+{
+  const { boot } = await import('../port/src/platform/boot.js');
+  const { IFACE } = await import('../port/src/game/chain.js');
+  const SPAN = [];
+  for (let a = 0x1FF3; a <= 0x1FFF; a++) SPAN.push(a);
+  const seeded = () => {
+    let s = 7;
+    return () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  };
+
+  const asDisk = boot(d.buf, { difficulty: 2, rnd: seeded(), corruptInterface: true });
+  const fixed = boot(d.buf, { difficulty: 2, rnd: seeded() });
+
+  check('the default is the repaired interface', fixed.repaired && !asDisk.repaired,
+    'corruptInterface defaults to false');
+  check('and the default gives the binary the numbers the BASIC rolled',
+    fixed.mem[IFACE.target] === fixed.intended.target
+      && IFACE.waves.every((a, i) => fixed.mem[a] === fixed.intended.waves[i]),
+    `target ${fixed.mem[IFACE.target]},`
+      + ` waves ${IFACE.waves.map((a) => fixed.mem[a]).join('/')}`);
+
+  check('the disk\'s own behaviour is still reachable, and still what the machine has',
+    SPAN.every((a) => asDisk.mem[a] === live(a)),
+    `$1FF3-$1FFF on the machine: ${SPAN.map((a) => live(a)).join(' ')}`);
+
+  check('control: the two differ, so the switch is doing something',
+    SPAN.some((a) => asDisk.mem[a] !== fixed.mem[a]),
+    `target ${asDisk.mem[IFACE.target]} -> ${fixed.mem[IFACE.target]}`);
+
+  const strayed = [];
+  for (let a = 0; a < 0x10000; a++) {
+    if (a >= 0x1FF3 && a <= 0x1FFF) continue;
+    if (asDisk.mem[a] !== fixed.mem[a]) strayed.push(a);
+  }
+  check('and it changes those thirteen bytes and not one other byte of the 64K',
+    strayed.length === 0,
+    strayed.length ? `${strayed.length} strayed, first ${hx(strayed[0])}`
+      : 'the load model itself is untouched - every overshoot still lands where it lands');
+}
+
 console.log('');
 const failed = results.filter((r) => !r.ok);
 console.log(failed.length ? `${failed.length} of ${results.length} checks FAILED`

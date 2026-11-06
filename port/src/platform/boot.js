@@ -82,13 +82,38 @@ export function seedInterface(mem, difficulty, rnd = Math.random) {
 /**
  * A 64K image loaded for a flight, and what the interface held on either side of the BRUN.
  *
+ * **The interface is repaired by default, and that is the one place this port does not do
+ * what the disk does.** The reasoning, because it runs against every other decision here:
+ *
+ * Fidelity to *the game* and fidelity to *this disk image* are the same thing everywhere
+ * else in this port, and opposite here. Keeping `STARBASE`'s `IF A = 8 THEN A = 9` preserves
+ * something Mitchell Robbins wrote. Keeping this preserves a line of someone else's leftover
+ * high-score text - `" 1     Y 33366"` - that happened to be lying in the sectors of this
+ * particular copy. It is not authorship, it is damage, and `BASE STAR.OBJ0` is the proof:
+ * same 5,890 bytes, same `$08EF`, same 250-byte overshoot, 249 of its 250 slack bytes zero
+ * and the one that is not landing at `$1FF1`, below the interface. Two files with identical
+ * geometry, one of which ends every run at the high scores and one of which does nothing at
+ * all, and nothing in either chose which.
+ *
+ * Left alone, the binary reads a target of 217 flights, a flight counter already at 32, and
+ * waves of 32/51/51 where the BASIC rolled nine enemies - so `SD PART2` line 172 finds the
+ * counters non-zero, goes to `MONOLITH`, and the game cannot be finished at all. Defaulting
+ * to that would be preserving a this image's accident at the cost of the author's game.
+ *
+ * So the load model stays exact - `dos.js` still overshoots, `parity_overshoot.mjs` still
+ * holds it against the machine over 9,328 bytes, and `actual` below still reports what the
+ * slack wrote. Only the thirteen bytes are put back afterwards. Pass `corruptInterface: true`
+ * to see the disk as it is. On a clean dump the repair is a no-op and this switch stops
+ * meaning anything, which is the test named in DISK_TRUTH.
+ *
  * @param {Uint8Array|ArrayBuffer} image the .dsk
  * @param {object} [opts] `difficulty` 1-3, `rnd` a source of [0,1), `loads` to run the
- *   finale's sequence instead, `honest` false to put the interface back after the BRUN -
- *   which is the first QoL switch and defaults to off, because the baseline is the disk
+ *   finale's sequence instead, `corruptInterface` true to leave the BRUN's slack lying on
+ *   `$1FF3`-`$1FFF` the way this image does - see the note above `boot` for why that is a
+ *   switch and not the default
  */
 export function boot(image, { difficulty = 1, rnd = Math.random, loads = FLIGHT_LOADS,
-  honest = true } = {}) {
+  corruptInterface = false } = {}) {
   const disk = openDisk(image);
   const mem = new Uint8Array(0x10000);
 
@@ -108,9 +133,9 @@ export function boot(image, { difficulty = 1, rnd = Math.random, loads = FLIGHT_
     target: mem[IFACE.target],
     waves: IFACE.waves.map((a) => mem[a]),
   };
-  if (!honest) {
-    // The one departure, and it is off by default: put back what the BASIC meant the binary
-    // to read. See oracle/DISK_TRUTH.md - on a clean dump this switch would be a no-op.
+  if (!corruptInterface) {
+    // Put back what the BASIC meant the binary to read. On a clean dump this is a no-op -
+    // which is exactly the argument for doing it by default. See the note above `boot`.
     mem[IFACE.target] = intended.target;
     IFACE.waves.forEach((a, i) => { mem[a] = intended.waves[i]; });
     mem[IFACE.difficulty] = difficulty;
@@ -120,9 +145,9 @@ export function boot(image, { difficulty = 1, rnd = Math.random, loads = FLIGHT_
     }
   }
 
-  // `corrupted` is a fact about the load and stays true whether or not the switch put the
-  // numbers back; `repaired` says which of the two the image now holds.
-  return { mem, disk, loaded, intended, actual, repaired: !honest,
+  // `corrupted` is a fact about the load and stays true whether or not the numbers were put
+  // back; `repaired` says which of the two the image now holds.
+  return { mem, disk, loaded, intended, actual, repaired: !corruptInterface,
     corrupted: actual.target !== intended.target
       || actual.waves.some((v, i) => v !== intended.waves[i]) };
 }

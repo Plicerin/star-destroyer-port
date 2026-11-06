@@ -2057,15 +2057,33 @@ and nothing in either chose which.
 
 ### What the port does about it
 
-Nothing. `port/src/game/dos.js` loads the way DOS does, so the corruption happens for the same
-reason it happens on the disk, and a dump whose slack is zeros plays correctly with no change
-to the port. This is the same decision as the title pages: the defect lives in the data, and
-putting it there is how a clean dump fixes it.
+**It loads exactly the way DOS does, and then puts the thirteen bytes back.** That is the only
+place in this port where the disk is not followed, and it was not the first decision: for most
+of this project the default was to leave the corruption in place, on the rule that the
+baseline is the disk.
 
-Which makes this the **second thing a clean dump would change**, and the more interesting one,
+The rule still holds; this is where it stops applying. **Fidelity to the game and fidelity to
+this image are the same thing everywhere else, and opposite here.** Keeping `STARBASE`'s
+`IF A = 8 THEN A = 9` preserves something Mitchell Robbins wrote, so the port keeps it.
+Keeping this preserves `" 1     Y 33366"` - a stranger's high-score line that happened to be
+lying in the sectors of this copy. It is not authorship, it is damage, and `BASE STAR.OBJ0`
+is the proof: same geometry, same overshoot, and its slack does nothing. Nothing in either
+file chose which. Left alone the binary reads a target of 217 against a flight counter already
+at 32, and `SD PART2` line 172 ends every run at the high scores - so the default was
+preserving a this image's accident at the cost of the author's game.
+
+**What did not change is the measurement.** `dos.js` still overshoots, `boot()` still reports
+in `actual` what the slack wrote, and `parity_overshoot.mjs` still holds the load model against
+the machine over 9,328 bytes - with five checks added around the repair itself, the important
+one being that it touches those thirteen bytes and **not one other byte of the 64K**. The
+disk's own behaviour is a switch away (`corruptInterface: true`, the page's *load this disk's
+broken interface*), and in that mode `$1FF3`-`$1FFF` still agrees with the machine byte for
+byte.
+
+This is still the **second thing a clean dump would change**, and the more interesting one,
 because it is testable the moment one exists: load `STAR DESTROYER.OBJ0` from it, look at bytes
 5,894 to 6,143 of its sector chain, and if they are zeros then this image is why the game does
-not work rather than the game.
+not work rather than the game - and the repair above becomes a no-op that could be deleted.
 
 ---
 

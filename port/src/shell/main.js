@@ -57,9 +57,11 @@ export class Shell {
    * @param {HTMLCanvasElement} canvas
    * @param {object} [opts] `fps` passes a second - the disk's 2.57 by default, and see
    *   FPS_CHOICES for what raising it actually does; `tint` 'colour' or a monochrome
-   *   phosphor; `honest` false to repair the interface DOS corrupts
+   *   phosphor; `corruptInterface` true to leave the BRUN's slack lying on the interface,
+   *   which is what this disk does and makes the game unfinishable - see the note above
+   *   `boot` in platform/boot.js for why that is the switch rather than the default
    */
-  constructor(canvas, { fps = DISK_FPS, tint = 'colour', honest = true } = {}) {
+  constructor(canvas, { fps = DISK_FPS, tint = 'colour', corruptInterface = false } = {}) {
     this.canvas = canvas;
     canvas.width = HGR_W;
     canvas.height = HGR_H;
@@ -67,7 +69,7 @@ export class Shell {
     this.frame = this.ctx.createImageData(HGR_W, HGR_H);
     this.fps = fps;
     this.tint = tint;
-    this.honest = honest;
+    this.corruptInterface = corruptInterface;
 
     this.input = new Input(window).attach();
     this.audio = new Audio();
@@ -91,7 +93,7 @@ export class Shell {
    * @param {number} difficulty 1, 2 or 3
    */
   load(image, difficulty = 1) {
-    this.bootInfo = boot(image, { difficulty, honest: this.honest });
+    this.bootInfo = boot(image, { difficulty, corruptInterface: this.corruptInterface });
     this.mem = this.bootInfo.mem;
     this.game = new Game(this.mem);
     this.game.setup();
@@ -142,6 +144,8 @@ export class Shell {
       corrupted: this.bootInfo ? this.bootInfo.corrupted : false,
       repaired: this.bootInfo ? this.bootInfo.repaired : false,
       intended: this.bootInfo ? this.bootInfo.intended : null,
+      /** What the slack actually wrote, whether or not it was put back afterwards. */
+      actual: this.bootInfo ? this.bootInfo.actual : null,
     };
   }
 
