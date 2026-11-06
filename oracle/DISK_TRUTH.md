@@ -2280,8 +2280,27 @@ promoted to fact.
    routine is not.
 
    So this stays open, and the next person needs **a complete DOS 3.3 image whose tracks 0-2
-   contain `STA $B7EC`**. None of the four images to hand does. Run that one-line test on a
-   candidate before spending anything else on it.
+   contain `STA $B7EC`**. None of the four images to hand does.
+
+   **How to tell a usable candidate from another dead end**, in three steps and about a
+   minute:
+
+   1. Does the image contain `8D EC B7` (`STA $B7EC`) anywhere? If not, it has no file
+      manager and nothing else about it matters. All three "DOS" images tried here fail at
+      this step.
+   2. Is its **T1/S14** byte-identical to this disk's? That sector holds
+      `$BC4B LDA $B5C9 / STA $B7F0 / LDA $B5CA / STA $B7F1`, the routine that sets the IOB
+      buffer once, and it is byte-identical on this disk and on Space Vikings in 4am's release
+      - two different publishers, two different whoever did it. A candidate that matches it is the
+      same DOS lineage and its differences mean something. Its first twelve md5 hex digits
+      are **`00370d4751cd`**.
+   3. Then the question itself: does it contain `EE F1 B7` (`INC $B7F1`)? If yes, the
+      overshoot is stock DOS. If no, this disk's DOS has a routine a stock one does not.
+
+   For reference, the nineteen sectors on tracks 0-2 that this disk and Space Vikings hold
+   byte-identical - the DOS core two unrelated commercial disks agree on - are T0/S2, S3, S4,
+   S10, S11, S12, S14, S15; T1/S0, S1, S2, S7, S10, S11, S12, S14, S15; T2/S0, S1. The walk
+   at T0/S6 is **not** among them: the two disks differ there in 245 of 256 bytes.
 3. ~~**Opcode 3.**~~ Answered: a line back to the saved previous point, which it leaves
    in place. Handler `$62C0`.
 4. ~~**What `CALL $6000` does with all this.**~~ Answered above, and so is everything that
