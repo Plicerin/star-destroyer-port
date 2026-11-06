@@ -15,6 +15,7 @@
 import { openOracle } from './a2.mjs';
 import { openDisk, DISK } from './dsk.mjs';
 import { traverse, disasmRange } from './disasm6502.mjs';
+import { toFinale, FINALE_ENTRY, sdStart2Setup } from './exercise.mjs';
 import { FATAL, HITS } from '../port/src/game/damage.js';
 import { IFACE } from '../port/src/game/chain.js';
 
@@ -173,62 +174,87 @@ console.log('\n=== the rules that differ, and would be silently wrong if assumed
 }
 
 // ---------------------------------------------------------------- the machine ------------
-console.log('\n=== it runs ===');
+console.log('\n=== it runs as a mission, not as a binary ===');
+// The first pass at this side-loaded the four files and jumped to $0957. That starts the
+// binary; it does not start the mission. `SD START2` pokes seventeen addresses between the
+// BLOADs and `SD PART3`'s BRUNs, and two of them - object 3's count at $814B, and the wave
+// counters - are what the finale's own "is the field empty" test reads. Left at zero the
+// mission believes it has already been won: $112A runs on the first pass, $1FFF comes back
+// 1, and 140 of 1,369 addresses ever execute.
+//
+// `toFinale` reads those pokes off the disk and applies them in the chain's own order. The
+// control below is the same run without them.
 const a2 = await openOracle();
-let live = null;
+let live = null, control = null;
 try {
-  await a2.coldStart({ fill: 0x00 });
-  for (let i = 0; i < 40; i++) {
-    await a2.waitMs(500);
-    if ((await a2.screen()).some((r) => r.includes('STARSHIP BATTLE'))) break;
-  }
-  // SD START2's set, then the binary over the top - the order SD PART3 uses.
-  const files = ['A2-3D2', 'SV DATA2', 'BASE STAR DATA', 'HEADING DATA', 'MATH',
-    'BASE STAR.OBJ0'];
-  const at = { 'A2-3D2': 0x6000, 'HEADING DATA': 35275 };
-  live = JSON.parse(await a2.ev(`(() => {
-    const cpu = window.M.cpu, wr = window.M.wr, rd = window.M.rd;
-    const set = ${JSON.stringify(files.map((n) => {
-    const f = read(n);
-    return { name: n, addr: at[n] ?? f.addr, raw: [...f.raw] };
-  }))};
-    for (const f of set) for (let i = 4; i < f.raw.length; i++) wr(f.addr - 4 + i, f.raw[i]);
+  const arrival = await toFinale(a2);
+  check('SD START2\'s setup reads cleanly off the disk, with nothing left unresolved',
+    arrival.setup.unresolved.length === 0 && arrival.setup.pokes.length === 17,
+    `${arrival.setup.pokes.length} pokes and ${arrival.setup.loads.length} loads, including`
+      + ' $814B = 255, which is the one that matters');
+
+  const run = (cycles) => a2.ev(`JSON.stringify((() => {
+    const cpu = window.M.cpu, rd = window.M.rd;
     const before = []; for (let a = 0x80FB; a < 0x82E6; a++) before.push(rd(a));
-    const st = cpu.getState(); st.pc = ${ENTRY}; st.sp = 0xF8; cpu.setState(st);
-    let instr = 0, renders = 0, prev = 0;
-    const seen = new Set();
-    cpu.stepCyclesDebug(6000000, () => {
+    let renders = 0, won = 0; const seen = new Set();
+    cpu.stepCyclesDebug(${cycles}, () => {
       const pc = cpu.getPC();
-      instr++;
       if (pc === 0x6000) renders++;
+      if (pc === 0x112A || pc === 0x10A7) won++;
       if (pc >= 0x08EF && pc <= 0x1FF0) seen.add(pc);
     });
     const after = []; for (let a = 0x80FB; a < 0x82E6; a++) after.push(rd(a));
-    let listMoved = 0;
-    for (let i = 0; i < before.length; i++) if (before[i] !== after[i]) listMoved++;
+    let moved = 0; for (let i = 0; i < before.length; i++) if (before[i] !== after[i]) moved++;
     let lit = 0; for (let a = 0x2000; a < 0x4000; a++) if (rd(a)) lit++;
-    return JSON.stringify({ instr, renders, covered: seen.size, listMoved, lit,
-      hits: rd(${HITS}), finale: rd(${IFACE.finale}), baseStar: rd(${IFACE.baseStar}) });
-  })()`));
-  console.log(`  ${live.instr} instructions, ${live.renders} renders,`
-    + ` ${live.covered} of its own addresses reached`);
-  console.log(`  display list: ${live.listMoved} bytes moved; page 1 lit ${live.lit}`);
+    return { renders, won, covered: seen.size, moved, lit, hits: rd(0x0933),
+      finale: rd(0x1FF7), baseStar: rd(0x1FFF), obj3: rd(0x814B) };
+  })())`).then(JSON.parse);
+
+  await a2.ev(`(() => { const cpu = window.M.cpu; const st = cpu.getState();
+    st.pc = ${FINALE_ENTRY}; st.sp = 0xF8; cpu.setState(st); return 1; })()`);
+  live = await run(20000000);
+  console.log(`  ${live.covered} of 1,369 addresses, ${live.renders} renders,`
+    + ` ${live.moved} display-list bytes moved, page 1 lit ${live.lit}`);
   console.log(`  $0933 hits ${live.hits}, $1FF7 ${live.finale}, $1FFF ${live.baseStar}`);
+
+  // The control: the same files, the same entry, without SD START2's pokes.
+  const files = [...sdStart2Setup(d).loads,
+    { file: 'PART1.OBJ0', at: null }, { file: 'BASE STAR.OBJ0', at: null }]
+    .map(({ file, at }) => {
+      const f = read(file);
+      return { addr: at ?? f.addr, raw: [...f.raw] };
+    });
+  await a2.ev(`(() => { const wr = window.M.wr;
+    for (const f of ${JSON.stringify(files)}) {
+      for (let i = 4; i < f.raw.length; i++) wr(f.addr - 4 + i, f.raw[i]);
+    }
+    const cpu = window.M.cpu; const st = cpu.getState();
+    st.pc = ${FINALE_ENTRY}; st.sp = 0xF8; cpu.setState(st); return 1; })()`);
+  control = await run(2000000);
 } finally {
   await a2.close();
 }
 {
-  // Said plainly: this is not yet a parity target. 140 of 1,369 addresses in six million
-  // cycles means the mission ended almost at once, and $1FFF coming back as 1 says it ended
-  // by winning - because this harness loads the files but does not reproduce the state
-  // SD PART3 and the BASIC leave behind, so $093E and $814B are zero and $112A is reached
-  // on the first pass. Getting it into a real mission is the next pass's first job.
-  console.log(`  (only ${live.covered} of its 1,369 addresses ran, and $1FFF came back`
-    + ` ${live.baseStar} - this starts the binary, it does not yet play the mission)`);
-  check('the finale runs, renders and moves its display list',
-    live.renders > 0 && live.listMoved > 0 && live.lit > 0,
-    `${live.renders} renders, ${live.listMoved} display-list bytes moved, ${live.lit} lit -`
-      + ' so the binary is intact and reachable; a target to hold a port to needs more');
+  check('the mission runs: it renders repeatedly and keeps moving its display list',
+    live.renders > 20 && live.moved > 0 && live.lit > 0,
+    `${live.renders} renders over 20M cycles - the main mission's idle flight looks the same`);
+
+  check('and it does NOT think it has already been won',
+    live.baseStar === 0 && live.won === 0,
+    `$1FFF is ${live.baseStar} and neither $10A7 nor $112A was reached`);
+
+  check('object 3\'s count survives into the mission, which is what SD START2 is for',
+    live.obj3 === 255, `$814B = ${live.obj3}`);
+
+  check('control: without those pokes it wins on the spot, as the first pass did',
+    control.won > 0 && control.baseStar > 0 && control.covered < live.covered,
+    `$1FFF came back ${control.baseStar} after ${control.covered} addresses, against`
+      + ` ${live.baseStar} after ${live.covered} - so the pokes are the difference`);
+
+  check('and the mission reaches four times the code the side-load did',
+    live.covered > 500,
+    `${live.covered} of 1,369 addresses against the 140 a bare side-load reaches;`
+      + ' the rest needs a player, exactly as the main mission does');
 }
 
 console.log('');

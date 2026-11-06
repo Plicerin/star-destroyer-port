@@ -18,6 +18,7 @@
  */
 import { identify } from './screens.mjs';
 import { openDisk, DISK } from './dsk.mjs';
+import { listProgram } from './detokenise.mjs';
 
 export const LIST = 0x80FB;        // where $6090 points the list pointer, hard-coded
 export const LIST_LEN = 491;         // SV DATA's length - what has to be saved and restored
@@ -108,10 +109,11 @@ export const OBJ0_VARIABLES = [[0x0933, 0x0956], [0x1D4A, 0x1D51]];
  * It throws rather than giving up quietly, and it names the addresses that would not settle,
  * because a wait that times out and carries on is how a probe comes to measure the fill.
  */
-export async function settleBinary(a2, { tries = 60, waitMs = 500 } = {}) {
+export async function settleBinary(a2, { tries = 60, waitMs = 500, file = OBJ0,
+  variables = OBJ0_VARIABLES } = {}) {
   const disk = openDisk(DISK);
-  const f = disk.read(disk.files.find((x) => x.name === OBJ0));
-  const variable = (a) => OBJ0_VARIABLES.some(([lo, hi]) => a >= lo && a <= hi);
+  const f = disk.read(disk.files.find((x) => x.name === file));
+  const variable = (a) => variables.some(([lo, hi]) => a >= lo && a <= hi);
   let differing = [];
   for (let i = 0; i < tries; i++) {
     const live = JSON.parse(await a2.ev(
@@ -123,9 +125,149 @@ export async function settleBinary(a2, { tries = 60, waitMs = 500 } = {}) {
     if (!differing.length) return { seconds: (i * waitMs) / 1000 };
     await a2.waitMs(waitMs);
   }
-  throw new Error(`${OBJ0} never settled: ${differing.length} bytes still differ from the file,`
+  throw new Error(`${file} never settled: ${differing.length} bytes still differ from the file,`
     + ` first at $${differing[0].toString(16)}`);
 }
+
+/** `SD PART3` BRUNs this over the same $08EF-$1FF0 the main mission used. */
+export const FINALE = 'BASE STAR.OBJ0';
+
+/**
+ * Drive the disk all the way to the final mission, by playing the chain rather than faking it.
+ *
+ * The obvious shortcut - side-load `SV DATA2`, `BASE STAR DATA` and the binary and jump to
+ * `$0957` - is what the first pass at this did, and it does not work. `SD START2` pokes a
+ * dozen addresses on its way past, two of which (`$814B`, object 3's count, and the wave
+ * counters) are read by the finale's own "is the field empty" test. Side-loaded, they are
+ * zero, the mission thinks it has already been won, `$112A` increments `$1FFF` on the first
+ * pass and the whole thing is over in 140 of its 1,369 addresses.
+ *
+ * So this walks the real route. Reaching the finale honestly means finishing a flight, and
+ * the exit that leads there is `SD PART2` line 175 - flights flown at or past the target -
+ * which is only tested when line 172's wave test has already passed. So the nine bytes that
+ * `$18DD` reads go to zero and the flight counter goes to the target, and the machine does
+ * the rest: `HYPERDRIVE 3`, `STARBASE`, `HYPERDRIVE 4`, `SD START2`, `SD PART3`. Nothing on
+ * that route waits for a key.
+ */
+/**
+ * `SD START2`'s setup, read off the disk rather than transcribed.
+ *
+ * It is the one program in the chain that is pure setup: four BLOADs and a run of POKEs, no
+ * input, no animation, no branch that depends on anything. So its effect can be reproduced
+ * exactly, and reproducing it is the difference between starting the finale's binary and
+ * starting the finale.
+ *
+ * Variables are resolved from the program's own `NAME = number` assignments, so a POKE
+ * written `POKE XI + 1,253` resolves through line 3's `XI = 33046`. The one pair it cannot
+ * read literally is line 129's `POKE 33344,LO% : POKE 33345,HI%`, which lines 10-13 compute
+ * from `BV% = 5000`: `HI%` is an integer variable so `5000/256` truncates to 19, and `LO%`
+ * is `5000 - 19*256`.
+ */
+export function sdStart2Setup(disk) {
+  const f = disk.files.find((x) => x.name === 'SD START2');
+  const raw = disk.read(f);
+  const mem = new Uint8Array(0x10000);
+  for (let i = 0; i < raw.len; i++) mem[raw.addr + i] = raw.data[i];
+  const lines = listProgram(mem, 0x801);
+
+  const vars = new Map();
+  for (const l of lines) {
+    for (const m of l.text.matchAll(/([A-Z][A-Z0-9]?)\s*=\s*(-?\s*\d+)(?!\s*\d)/g)) {
+      if (!vars.has(m[1])) vars.set(m[1], Number(m[2].replace(/\s/g, '')));
+    }
+  }
+  const BV = 5000;
+  const HI = Math.trunc(BV / 256);
+  vars.set('LO%', BV - HI * 256);
+  vars.set('HI%', HI);
+
+  const resolve = (t) => {
+    const s = t.replace(/\s/g, '');
+    if (/^-?\d+$/.test(s)) return Number(s);
+    const m = s.match(/^([A-Z][A-Z0-9]?%?)(?:\+(\d+))?$/);
+    if (m && vars.has(m[1])) return vars.get(m[1]) + (m[2] ? Number(m[2]) : 0);
+    return null;
+  };
+
+  const pokes = [];
+  const unresolved = [];
+  for (const l of lines) {
+    for (const m of l.text.matchAll(/POKE\s*([^,]+?)\s*,\s*([A-Z0-9%+\-\s]+?)(?=\s*(?::|$))/g)) {
+      const addr = resolve(m[1]);
+      const value = resolve(m[2]);
+      if (addr === null || value === null) { unresolved.push(`${l.num}: ${m[0]}`); continue; }
+      pokes.push({ line: l.num, addr: addr < 0 ? addr + 0x10000 : addr, value: value & 0xff });
+    }
+  }
+  // Line 2's four BLOADs, with the two address overrides the line carries.
+  const loads = [
+    { file: 'A2-3D2', at: 0x6000 }, { file: 'SV DATA2', at: null },
+    { file: 'BASE STAR DATA', at: null }, { file: 'HEADING DATA', at: 35275 },
+  ];
+  return { pokes, loads, unresolved, vars };
+}
+
+/**
+ * Put the machine into the final mission, with the state `SD START2` and `SD PART3` leave.
+ *
+ * **Why not just play the chain.** The honest route is to finish a flight and let `SD PART2`
+ * line 175 send it to `HYPERDRIVE 3`, `STARBASE`, `HYPERDRIVE 4`, `SD START2`, `SD PART3`.
+ * That was tried first and it gets as far as `STARBASE`, where it stops: A2-3D2 enters a tight
+ * loop around `$664A` during the docking scene and never leaves it, through six emulated
+ * minutes against the thirty-five renders the program asks for. That is recorded as an open
+ * question of its own; it is not the finale's problem and the finale should not wait for it.
+ *
+ * **What this does instead.** `SD START2` is the one program on that route which is pure
+ * setup - four BLOADs and seventeen POKEs, no input, no animation, no branch that depends on
+ * anything - so its effect can be reproduced exactly, and `sdStart2Setup` reads it off the
+ * disk rather than trusting a transcription. Then `SD PART3` lines 164 and 170, which are two
+ * BRUNs and nothing else.
+ *
+ * The difference from side-loading the files and jumping in, which is what the first pass at
+ * this did, is those seventeen POKEs. Two of them are `$814B` (object 3's count) and the wave
+ * counters, which the finale's own "is the field empty" test reads: left at zero the mission
+ * believes it has already been won, `$112A` increments `$1FFF` on the first pass, and it is
+ * over before it starts.
+ *
+ * `toFlight` first, because it is what gets DOS up and the machine warm; the loads below then
+ * replace the main mission's files exactly as `SD START2` replaces them.
+ */
+export async function toFinale(a2, { difficulty = 1 } = {}) {
+  const flight = await toFlight(a2, { difficulty });
+  const disk = openDisk(DISK);
+  const setup = sdStart2Setup(disk);
+  if (setup.unresolved.length) {
+    throw new Error(`SD START2 has POKEs this cannot resolve: ${setup.unresolved.join('; ')}`);
+  }
+
+  // The order is the chain's own, and it matters: SD START2's four BLOADs, then its POKEs,
+  // and only then SD PART3's two BRUNs. Four of the POKEs are to $1FF7-$1FFF, which the last
+  // BRUN's overshoot lands on, so applying them afterwards would keep bytes the machine
+  // throws away. Written from the sector chain with the header stripped and the slack kept,
+  // which is what DOS puts there - see game/dos.js.
+  const image = ({ file, at }) => {
+    const f = disk.read(disk.files.find((x) => x.name === file));
+    return { name: file, addr: at ?? f.addr, raw: [...f.raw] };
+  };
+  const first = setup.loads.map(image);                                  // SD START2 line 2
+  const then = [{ file: 'PART1.OBJ0', at: null }, { file: FINALE, at: null }].map(image);
+
+  await a2.ev(`(() => {
+    const wr = window.M.wr;
+    const put = (set) => { for (const f of set) {
+      for (let i = 4; i < f.raw.length; i++) wr(f.addr - 4 + i, f.raw[i]);
+    } };
+    put(${JSON.stringify(first)});
+    for (const p of ${JSON.stringify(setup.pokes)}) wr(p.addr, p.value); // lines 4 to 155
+    put(${JSON.stringify(then)});                                        // SD PART3 164, 170
+    return 1;
+  })()`);
+
+  return { difficulty: flight.difficulty, setup, entry: FINALE_ENTRY };
+}
+
+/** `$0957` - where `BASE STAR.OBJ0` is entered, the same address the main mission uses. */
+export const FINALE_ENTRY = 0x0957;
 
 /** Install the experiment harness in the page. Call once, after toFlight. */
 export async function arm(a2) {

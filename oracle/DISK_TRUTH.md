@@ -2280,13 +2280,49 @@ nothing on screen would say so.
 `INITIALS` tests it against 1: a game that reached both sites would be won and pay no bonus.
 Whether both can be reached in one mission is not established.
 
-### What is not established
+### Getting it into a real mission
 
-Running the binary with its files loaded gets it started - it renders, it moves the display
-list - but **only 140 of its 1,369 addresses run**, and `$1FFF` comes back as 1 because the
-harness does not reproduce the state `SD PART3` and the BASIC leave behind, so `$093E` and
-`$814B` are zero and `$112A` is reached on the first pass. Getting it into a real mission is
-the first thing a port of it needs.
+~~Running the binary with its files loaded gets it started but only 140 of its 1,369 addresses
+run.~~ **Answered.** The missing piece was exactly what the previous paragraph guessed, and
+it is seventeen POKEs.
+
+`SD START2` is the one program on the route that is pure setup: four BLOADs and seventeen
+POKEs, no input, no animation, no branch that depends on anything. `exercise.mjs`'s
+`sdStart2Setup` reads them off the disk - variables resolved through the program's own
+`NAME = number` assignments, so `POKE XI + 1,253` resolves through line 3's `XI = 33046`, and
+line 129's `LO%`/`HI%` through lines 10-13 with `BV% = 5000` - and `toFinale` applies them in
+the chain's own order: the four BLOADs, then the POKEs, then `SD PART3`'s two BRUNs. The order
+is not cosmetic; four of the POKEs are to `$1FF7`-`$1FFF`, which the last BRUN's overshoot
+lands on.
+
+| | side-loaded | with `SD START2`'s POKEs |
+|---|---|---|
+| addresses reached | 147 | **542** of 1,369 |
+| `$1FFF` after the run | **1** - already won | 0 |
+| `$10A7` / `$112A` reached | yes, first pass | no |
+
+The decisive POKE is line 130's `POKE 33099,255` - `$814B`, object 3's count - together with
+line 4 zeroing the wave counters. Those are the bytes the finale's own "is the field empty"
+test reads, and at zero the mission believes it has already been won. `probe_basestar.mjs`
+holds both sides: the run, and the same run without the POKEs as a control.
+
+542 of 1,369 is where it settles and it stays there over 80M cycles and 156 renders, because
+the remaining code is the damage, kill and firing paths. The main mission with a centred
+paddle and no trigger looks the same. **This is now a parity target**; transliterating the
+binary against it is the next step.
+
+### The route is not walkable, and that is a separate bug
+
+The honest way in is to finish a flight and let `SD PART2` line 175 route to `HYPERDRIVE 3`,
+`STARBASE`, `HYPERDRIVE 4`, `SD START2`, `SD PART3`. Tried, and it gets three programs along:
+the flight exits, `HYPERDRIVE 3` sets `$1FF3` to 120, and `STARBASE` loads and starts its
+docking scene - **and never finishes it**. A2-3D2 enters a tight loop around `$664A`-`$665C`
+and stays there through six emulated minutes, against the thirty-five renders `STARBASE`'s own
+loop asks for (`Z` steps 45 from -1500 to -400, then `JM` counts ten more). Nothing waits for
+a key anywhere on that route.
+
+Whether that is the renderer, the starbase scene, or damage done by the nine bytes this
+harness pokes to make the flight exit, is **not established**. It is open question 17.
 
 ---
 
@@ -2551,3 +2587,10 @@ promoted to fact.
     the same, flickers at half rate, or keeps it, is **unmeasured**: `DEMO` has still never
     been walked in the oracle, and this is now the reason to walk it. Until it is, the port's
     attract mode draws the right words and may well show them for the wrong length of time.
+
+17. **Why `STARBASE` never finishes its docking scene in the machine.** Reached through the
+    real chain it loads, starts rendering and then sits in A2-3D2 around `$664A` for six
+    emulated minutes. Its own loop asks for about thirty-five renders. The suspect list is
+    the renderer, the starbase scene itself, and the nine bytes `toFinale`'s first attempt
+    poked to make the flight exit - and nothing distinguishes them yet. It is why the finale
+    is reached through `SD START2`'s setup rather than by walking the chain.
