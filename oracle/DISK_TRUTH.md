@@ -2308,8 +2308,50 @@ holds both sides: the run, and the same run without the POKEs as a control.
 
 542 of 1,369 is where it settles and it stays there over 80M cycles and 156 renders, because
 the remaining code is the damage, kill and firing paths. The main mission with a centred
-paddle and no trigger looks the same. **This is now a parity target**; transliterating the
-binary against it is the next step.
+paddle and no trigger looks the same.
+
+### The first block transliterated: how the mission ends
+
+`port/src/game/finale.js`, held by `parity_finale.mjs` (9 checks, 180 swept cases).
+
+**The two binaries are not the same code.** They share 105 bytes - the MATH directory - and
+nothing else: 4% of 5,890 match, and every routine the port knows by address in the main
+mission sits somewhere else here. "The same engine" means the same MATH entries, the same
+renderer, the same paddle read; it does not mean reuse. So the finale is transliterated.
+
+`$10E5`-`$112E` is the frame's last block and the finale's answer to `$18D6`/`$18DD`. It has
+four ways out, and the harness compares **which address the machine leaves through**:
+
+| exit | meaning |
+|---|---|
+| `$10EC RTS` | two hits - the mission is over |
+| `$1104 JMP $112E` | a stage finished |
+| `$112D RTS` | the field is empty - the base star is dead |
+| `$112E JMP $09A7` | round again |
+
+Three things in it differ from the main mission and none of them shows on screen:
+
+- **Two hits, tested for equality.** `$10E8 CPX #$02 / BNE` leaves only at exactly two, where
+  `$1CEE CPX #$04 / BCC` leaves at four *or more*. Nothing increments by more than one, so
+  they agree in play - but they are different programs, and the control that writes `>= 2`
+  fails at three hits.
+- **No quit flag.** The main mission writes `$4D` into zero page `$00` and tests it at
+  `$18D6`; the finale simply `RTS`es out of the mission from inside the frame. `$00` is not
+  used here at all.
+- **The pause compares against `$7F`**, where `$1929` compares against `$80`. One byte. The
+  keyboard sets bit 7 while a key is pending, so the two agree in ordinary play and part only
+  on exactly `$7F` - a cleared latch whose last key was DEL. Kept.
+
+The win is two bytes: `$814B` (object 3's count) and `$093E` (class 1's debris) both zero.
+That is the whole of "is the field empty", and it is why the mission has to be set up before
+it is run. `$1FFF` is incremented rather than stored, so a mission reaching both this and
+`$10A7` would leave it at 2 - which `SD PART3` reads as won and `INITIALS` reads as no bonus.
+
+The frame top is **`$09A7`**, where the main mission's is `$09A3`.
+
+What is still unported is everything the block calls out to: `$1131` and `$12AB` at the
+fifteenth stage, and the mission's own damage, kill and firing code. They are named in
+`finale.js` rather than dropped.
 
 ### The route is not walkable, and that is a separate bug
 
