@@ -2239,7 +2239,11 @@ promoted to fact.
    Only a clean dump can answer it.
 2. **Whether the change changed anything else** — the RWTS, a protection check inside a
    binary, the contents of `INITIALS.DAT`. Comparing against a second image is the only
-   honest way to answer it, and that has not changed. One thing was tried and is recorded
+   honest way to answer it, and **there is no second image**. The archive.org item
+   `a2_asimov_star_destroyer` was the standing lead; its `star_destroyer.dsk` is
+   byte-for-byte identical to this one, md5 `e48dd77ffa4b971bbaf75ab722424c7a`, and a search
+   of archive.org by identifier and by publisher returns no other Apple II Star Destroyer at
+   all. Every copy in circulation is this copy. One thing was tried and is recorded
    here as *not* an answer: tracks 0-2, which hold the DOS image, differ from a stock
    DOS 3.3 in 5,682 of 12,288 bytes. That sounds damning and proves nothing. DOS 3.3 ships
    in several releases, commercial disks routinely carry a patched or trimmed DOS, and the

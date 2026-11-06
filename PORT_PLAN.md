@@ -712,6 +712,13 @@ The owner is looking for one. If it arrives:
 4. It may also carry `STAR DESTROYER.ASM` — Robbins's own 25-sector assembly source, which
    was deleted from our copy and is unrecoverable from it.
 
-One lead, unverified: archive.org item **`a2_asimov_star_destroyer`** holds a
-`star_destroyer.dsk` of 143,360 bytes with twenty screenshots. Same Asimov lineage as our
-copy, so it may well be the same change — nobody has diffed them.
+~~One lead, unverified: archive.org item `a2_asimov_star_destroyer`.~~ **Diffed, and it is
+the same file.** `star_destroyer.dsk` from that item is byte-for-byte identical to
+`disk/STAR_DESTROYER.dsk` — md5 `e48dd77ffa4b971bbaf75ab722424c7a` for both. Not a second
+source.
+
+It is also the **only** Apple II Star Destroyer item on archive.org: a search by identifier
+and by publisher returns that one and nothing else. So there is no second image in
+circulation to compare against, and the questions that need one — what the original title
+screens were, what the four deleted files held, and whether the original's slack was
+harmless — can only be answered from a genuine original disk.
