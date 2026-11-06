@@ -2250,15 +2250,38 @@ promoted to fact.
    so all of them carry a trimmed or partial DOS, which is what a commercial game does to get
    its memory back.
 
-   **What a real DOS 3.3 System Master would settle**, and nothing here can: whether the
-   routine at `$BC83`-`$BCB3` is stock. That is the code that makes a `BLOAD` overshoot -
-   `$BC9B INC $B7F1` bumps the IOB's buffer one page per sector, so every sector after the
-   first is read straight to the destination, the last one included. It is the direct cause
-   of the thirteen interface bytes being destroyed, so whether the change put it there is the
-   difference between "this disk was broken by whoever made it" and "this is what DOS does".
-   The routine reads as original design rather than as a patch - it sits inline, with the
-   file's track/sector list indexed off `$40`/`$41` - but that is a reading, not a
-   measurement, and it stays an open question until there is a reference worth diffing.
+   **The routine in question** is `$BC83`-`$BCB3`, and the instruction is
+   `$BC9B INC $B7F1`: it bumps the IOB's buffer one page per sector, so every sector after
+   the first is read straight to the destination, the last one included. That is the direct
+   cause of the thirteen interface bytes being destroyed, so whether the change put it there
+   is the difference between "this disk was broken by whoever made it" and "this is what DOS
+   does".
+
+   **Three candidate references were tried and all three are unusable.** The test for whether
+   a candidate is worth diffing takes one line - does its image contain `STA $B7EC`
+   (`8D EC B7`) in plain form anywhere? A DOS with a file manager must.
+
+   | candidate | `STA $B7EC` | why it fails |
+   |---|---|---|
+   | `dos33.dsk` | none | 289 of 560 sectors blank; no IOB instruction anywhere |
+   | `dos33master.json`, labelled "DOS 3.3 Master" | none | plain sector data with a correct DOS boot sector, but track 2 holds 768 non-zero bytes - the DOS image is not all there |
+   | `Bolo.dsk`, `Neptune.dsk` | none / none | trimmed loaders, as a commercial game does to get its memory back |
+
+   **The one useful comparison** is Space Vikings in 4am's release, which demonstrably shares a
+   DOS lineage with this disk: 19 of their 48 sectors on tracks 0-2 are byte-identical,
+   including `$BC4B LDA $B5C9 / STA $B7F0 / LDA $B5CA / STA $B7F1` at T1/S14, which is the
+   routine that **sets** the buffer once. Both disks have that. Only this one has the routine
+   that **walks** it, and Space Vikings has no `INC $B7F1` anywhere.
+
+   That is suggestive and it is not conclusive, in the direction people will not expect:
+   Space Vikings has *fewer* IOB instructions than this disk, 32 against 56, so the more
+   likely reading is that 4am replaced DOS with something smaller rather than that this disk
+   gained a routine. A change that strips DOS is ordinary; one that adds a file-manager
+   routine is not.
+
+   So this stays open, and the next person needs **a complete DOS 3.3 image whose tracks 0-2
+   contain `STA $B7EC`**. None of the four images to hand does. Run that one-line test on a
+   candidate before spending anything else on it.
 3. ~~**Opcode 3.**~~ Answered: a line back to the saved previous point, which it leaves
    in place. Handler `$62C0`.
 4. ~~**What `CALL $6000` does with all this.**~~ Answered above, and so is everything that
