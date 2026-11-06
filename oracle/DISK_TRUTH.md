@@ -2239,6 +2239,26 @@ promoted to fact.
    author had every reason to modify his own. It is not evidence about whoever modified it. (The
    reference image used was `dos33.dsk` from the Space Vikings tree, which is not in this
    repository, so this is not a reproducible probe and is not one.)
+
+   **And that reference is worse than non-reproducible: it has no DOS file manager in it.**
+   Counting instructions anywhere in each image that address the RWTS IOB at `$B7E8`-`$B7F4`
+   - `STA`, `LDA`, `LDX`, `INC`, `STX` against those twelve bytes - gives 56 for this disk
+   and **0** for `dos33.dsk`, which also has 289 of its 560 sectors blank. So the 5,682-byte
+   figure was a diff against something that is not a working DOS, and it says nothing at all
+   rather than merely saying little. Four other images to hand are no better for the purpose:
+   Space Vikings in 4am's release has 32 such instructions, `Bolo` has 4 and `Neptune` has 0,
+   so all of them carry a trimmed or partial DOS, which is what a commercial game does to get
+   its memory back.
+
+   **What a real DOS 3.3 System Master would settle**, and nothing here can: whether the
+   routine at `$BC83`-`$BCB3` is stock. That is the code that makes a `BLOAD` overshoot -
+   `$BC9B INC $B7F1` bumps the IOB's buffer one page per sector, so every sector after the
+   first is read straight to the destination, the last one included. It is the direct cause
+   of the thirteen interface bytes being destroyed, so whether the change put it there is the
+   difference between "this disk was broken by whoever made it" and "this is what DOS does".
+   The routine reads as original design rather than as a patch - it sits inline, with the
+   file's track/sector list indexed off `$40`/`$41` - but that is a reading, not a
+   measurement, and it stays an open question until there is a reference worth diffing.
 3. ~~**Opcode 3.**~~ Answered: a line back to the saved previous point, which it leaves
    in place. Handler `$62C0`.
 4. ~~**What `CALL $6000` does with all this.**~~ Answered above, and so is everything that
