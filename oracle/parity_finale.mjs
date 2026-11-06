@@ -21,7 +21,9 @@
 import { openOracle } from './a2.mjs';
 import { toFinale } from './exercise.mjs';
 import { endOfFrame, pauses, DONE, HITS, FATAL, PROGRESS, STAGE, BASE_STAR, OBJ3_COUNT,
-  DEBRIS1, FRAME_TOP, STAGE_CALLS } from '../port/src/game/finale.js';
+  DEBRIS1, FRAME_TOP, STAGE_CALLS, SHLD, WARP, MSL, EMPTY, rammed, missileHit, systems,
+  secondEight } from '../port/src/game/finale.js';
+import { shrink } from '../port/src/game/damage.js';
 
 const results = [];
 const check = (what, ok, detail = '') => {
@@ -140,6 +142,93 @@ try {
     check('with a key really pending, the machine stops in the pause and the port agrees',
       pressed.exit === -1 && pauses(pressed.latch) === true,
       `$C000 held ${hx(pressed.latch, 2)} and the block sat in $1114 waiting for the next key`);
+  }
+
+  // ----------------------------------------------------------- the damage block ----------
+  // Same method as parity_damage.mjs: sweep the shield one unit at a time across its whole
+  // boundary, because that is where all the interesting behaviour is - which shrink lands,
+  // which one gets stored, and whether the systems take it instead. Each entry point is run
+  // as a subroutine and the four bytes it can touch are compared.
+  console.log('\n=== the damage block ===');
+  await a2.ev(`(() => {
+    const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+    const WATCH = [${SHLD}, ${WARP}, ${MSL}, ${HITS}];
+    window.M.dmg = (addr, pokes) => {
+      const before = cpu.getState();
+      const snap = {}; for (const a of WATCH) snap[a] = rd(a);
+      for (const [a, v] of Object.entries(pokes)) wr(Number(a), v & 0xff);
+      const seeded = {}; for (const a of WATCH) seeded[a] = rd(a);
+      const st = cpu.getState();
+      wr(0x100 + st.sp, 0xFF); st.sp = (st.sp - 1) & 0xff;
+      wr(0x100 + st.sp, 0xFE); st.sp = (st.sp - 1) & 0xff;
+      st.pc = addr; cpu.setState(st);
+      const calls = [];
+      cpu.stepCyclesDebug(2000000, () => {
+        const pc = cpu.getPC();
+        if (pc === 0x171D || pc === 0x1613 || pc === 0x1632 || pc === 0x15F5) calls.push(pc);
+        if (pc === 0xFFFF) return true;
+      });
+      const after = {}; for (const a of WATCH) after[a] = rd(a);
+      for (const [a, v] of Object.entries(snap)) wr(Number(a), v);
+      cpu.setState(before);
+      return { seeded, after, calls };
+    };
+    return 'ok';
+  })()`);
+  const dmg = (addr, pokes) => a2.ev('JSON.stringify(window.M.dmg(' + addr + ','
+    + JSON.stringify(pokes) + '))').then(JSON.parse);
+
+  for (const [name, addr, fn] of [
+    ['$1486 the ram', 0x1486, rammed],
+    ['$14EE the missile', 0x14EE, missileHit],
+    ['$14BF the systems', 0x14BF, systems],
+    ['$149E the second eight', 0x149E, secondEight],
+  ]) {
+    const wrong = [];
+    let n = 0, fatal = 0;
+    for (let shield = EMPTY; shield <= EMPTY + 20 && wrong.length < 3; shield++) {
+      for (const hits of [0, 1, 2]) {
+        for (const bars of [[0xFF, 0xFF], [EMPTY, 0xFF], [EMPTY, EMPTY]]) {
+          const pokes = { [SHLD]: shield, [MSL]: bars[0], [WARP]: bars[1], [HITS]: hits };
+          const r = await dmg(addr, pokes);
+          const mem = new Uint8Array(0x10000);
+          for (const [a, v] of Object.entries(r.seeded)) mem[a] = v;
+          const got = fn(mem, shrink);
+          n++;
+          if (got.fatal) fatal++;
+          const why = `shield ${shield} hits ${hits} bars ${bars}`;
+          let said = false;
+          for (const a of [SHLD, WARP, MSL, HITS]) {
+            if (mem[a] !== r.after[a]) {
+              wrong.push(`${why}: ${hx(a)} port ${mem[a]} machine ${r.after[a]}`);
+              said = true;
+              break;
+            }
+          }
+          if (!said && got.calls.join() !== r.calls.join()) {
+            wrong.push(`${why}: calls ${got.calls} vs ${r.calls}`);
+          }
+        }
+      }
+    }
+    check(`${name} agrees across the shield's whole boundary`,
+      wrong.length === 0, wrong.slice(0, 2).join('; ')
+        || `${n} cases, ${fatal} of them fatal`);
+  }
+
+  // The two readings that would look right and be wrong.
+  {
+    const ram = await dmg(0x1486, { [SHLD]: 0xFF, [MSL]: 0xFF, [WARP]: 0xFF, [HITS]: 0 });
+    check('a ram costs EIGHT off the shield, not the main mission\'s sixteen',
+      0xFF - ram.after[SHLD] === 8,
+      `$FF to ${ram.after[SHLD]} - $149A is CPY #$0A against a primitive that returns 1 to 4,`
+        + ' so the second eight is never the ram\'s');
+
+    const miss = await dmg(0x14EE, { [SHLD]: 0xFF, [MSL]: 0xFF, [WARP]: 0xFF, [HITS]: 2 });
+    check('and a missile SETS the hit count to one, where everything else raises it',
+      miss.after[HITS] === 1,
+      `two went in and ${miss.after[HITS]} came out - $14B2 LDA #$01 / STA $0933, which`
+        + ' nothing in the main mission does');
   }
 
   // ------------------------------------------------------------------ controls ------------

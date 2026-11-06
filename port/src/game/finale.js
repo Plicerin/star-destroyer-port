@@ -121,3 +121,109 @@ export function endOfFrame(mem, { latch = 0 } = {}) {
   }
   return { done: DONE.running, paused, calls, stage };       // $112E JMP $09A7
 }
+
+// ---------------------------------------------------------------------------------------
+// The damage block, $1476-$14FA.
+//
+// The shrink primitive at `$1476` is logic-identical to the main mission's `$1C89` -
+// `LDY #$01 / DEX / CPX #$C7 / BEQ / CPY #$04 / BEQ / INY / JMP` - same floor, same four
+// steps, so `damage.js`'s `shrink` is reused rather than rewritten. Everything around it is
+// at different addresses and two pieces of it behave differently.
+//
+// **The shield comes off in two blocks of eight, and the ram only ever gets the first.**
+// `$1486` shrinks twice, stores, and then tests `CPY #$0A` before falling into `$149E` for
+// the second eight. `$1476` returns Y between 1 and 4 and can return nothing else, so that
+// test is never equal and the ram always branches away to the systems instead. The main
+// mission's twin test is `CPY #$04`, which is exactly what the primitive can return. One
+// digit, and it is the difference between a ram costing sixteen and a ram costing eight.
+//
+// `$149E` is not dead, though: **the missile path jumps straight into it** - `$14EE` tests
+// the shield against `$C8` and `$14F8` is `JMP $149E`. So the second eight is the missile's,
+// not the ram's second helping.
+//
+// **And the missile sets the hit count rather than raising it.** `$14B2 LDA #$01 / STA
+// $0933`, unconditionally, in the middle of `$149E`. A missile landing on a healthy shield
+// therefore puts the count at exactly 1 - which knocks a count of 2 back down to 1, and the
+// mission ends at exactly 2. Nothing in the main mission does this. It is written here as
+// the store it is.
+//
+// **Two fatal tests, doing different jobs.** `$14E0 CPX #$02 / BCC` is a threshold: at two
+// or more the systems block jumps to `$171D`, which is `JSR $1797` (display teardown through
+// `$C054` and `$C056`), two sound bursts and an `RTS` - no state at all, not even a quit
+// flag. The mission actually ends at `$10E8 CPX #$02 / BNE` in the frame block above. So the
+// damage block plays the death and the frame ends the mission.
+
+/** The three panel bars, at the same addresses as the main mission's: `SV DATA2` differs
+ *  from `SV DATA` in eight bytes and all eight are shape pointers, so the panel does not
+ *  move. */
+export const SHLD = 0x81DD;
+export const WARP = 0x81F3;
+export const MSL = 0x8209;
+
+/** `CPX #$C7` - the same floor the main mission uses. */
+export const EMPTY = 0xC7;
+
+/** `CPX #$02 / BCC` at `$14E0`. A threshold, unlike the frame's equality test. */
+export const FATAL_DAMAGE = 2;
+
+/** `$149A CPY #$0A`, against a primitive that returns at most 4. */
+export const RAM_SECOND_STAGE = 0x0A;
+
+/** `$14B7 CPY #$04` - this one the primitive can return, so this branch is live. */
+export const MISSILE_FULL = 0x04;
+
+/** `LDA #$01` at `$14B2`: what the missile path puts in the hit count. */
+export const MISSILE_SETS = 1;
+
+/** What each outcome would have called. None of these is ported. */
+export const CALLS = {
+  /** $171D - teardown then two bursts, and no state. */
+  destroyed: 0x171D,
+  /** $1613 and $1632 - a systems hit that was not fatal. */
+  systems: [0x1613, 0x1632],
+  /** $15F5 - the missile block's own sound, when its second shrink took a full four. */
+  missileHeld: 0x15F5,
+};
+
+/** `$14BF` - the systems take it: four off the missile bar, four off warp, then the count. */
+export function systems(mem, shrink) {
+  for (const bar of [MSL, WARP]) {                           // $14BF, $14CC
+    if (mem[bar] !== EMPTY) mem[bar] = shrink(mem[bar]).value;
+  }
+  mem[HITS] = (mem[HITS] + 1) & 0xff;                        // $14D9 LDX / INX / STX
+  if (mem[HITS] >= FATAL_DAMAGE) {                           // $14E0 CPX #$02 / BCC
+    return { absorbed: false, fatal: true, calls: [CALLS.destroyed] };  // $14E4 JMP $171D
+  }
+  return { absorbed: false, fatal: false, calls: [...CALLS.systems] };  // $14E7, $14EA
+}
+
+/** `$149E` - the second eight, which only the missile reaches. */
+export function secondEight(mem, shrink) {
+  if (mem[SHLD] === EMPTY) return systems(mem, shrink);      // $14A1
+  const first = shrink(mem[SHLD]);
+  if (first.value === EMPTY) return systems(mem, shrink);    // $14A8
+  const second = shrink(first.value);
+  mem[SHLD] = second.value;                                  // $14AF
+  mem[HITS] = MISSILE_SETS;                                  // $14B2-$14B4, unconditional
+  if (second.steps !== MISSILE_FULL) return systems(mem, shrink);        // $14B7
+  return { absorbed: true, fatal: false, calls: [CALLS.missileHeld] };   // $14BB, $14BE RTS
+}
+
+/** `$1486` - an enemy reached the ship. Eight off the shield, then the systems. */
+export function rammed(mem, shrink) {
+  if (mem[SHLD] === EMPTY) return systems(mem, shrink);      // $1489
+  const first = shrink(mem[SHLD]);
+  if (first.value === EMPTY) return systems(mem, shrink);    // $1490
+  const second = shrink(first.value);
+  mem[SHLD] = second.value;                                  // $1497
+  // $149A CPY #$0A against a Y of 1 to 4. Never equal, so this always goes to the systems
+  // and never falls into the second eight. Written as the comparison it is.
+  if (second.steps !== RAM_SECOND_STAGE) return systems(mem, shrink);
+  return secondEight(mem, shrink);
+}
+
+/** `$14EE` - a missile reached the ship. `CPX #$C8 / BCS`, then `$14F8 JMP $149E`. */
+export function missileHit(mem, shrink) {
+  if (mem[SHLD] >= EMPTY + 1) return secondEight(mem, shrink);  // $14F1 / $14F8
+  return systems(mem, shrink);                                  // $14F5
+}

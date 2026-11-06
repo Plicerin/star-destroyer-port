@@ -2349,9 +2349,41 @@ it is run. `$1FFF` is incremented rather than stored, so a mission reaching both
 
 The frame top is **`$09A7`**, where the main mission's is `$09A3`.
 
-What is still unported is everything the block calls out to: `$1131` and `$12AB` at the
-fifteenth stage, and the mission's own damage, kill and firing code. They are named in
-`finale.js` rather than dropped.
+### The damage block, $1476-$14FA
+
+The shrink primitive at `$1476` is **logic-identical** to `$1C89` - `LDY #$01 / DEX /
+CPX #$C7 / BEQ / CPY #$04 / BEQ / INY / JMP`, same floor, same four steps - so `damage.js`'s
+`shrink` is reused rather than rewritten. Everything around it is at different addresses, and
+two pieces of it behave differently in ways that matter.
+
+**A ram costs eight, not sixteen.** `$1486` shrinks the shield twice, stores, then tests
+`CPY #$0A` before falling into `$149E` for a second eight. `$1476` returns Y between 1 and 4
+and can return nothing else, so that test is never equal, the branch is always taken and the
+ram goes to the systems instead. The main mission's twin test is `CPY #$04`, which is exactly
+what the primitive can return. One digit. Measured: `$FF` goes to 247.
+
+**`$149E` is not dead code, it is the missile's.** `$14EE` tests the shield against `$C8` and
+`$14F8` is `JMP $149E`, so the second eight belongs to the missile path. Which means ram and
+missile cost the same eight here, where in the main mission a ram costs twice a missile.
+
+**And the missile *sets* the hit count.** `$14B2 LDA #$01 / STA $0933`, unconditionally, in
+the middle of `$149E`. A missile landing on a healthy shield puts the count at exactly 1 -
+so it knocks a count of 2 back down to 1. Nothing in the main mission stores that byte at
+all; every other write to it is an increment. Measured: two goes in, one comes out.
+
+**Two fatal tests, doing different jobs.** `$14E0 CPX #$02 / BCC` is a threshold - at two or
+more the systems block jumps to `$171D`, which is `JSR $1797` (teardown through `$C054` and
+`$C056`), two sound bursts and an `RTS`. No state, not even a quit flag. The mission ends at
+`$10E8 CPX #$02 / BNE`, the equality test in the frame. So the damage block plays the death
+and the frame ends the mission, and a port with only one of the two would look right until
+the count managed to pass two.
+
+All four entry points - `$1486`, `$14EE`, `$14BF`, `$149E` - are held against the machine
+across the shield's whole boundary, 189 cases each.
+
+What is still unported is everything these call out to: `$1131` and `$12AB` at the fifteenth
+stage, `$171D`, `$1613`, `$1632` and `$15F5`, and the mission's kill and firing code. They
+are named in `finale.js` rather than dropped.
 
 ### The route is not walkable, and that is a separate bug
 
