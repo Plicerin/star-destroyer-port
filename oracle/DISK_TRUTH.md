@@ -2048,9 +2048,12 @@ it ends `SD PART2` line 172 finds the wave counters nonzero and goes to `MONOLIT
 is then seen doing exactly what it should with the wrong numbers: `$1E9D DEC $1FF9`,
 `$1ECE DEC $1FFA` and `$09A0 INC $1FF5`, three writes in three million instructions.
 
-**`BASE STAR.OBJ0` loads to the same address with the same length and its slack is all zeros.**
-Same program, same overshoot, harmless. That asymmetry is what says neither was intended: one
-file's slack breaks the game and the other's does not, and nothing chose either.
+**`BASE STAR.OBJ0` loads to the same address with the same length and the same 250-byte
+overshoot, and it is harmless.** 249 of its 250 slack bytes are zero; the one that is not sits
+at `$1FF1`, two bytes below the interface, so it touches nothing. Against the mission binary's
+230 non-zero slack bytes that is the whole asymmetry, and it is what says neither was intended:
+two files with identical geometry, one of which destroys the game and one of which does not,
+and nothing in either chose which.
 
 ### What the port does about it
 
