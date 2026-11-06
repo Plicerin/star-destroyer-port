@@ -656,6 +656,23 @@ throughout.
   the chain for the length of the tune and lets a key cut it short, which is what
   `$0371 BIT $C000` is for.
 
+## Phase 6.8 — the final mission  (established)
+
+`BASE STAR.OBJ0`, over `probe_basestar.mjs` (14 checks). The last part of the game that is
+gameplay rather than presentation, and the chain already reaches `SD PART3` and finds
+nothing.
+
+**Most of the port applies unchanged.** It is the same engine: same entry, same eleven MATH
+entries, same paddle, same renderer, two thirds the size. The scene differs in eight bytes -
+five objects' shape pointers - and the model file in a third of its bytes.
+
+What a port must not assume: **two hits end it, not four**; `$1FF7` is its progress counter
+and counts to fifteen; `$1FFF` is incremented rather than set, by two different sites.
+
+Next for it: get the binary into a real mission in the oracle. Loading its files and calling
+`$0957` runs only 140 of its 1,369 addresses, because the state `SD PART3` leaves behind is
+not reproduced - so there is no parity target yet.
+
 ## Phase 7 — the switches
 
 Only now, and all defaulting to off: save states, frame rate, gamepad. Each one measured

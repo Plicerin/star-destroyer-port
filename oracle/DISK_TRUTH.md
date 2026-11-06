@@ -2176,6 +2176,52 @@ starfield needs.
 
 ---
 
+## The final mission is the same engine with five different models
+
+`probe_basestar.mjs` (14 checks).
+
+`SD PART3` BRUNs `BASE STAR.OBJ0` after `SD START2` has loaded `SV DATA2` and
+`BASE STAR DATA` in place of the main mission's `SV DATA` and `MAIN DATA`. It is the last
+part of the game that is gameplay rather than presentation.
+
+**It is the same engine.** Same load address, same length, same entry at `$0957`, the first
+105 bytes identical - MATH's directory, which both read through. It calls the same eleven
+MATH entry points and no others, reads the paddle twice and calls the renderer three times,
+exactly as the main mission does. It is about two thirds the size: **1,369 instructions
+against 2,085**.
+
+**The scene is nearly the same scene.** `SV DATA2` differs from `SV DATA` in **eight bytes**
+of 491, and every one of them is at offset 11 or 12 of an object record - the shape pointer.
+Objects 1 to 5 draw different models and nothing else about the display list changes.
+`BASE STAR DATA` against `MAIN DATA` is 1,043 of 1,575 bytes identical, so the model file
+shares two thirds of its structure and differs in the shapes themselves.
+
+### Three rules a port would get silently wrong
+
+| | the main mission | the finale |
+|---|---|---|
+| hits before it ends | 4, at `$1CFC` | **2**, at `$10E8 CPX #$02` with an `RTS` under it |
+| `$1FF7` | written by `SD START2`, read by no BASIC | **its progress counter**, compared against 15 at `$10F0` |
+| the wave counts | rolled by `SD PART2` | hardcoded 5, 3, 3 at `$1803` - **but nothing reaches that routine** |
+
+Carrying the main mission's four hits across would make the finale twice as survivable, and
+nothing on screen would say so.
+
+**`$1FFF` is incremented, not set.** Two places mark the base star dead - `$10A7` and
+`$112A` - and both `INC`. So it can reach 2, and `SD PART3` tests it against 0 while
+`INITIALS` tests it against 1: a game that reached both sites would be won and pay no bonus.
+Whether both can be reached in one mission is not established.
+
+### What is not established
+
+Running the binary with its files loaded gets it started - it renders, it moves the display
+list - but **only 140 of its 1,369 addresses run**, and `$1FFF` comes back as 1 because the
+harness does not reproduce the state `SD PART3` and the BASIC leave behind, so `$093E` and
+`$814B` are zero and `$112A` is reached on the first pass. Getting it into a real mission is
+the first thing a port of it needs.
+
+---
+
 ## Open questions
 
 Things this pass did **not** establish. None of them should be guessed at later and quietly
