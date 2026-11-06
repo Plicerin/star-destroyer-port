@@ -210,7 +210,13 @@ export const CHAIN = {
   'SD RET': { to: null, orphan: true },
   'CLEAR SCORES': { to: null, orphan: true },
   INITIALS: { to: null },
-  DEMO: { to: null },
+  /**
+   * The attract mode, and the only place the game says what it is about. Its loop draws the
+   * narration out of the shape table and leaves on its own at line 210 - or at line 144 the
+   * moment a key is pressed, which is why nobody who played this ever saw it. Both exits are
+   * `RUN SELECT`. Held by `probe_shapetext.mjs`.
+   */
+  DEMO: { to: 'SELECT', from: 'DEMO 144 / 210' },
 };
 
 /** What each program zeroes or sets on its way in, from its own first lines. */

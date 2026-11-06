@@ -130,7 +130,9 @@ boot -> START -> LOGO1 --(a key within 500 BASIC iterations)--> SELECT -> SD -> 
   BATTLE! / PRESS ANY KEY TO SKIP TITLE PAGE.`), BLOADs `SD.PIC1` at `$2000` and `SD.PIC2`
   at `$4000`, chains `LOGO1`.
 - `LOGO1` BLOADs `TITLE.OBJ0`, then `FOR J = 1 TO 500` polling `$C000`. A key chains
-  `SELECT`; the loop running out does `CALL 2287`, `CALL 62454` and chains `DEMO`.
+  `SELECT`; the loop running out does `CALL 2287`, `CALL 62454` and chains `DEMO`. **The
+  branch nobody takes is the one with the story in it** - `DEMO` is where the game says what
+  it is about, drawn from the shape table. See *The ship is called the Beowulf*.
 - `SELECT` shows `DIFFICULTY.PIC` and chains `SD`.
 - `SD` chains `SD START`, after `BLOAD MATH`.
 
@@ -2229,6 +2231,79 @@ the first thing a port of it needs.
 
 ---
 
+## The ship is called the Beowulf
+
+`probe_shapetext.mjs`.
+
+For most of this file the game had no fiction in it. Nothing on the disk names the player's
+ship or the enemy, and a search of the image for a name finds nothing, so this file said
+there was nothing to find. **That was wrong, and the reason it was wrong is worth more than
+the correction.** `START` prints its one message to the *text* screen, so
+`PREPARE YOURSELF FOR THE ULTIMATE / STARSHIP BATTLE!` really does sit in the image as ASCII.
+Every other word the game shows is **drawn**, with `XDRAW`, out of one shape table - and the
+programs hold their text as lists of **shape numbers in `DATA` statements**. There is no text
+to search for. A screenshot of the original showed a sentence this file said did not exist.
+
+**The cipher is forced, not guessed.** `STARBASE` turns a digit into a shape number twice, by
+different routes, and they agree:
+
+| line | code | digit 0 | digit 9 |
+|---|---|---|---|
+| 2050 | `A = VAL(P$)` then `A = A + 2` | 2 | 11 |
+| 3020 | `A = ASC(MID$(A$,J,1))` then `A = A - 46` | 2 | 11 |
+
+`ASC - 46` makes the table a contiguous ASCII run starting at `/` (47). Then `?` is 17, and
+the letters in the `DATA` start at **18**, not 19 - so `@` is **left out**. That closes the
+account exactly: 1 + 10 + 6 + 26 = **43**, which is what the table's count byte declares,
+with nothing over and nothing short. ASCII `/` through `Z` less `@`.
+
+    shape 1      /
+    shapes 2-11  0 1 2 3 4 5 6 7 8 9      (ASC - 46)
+    shapes 12-17 : ; < = > ?              (ASC - 46)
+    shapes 18-43 A .. Z                   (ASC - 47)
+
+Confirmed against two words the derivation had no say in: `STARBASE` line 500 decodes to
+`STARBASE`, the program's own name, and `INITIALS` line 2999 to `FINAL SCORE`. `0` is a space
+and is never drawn (`DEMO` line 408, `STARBASE` line 208); `127` ends a row; `999` ends a
+block, and `STARBASE` adds `777`, which stops the read, draws the score box and resumes.
+
+**What it says is the whole of the game's story, and it is in `DEMO`** - the attract mode
+this file called "never walked":
+
+```
+DEMO 450   STAR DESTROYER
+DEMO 500   YOU ARE THE COMMANDER OF THE
+DEMO 510   STARSHIP BEOWULF
+DEMO 520   DESTROY THE ALIEN ARMADA
+DEMO 525   BEFORE THEY DESTROY YOU
+```
+
+So the player's ship is the **Beowulf** and the enemy is the **alien armada**. Nothing else
+on the disk names either, and no manual survives, so this is the only statement of what the
+game is about that exists.
+
+The port draws all 92 characters, in order, and leaves for `SELECT` on its own as the program
+does. **What is not established is how long they stay up.** `GOSUB 400` is called from inside
+the attract loop, which page-flips and renders 96 times while the text is on screen, and in
+the port the page is nearly empty by the end. That is open question 16, and it is the reason
+to finally walk `DEMO` in the oracle. `STARBASE` adds `STARBASE`, `DOCKING COMPLETE`, `SCORE` and
+`LEVEL`; `INITIALS` adds `FINAL SCORE`. That is the game's entire written vocabulary, and it
+uses **22 of the 26 letters** - no word in it contains a J, a Q, an X or a Z.
+
+**One bug falls out of reading it.** `STARBASE` line 2045 is `IF A = 8 THEN A = 9`, applied to
+the digit before the `+ 2`, so **every 8 in the docking score is drawn as a 9**: a score of
+800 reads 900. Shape 10 is a perfectly good 8 - rendered and compared against shape 9, closed
+top and bottom where the 9 is open - and the level-number routine at line 3020 draws it
+without any such guard. So it is a mistake in the original, not a workaround for a damaged
+glyph, and the port keeps it.
+
+The lesson for the rest of this file: **"a search of the disk finds nothing" is not a finding
+about the game.** It is a finding about the search, and this file has reached for that
+reasoning before. Where it says the game contains no X, the question to ask is whether X
+would be stored as bytes a search could match.
+
+---
+
 ## Open questions
 
 Things this pass did **not** establish. None of them should be guessed at later and quietly
@@ -2243,7 +2318,31 @@ promoted to fact.
    `a2_asimov_star_destroyer` was the standing lead; its `star_destroyer.dsk` is
    byte-for-byte identical to this one, md5 `e48dd77ffa4b971bbaf75ab722424c7a`, and a search
    of archive.org by identifier and by publisher returns no other Apple II Star Destroyer at
-   all. Every copy in circulation is this copy. One thing was tried and is recorded
+   all. Every copy in circulation is this copy.
+
+   Its fifty files were gone through rather than skimmed: the image, twenty-odd screenshots,
+   and metadata. **No manual, no documentation, no description beyond the word "star
+   destroyer".** The one substantial file is `a2_asimov_star_destroyer_meta.xml`, 24KB, whose
+   `notes` field holds a 2014 auto-analysis of the disk: disk info, the catalogue, and
+   detokenised listings of 21 Applesoft programs. Nothing in it about the game that this
+   repository does not already take off the disk itself.
+
+   It is worth something anyway, as **an independent reading of the same bytes from 2014**:
+
+   - the catalogue agrees exactly - 48 files, same types, same sector counts, **same order** -
+     and so do the free-sector count (10) and the volume number (254);
+   - the detokenised line numbers agree for **20 of the 21** programs, `SD PART2`'s
+     `= >` spelling of `>=` included;
+   - on `INITIALS` they do not, and **this repository's reader is the one that is right**.
+     It finds seven lines the 2014 tool dropped, a contiguous run from 5010 to 5052, and they
+     are coherent high-score-insertion code - `INSERT = 1`, the `FOR J = 8 TO 1 STEP -1`
+     that walks the table, and a stray `PRINT J` at 5051 that looks like the author's own
+     debugging left in. The 2014 listing skips straight from 380 to 5055.
+
+   The 2014 listings also drop the Ctrl-D from every DOS command, printing `"BRUNPART1.OBJ0"`
+   where this repository prints `"^DBRUNPART1.OBJ0"`. That byte is the whole of DOS's
+   interface from BASIC, so a listing without it reads as a program that prints filenames at
+   the screen. One thing was tried and is recorded
    here as *not* an answer: tracks 0-2, which hold the DOS image, differ from a stock
    DOS 3.3 in 5,682 of 12,288 bytes. That sounds damning and proves nothing. DOS 3.3 ships
    in several releases, commercial disks routinely carry a patched or trimmed DOS, and the
@@ -2350,8 +2449,12 @@ promoted to fact.
    supplied itself will tell you whatever you put there.
 10. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
    measured about when or in what format.
-11. **The `DEMO` path**, never walked. The chain around it is now established (above);
-    what `DEMO` itself does is not.
+11. ~~**The `DEMO` path**, never walked.~~ Partly answered, above, and it mattered more than
+    its place in this list suggested: `DEMO`'s `DATA` statements hold **the game's entire
+    fiction**, drawn from the shape table rather than printed, which is why no search of the
+    image ever found it. The player commands the starship *Beowulf* against an alien armada.
+    What is still unwalked is `DEMO`'s *animation* - whatever it draws between the sentences -
+    and whether it returns to `LOGO1` or loops.
 12. ~~**The world-to-view transform.**~~ Derived, above, and both routines under it are
     now transliterated and held by `parity_math.mjs` and `parity_view.mjs`.
 13. ~~**`MATH` (`$98F3`) and `HEADING DATA` (`$89CB`).**~~ Both answered, below. `MATH` is a
@@ -2381,3 +2484,11 @@ promoted to fact.
     a minute of flight. What is still unread is
     `$0905`-`$0907`, `$0911`-`$0914`, `$0918`-`$091E`, `$0925`, `$0927`-`$092A` and
     `$0933`-`$0937`.
+16. **Whether `DEMO`'s narration stays on the screen.** The sentences are drawn - the port
+    XDRAWs all 92 characters in order, and `probe_shapetext.mjs` holds that - but `DEMO`
+    draws them *from inside* its attract loop, which page-flips (`POKE 33040, 84 + OO`) and
+    makes 96 `CALL 24576`s while they are up. In the port the page is nearly bare by the time
+    `DEMO` leaves, so the text is being overwritten by later frames. Whether the machine does
+    the same, flickers at half rate, or keeps it, is **unmeasured**: `DEMO` has still never
+    been walked in the oracle, and this is now the reason to walk it. Until it is, the port's
+    attract mode draws the right words and may well show them for the wrong length of time.
