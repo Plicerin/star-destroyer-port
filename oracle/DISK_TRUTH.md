@@ -2472,24 +2472,36 @@ first `RTS`, with a branch or `JMP` landing inside the routine written as an off
 an address, and everything else - absolute operands, calls out - kept exactly. Same shape
 means same code at a different address.
 
-**14 of the finale's 33 routines are main-mission routines moved**, 208 instructions:
+**18 of the finale's 32 routines are main-mission routines moved**, 274 of its 556
+instructions. The match runs to a **fixpoint**: a `JSR` to a routine already known to be a
+relocation is rewritten through the mapping before the key is made, so two routines that are
+the same code except that each calls its own copy of a helper can match once the helper is
+known. Learning one helper lets its callers match, which can expose further callers; it
+settles after three rounds. A single pass finds 14 and misses both star pans, which differ
+from `$1B95` and `$1BD5` only in which wrap helper they name.
 
 | finale | main | | finale | main | | finale | main |
 |---|---|---|---|---|---|---|---|
-| `$1131` | `$1A1E` | | `$134D` | `$1B60` | | `$1478` | `$1C8B` |
-| `$12D5` | `$1AE8` | | `$16EC` | `$1EFA` | | `$140B` | `$1C1E` |
-| `$142A` | `$1C3D` | | `$1278` | `$1A8B` | | `$141F` | `$1C32` |
-| `$1318` | `$1B2B` | | `$12B4` | `$1AC7` | | `$12AB` | `$1ABE` |
-| | | | `$1476` | `$1C89` | | `$1797` | `$1FA9` |
+| `$1131` | `$1A1E` | | `$134D` | `$1B60` | | `$1476` | `$1C89` |
+| `$12D5` | `$1AE8` | | `$16EC` | `$1EFA` | | `$1478` | `$1C8B` |
+| `$142A` | `$1C3D` | | `$1278` | `$1A8B` | | `$140B` | `$1C1E` |
+| `$1382` | `$1B95` | | `$12B4` | `$1AC7` | | `$141F` | `$1C32` |
+| `$13C2` | `$1BD5` | | `$1402` | `$1C15` | | `$12AB` | `$1ABE` |
+| `$1318` | `$1B2B` | | `$1416` | `$1C29` | | `$1797` | `$1FA9` |
 
 And **every one of them is a routine the port already holds against the machine** -
 `controls.js`, `damage.js`, `dispatch.js`, `entities.js`, `kill.js`, `weapon.js`. They are not
 work; they are a lookup. Four of them had been written down in `finale.js` as gaps before
 anyone checked.
 
-That leaves **18 routines and 348 instructions** that are the finale's own, and the largest
-is `$1544` at 40. There is no monster routine in it: every one is of ordinary size, and the
-damage block is among them and already ported.
+That leaves **14 routines and 282 instructions** that are the finale's own, and the largest
+is `$1544` at 40. There is no monster routine in it. Of those fourteen:
+
+- **two are already ported** - `$1486` and `$14EE`, the damage block, 45 instructions;
+- **six are sound**, 105 instructions, every one of them reaching `$1544`, which is the
+  finale's own `$1D52`. Sound is Phase 6 everywhere in this port and the finale matches;
+- **six are gameplay still to write**: `$119E`, `$120B`, `$14FB`, `$17A0`, `$15AC` and
+  `$1591`, **132 instructions** between them.
 
 **The first version of this analysis said 19 routines and 694 instructions, with `$0D2A` at
 346 of them.** That was wrong and the way it was wrong is worth keeping. It found call targets

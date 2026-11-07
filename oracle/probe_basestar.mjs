@@ -197,7 +197,7 @@ console.log('\n=== how much of the finale is the main mission, relocated ===');
     const { starts } = traverse(mem, [ENTRY], { lo: f.addr, hi: f.addr + f.len });
     return { mem, lo: f.addr, hi: f.addr + f.len, starts };
   };
-  const shape = (img, entry) => {
+  const shape = (img, entry, map = new Map()) => {
     const insts = [];
     let a = entry;
     for (let i = 0; i < 400; i++) {
@@ -213,9 +213,14 @@ console.log('\n=== how much of the finale is the main mission, relocated ===');
       if (BRANCH.test(x.op)) {
         return `${x.op}+${x.bytes[1] > 127 ? x.bytes[1] - 256 : x.bytes[1]}`;
       }
-      if (x.op === 'JMP' && x.len === 3) {
-        const t = x.bytes[1] | (x.bytes[2] << 8);
-        return (t >= entry && t <= end + 2) ? `JMP@${t - entry}` : `JMP ${hx(t)}`;
+      const abs = x.len === 3 ? (x.bytes[1] | (x.bytes[2] << 8)) : -1;
+      if (x.op === 'JMP' && abs >= entry && abs <= end + 2) return `JMP@${abs - entry}`;
+      // A call to a routine already known to be a relocation is rewritten through the
+      // mapping, so two routines that are the same code except that each calls its own copy
+      // of a helper can match. That is why this runs to a fixpoint below rather than once:
+      // learning one helper lets its callers match, which can expose further callers.
+      if ((x.op === 'JSR' || x.op === 'JMP') && map.has(abs)) {
+        return `${x.op}=${hx(map.get(abs))}`;
       }
       return x.bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
     }).join(' ') };
@@ -232,17 +237,29 @@ console.log('\n=== how much of the finale is the main mission, relocated ===');
   };
 
   const bsImg = image(BS), sdImg = image(SD);
+  const bsT = targets(bsImg), sdT = targets(sdImg);
   const main = new Map();
-  for (const t of targets(sdImg)) {
-    const s = shape(sdImg, t);
+  const selfMap = new Map(sdT.map((x) => [x, x]));
+  for (const t of sdT) {
+    const s = shape(sdImg, t, selfMap);
     if (s && s.count >= 4) main.set(s.key, t);
   }
+  let map = new Map();
+  for (let i = 0; i < 8; i++) {
+    const next = new Map();
+    for (const t of bsT) {
+      const s = shape(bsImg, t, map);
+      if (s && s.count >= 4 && main.has(s.key)) next.set(t, main.get(s.key));
+    }
+    const grew = next.size !== map.size;
+    map = next;
+    if (!grew) break;
+  }
   const relocated = [], own = [];
-  for (const t of targets(bsImg)) {
-    const s = shape(bsImg, t);
+  for (const t of bsT) {
+    const s = shape(bsImg, t, map);
     if (!s || s.count < 4) continue;
-    const hit = main.get(s.key);
-    if (hit !== undefined) relocated.push({ from: t, to: hit, n: s.count });
+    if (map.has(t)) relocated.push({ from: t, to: map.get(t), n: s.count });
     else own.push({ from: t, n: s.count });
   }
   const sum = (a) => a.reduce((n, x) => n + x.n, 0);
@@ -252,8 +269,8 @@ console.log('\n=== how much of the finale is the main mission, relocated ===');
     console.log(`    ${hx(r.from)} -> ${hx(r.to)}  ${r.n}`);
   }
 
-  check('a third of the finale\'s routines are main-mission routines moved',
-    relocated.length === 14 && sum(relocated) === 208,
+  check('over half of the finale\'s routines are main-mission routines moved',
+    relocated.length === 18 && sum(relocated) === 274,
     `${relocated.length} of ${relocated.length + own.length}, ${sum(relocated)} of`
       + ` ${sum(relocated) + sum(own)} instructions - identical but for the addresses their`
       + ' own branches name');
@@ -263,7 +280,9 @@ console.log('\n=== how much of the finale is the main mission, relocated ===');
   const PORTED = { 0x1A1E: 'kill.js', 0x1AE8: 'dispatch.js', 0x1C3D: 'entities.js',
     0x1B2B: 'kill.js', 0x1B60: 'weapon.js', 0x1EFA: 'entities.js', 0x1A8B: 'kill.js',
     0x1AC7: 'kill.js', 0x1C89: 'damage.js', 0x1C8B: 'damage.js', 0x1C1E: 'controls.js',
-    0x1C32: 'controls.js', 0x1ABE: 'kill.js', 0x1FA9: 'damage.js' };
+    0x1C32: 'controls.js', 0x1ABE: 'kill.js', 0x1FA9: 'damage.js',
+    0x1B95: 'controls.js', 0x1BD5: 'controls.js', 0x1C15: 'controls.js',
+    0x1C29: 'controls.js' };
   const missing = relocated.filter((r) => !PORTED[r.to]);
   check('and every one of them is already in the port, named by its main-mission address',
     missing.length === 0,
@@ -272,7 +291,7 @@ console.log('\n=== how much of the finale is the main mission, relocated ===');
 
   own.sort((a, b) => b.n - a.n);
   check('and the rest is the finale\'s own, in routines of ordinary size',
-    own.length === 18 && sum(own) === 348,
+    own.length === 14 && sum(own) === 282,
     `${own.length} routines, ${sum(own)} instructions, the largest ${hx(own[0].from)} at`
       + ` ${own[0].n} - and the damage block is among them, already ported`);
 
