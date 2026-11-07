@@ -177,7 +177,7 @@ export const CLASSES = [
  * Class 1 has a redundant `LDA OBJ1.heading / STA OBJ1.heading` in the middle that the other
  * two copies leave out. It is a no-op and is not reproduced; nothing can tell.
  */
-function turnUp(mem, c) {
+export function turnUp(mem, c) {
   const h = field(c.enemy, 'heading');
   mem[h] = (mem[h] + 1) & 0xff;
   mem[h] = (mem[h] + 1) & 0xff;
@@ -186,7 +186,7 @@ function turnUp(mem, c) {
 }
 
 /** $0D90 / $119D / $15A7 - three decrements, then publish to the twin. */
-function turnDown(mem, c) {
+export function turnDown(mem, c) {
   const h = field(c.enemy, 'heading');
   for (let k = 0; k < 3; k++) mem[h] = (mem[h] - 1) & 0xff;
   mem[field(c.twin, 'heading')] = mem[h];
@@ -196,10 +196,17 @@ function turnDown(mem, c) {
 /**
  * $0DA5-$0E04 - launch a missile, if the one this class uses is not already up.
  *
+ * The finale's base star fires with this same block, so two things that are constants of the
+ * main mission are arguments here: `heading` is the heading the shot leaves on, which the
+ * finale takes from the candidate that matched rather than from the enemy's own record, and
+ * `c.alsoCool` is a second cooldown it writes and the main mission has no counterpart for.
+ *
  * @param {Uint8Array} mem a 64K image: the display list and the binary's own state
  * @param {import('./math.js').Math24} math
+ * @param {object} c the class
+ * @param {number} heading the heading to launch on
  */
-function fire(mem, math, c) {
+export function fire(mem, math, c, heading = mem[field(c.enemy, 'heading')]) {
   // $0DA5 - one at a time. Classes 2 and 3 test the same count, because they share object 5.
   if (mem[field(c.missile, 'count')] !== 0) return { action: 'busy' };
 
@@ -209,17 +216,20 @@ function fire(mem, math, c) {
 
   // $0DB5 - the launch sound's flag, read and cleared at $186E. Class 3 stores the
   // accumulator here rather than the 1 it just loaded into X; see the header.
-  mem[c.launchSound] = c.soundStoresHeading ? mem[field(c.enemy, 'heading')] : 1;
+  mem[c.launchSound] = c.soundStoresHeading ? heading : 1;
 
   // $0DBA - and the enemy will not fire again until this has counted down.
   mem[c.cooldown] = c.cooldownFrames;
+
+  // $0DE0 - the base star also drops the page toggle into class 2's cooldown, which is a
+  // coupling the main mission has nothing like. Whatever it is for, it is what the code does.
+  if (c.alsoCool) mem[c.alsoCool.at] = mem[c.alsoCool.from];
 
   // $0DBF - the missile starts where the enemy is.
   math.copy(c.enemyPos[0], c.missilePos[0]);
   math.copy(c.enemyPos[1], c.missilePos[1]);
 
-  // $0DD1 - and flies on the enemy's heading, which $1AE8 reads out of $0949.
-  const heading = mem[field(c.enemy, 'heading')];
+  // $0DD1 - and flies on the heading, which $1AE8 reads out of $0949.
   mem[SAVED_HEADING] = heading;
   mem[field(c.missile, 'heading')] = heading;
   buildStepOperands(math, heading);

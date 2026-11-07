@@ -2252,11 +2252,12 @@ starfield needs.
 `BASE STAR DATA` in place of the main mission's `SV DATA` and `MAIN DATA`. It is the last
 part of the game that is gameplay rather than presentation.
 
-**It is the same engine.** Same load address, same length, same entry at `$0957`, the first
-105 bytes identical - MATH's directory, which both read through. It calls the same eleven
-MATH entry points and no others, reads the paddle twice and calls the renderer three times,
-exactly as the main mission does. It is about two thirds the size: **1,369 instructions
-against 2,085**.
+**It is the same engine, and very largely the same code.** Same load address, same length,
+same entry at `$0957`, the first 105 bytes identical - MATH's directory, which both read
+through and which is the one part that does not move. It calls the same eleven MATH entry
+points and no others, reads the paddle twice and calls the renderer three times, exactly as the
+main mission does. It is about two thirds the size - **1,369 instructions against 2,085** - and
+1,070 of those 1,369 are the main mission's at a different address.
 
 **The scene is nearly the same scene.** `SV DATA2` differs from `SV DATA` in **eight bytes**
 of 491, and every one of them is at offset 11 or 12 of an object record - the shape pointer.
@@ -2332,12 +2333,16 @@ paddle and no trigger looks the same.
 
 ### The first block transliterated: how the mission ends
 
-`port/src/game/finale.js`, held by `parity_finale.mjs` (9 checks, 180 swept cases).
+`port/src/game/finale.js`, held by `parity_finale.mjs` (33 checks).
 
-**The two binaries are not the same code.** They share 105 bytes - the MATH directory - and
-nothing else: 4% of 5,890 match, and every routine the port knows by address in the main
-mission sits somewhere else here. "The same engine" means the same MATH entries, the same
-renderer, the same paddle read; it does not mean reuse. So the finale is transliterated.
+**The two binaries are very largely the same code.** 1,070 of the 1,369 instructions
+reachable from `$0957` are the main mission's at a different address, over six offsets between
+`-$0004` and `+$08ED`. See "What the finale actually is" below.
+
+This section first said the opposite - 105 bytes, 4% of 5,890 - and that figure came of
+comparing the two images byte for byte **at the same address**, which is the one arrangement
+under which moved code cannot match. The 105 bytes it found are the MATH directory, which does
+not move. Everything else does.
 
 `$10E5`-`$112E` is the frame's last block and the finale's answer to `$18D6`/`$18DD`. It has
 four ways out, and the harness compares **which address the machine leaves through**:
@@ -2422,16 +2427,34 @@ one, that class's debris counter is loaded with four, and three routines run.
 the finale's scoring. There is no third: `$093E` is written by nothing but `$10FF`, the staged
 win itself, which is why class 1 is the base star rather than an enemy.
 
-**The second block has `ROL $0907` where the first has `LDX $0906`.** The bytes are `AE 06 09`
-against `2E 07 09` - one bit of one opcode - with identical alignment on both sides, so it is
-not a disassembly artefact. Run in the machine as the single instruction it is: it rotates
-`$0907` left through carry (`$12` to `$24`, or `$25` with carry in; `$81` to `$02`) and leaves
-X holding what `$0F75 LDX $0930` put there. So the block **corrupts its own operand every time
-it runs** and hands MATH the previous one twice.
+**The second block has `ROL $0907` where it should have `LDX $0907`.** `AE` against `2E` -
+bit 7 of one opcode byte, the operand and the alignment either side identical, so it is not a
+disassembly artefact. Run in the machine as the single instruction it is: it rotates `$0907`
+left through carry (`$12` to `$24`, or `$25` with carry in; `$81` to `$02`) and leaves X
+holding what `$0F75 LDX $0930` put there, so the block hands MATH the previous operand twice.
 
-Typo or bit rot is not knowable from here, and this file does not guess. What it does is
-measurable and the port does the same. `$0907` is one of the bytes open question 15 has never
-managed to name, and there is now a reason to want it named: it is the one the game damages.
+This file once said that whether that was intended was not knowable from here. **It is, and it
+was not.** Three measurements, each independent of the others:
+
+1. **The main mission has the instruction intact.** The same block is at `$0F40` there, and
+   `$0F55` is `LDX $0907` - the same operand, the same place in the sequence, `AE`.
+2. **The operand is a directory entry.** `$0907` is one of the 65 bytes at `$08F2` that hold
+   table offsets, and the instruction after it uses the byte as an index. `ROL` cannot load an
+   index; it can only double one.
+3. **The damage is measurable in a running mission.** After a mission has been going a while,
+   `$0907` and `$0914` hold 0 against the build's 63 and 118 - and **the other 63 entries are
+   exactly what the build put there**. So it is these instructions and not the mission writing
+   over its own variables.
+
+**There are two of them.** The other is `$101C ROL $0914` in the shot's advance block, against
+`LDX $0914` at the main mission's `$13F4`. Same single bit, same shape of damage: `$0914` is a
+directory entry too.
+
+So the port reads both as `LDX`, and the repair is the default. `ROTATED_INDICES` in
+`finale.js` carries the evidence and `rotatedIndices: true` reproduces what this copy does,
+which is what `parity_finale.mjs` compares against the machine - the machine is running the
+same copy. On an undamaged image the repair is a no-op, which is the argument for doing it by
+default; it is the same argument as the interface repair in `boot.js`.
 
 ### The hit test, and what the ROL actually costs
 
@@ -2444,9 +2467,9 @@ The idiom is `kill.js`'s to the instruction: four `JSR $9C4B` calls filling `$1C
 slots, the range, then `LDY $090A / LDX $092F / JSR $99D2 / BPL` - the same `$092F` threshold
 an enemy rams the ship at, equality included.
 
-**And the `ROL` is worse than it looked.** `$9C4B` walks X forward three bytes as it copies,
-so it ends on the index *after* its source; table entries are three bytes, so after copying
-`$0930` the register holds `$0931`'s index. Block B's third copy never reloads X, so:
+**What the `ROL` costs, when it is left in.** `$9C4B` walks X forward three bytes as it
+copies, so it ends on the index *after* its source; table entries are three bytes, so after
+copying `$0930` the register holds `$0931`'s index. Block B's third copy never reloads X, so:
 
 |  | aX | bX | aZ | bZ |
 |---|---|---|---|---|
@@ -2456,72 +2479,141 @@ so it ends on the index *after* its source; table entries are three bytes, so af
 Both points get the target's Z. **The Z delta is always zero**, so the range block B measures
 is the X distance alone: the second weapon hits on how far across the target is and never on
 how far away. Measured against the machine's MATH table byte for byte, from twelve different
-mission states, plus a forced hit with the threshold raised.
+mission states, plus a forced hit with the threshold raised - and that is the behaviour
+`rotatedIndices: true` asks for, not the behaviour the port ships.
 
 One gap named rather than hidden: the bit `$0F7E` rotates in is the carry left by the `JSR`
 above it, which is data-dependent, and `math.js` does not model MATH's flags because nothing
 else has needed them. `hitTest` takes the carry as an input and the harness supplies the
 machine's.
 
-### A third of the finale is already written
+### What the finale actually is
 
 Three routines turning up identical-but-relocated was either a coincidence or a pattern, and
-the difference decides whether the finale is 1,369 instructions to write or far fewer. So
-every routine either binary is JSRed to was reduced to a **shape**: its instructions to the
-first `RTS`, with a branch or `JMP` landing inside the routine written as an offset instead of
-an address, and everything else - absolute operands, calls out - kept exactly. Same shape
-means same code at a different address.
+the difference decides whether the finale is 1,369 instructions to write or far fewer.
 
-**18 of the finale's 32 routines are main-mission routines moved**, 274 of its 556
-instructions. The match runs to a **fixpoint**: a `JSR` to a routine already known to be a
-relocation is rewritten through the mapping before the key is made, so two routines that are
-the same code except that each calls its own copy of a helper can match once the helper is
-known. Learning one helper lets its callers match, which can expose further callers; it
-settles after three rounds. A single pass finds 14 and misses both star pans, which differ
-from `$1B95` and `$1BD5` only in which wrap helper they name.
+**Asking it per routine was the wrong unit, three times over**, and each mistake hid work the
+port had already done:
 
-| finale | main | | finale | main | | finale | main |
-|---|---|---|---|---|---|---|---|
-| `$1131` | `$1A1E` | | `$134D` | `$1B60` | | `$1476` | `$1C89` |
-| `$12D5` | `$1AE8` | | `$16EC` | `$1EFA` | | `$1478` | `$1C8B` |
-| `$142A` | `$1C3D` | | `$1278` | `$1A8B` | | `$140B` | `$1C1E` |
-| `$1382` | `$1B95` | | `$12B4` | `$1AC7` | | `$141F` | `$1C32` |
-| `$13C2` | `$1BD5` | | `$1402` | `$1C15` | | `$12AB` | `$1ABE` |
-| `$1318` | `$1B2B` | | `$1416` | `$1C29` | | `$1797` | `$1FA9` |
+- it could only see `JSR` targets, so a routine reached only by `JMP` - `$168A` is one - was
+  neither relocated nor the finale's own: it was invisible;
+- it kept a routine's absolute operands literal, so the tone generator did not match its twin
+  even though the two differ in nothing but their address;
+- a loop body is not a routine at all. The finale's frame loop has no `RTS`, so nothing could
+  ever have matched it - and the frame loop is the largest single thing in the file.
 
-And **every one of them is a routine the port already holds against the machine** -
-`controls.js`, `damage.js`, `dispatch.js`, `entities.js`, `kill.js`, `weapon.js`. They are not
-work; they are a lookup. Four of them had been written down in `finale.js` as gaps before
-anyone checked.
+So the question is asked of **instructions**. For a candidate pair of routines the offset is
+fixed by the two entry addresses, and every instruction must then be either byte-identical or
+differ only in an absolute operand off by exactly that offset. The offsets that survive are
+then grown over every instruction they explain, in runs of four or more. An offset is never
+fitted to the result: each one is established either by a whole routine matching or by the
+contiguous region it accounts for.
 
-That leaves **14 routines and 282 instructions** that are the finale's own, and the largest
-is `$1544` at 40. There is no monster routine in it. Of those fourteen:
+**1,070 of the 1,369 instructions reachable from `$0957` are the main mission's, moved.**
 
-- **two are already ported** - `$1486` and `$14EE`, the damage block, 45 instructions;
-- **six are sound**, 105 instructions, every one of them reaching `$1544`, which is the
-  finale's own `$1D52`. Sound is Phase 6 everywhere in this port and the finale matches;
-- **six are gameplay still to write**: `$119E`, `$120B`, `$14FB`, `$17A0`, `$15AC` and
-  `$1591`, **132 instructions** between them.
+| offset | instructions | what it covers |
+|---|---|---|
+| `-$0004` | 324 | the frame loop - `Game.pass`'s `$09A3` is the finale's `$09A7` |
+| `+$0813` | 295 | the dispatch, the kills, the controls, the geometry |
+| `+$080E` | 277 | the sound, and the respawns |
+| `+$07EC` | 121 | the enemy region at `$0E66`-`$0F51` |
+| `+$0812` | 49 | the three-note launch sequence and `$1797` |
+| `+$08ED` | 4 | `$1131` |
 
-**The first version of this analysis said 19 routines and 694 instructions, with `$0D2A` at
-346 of them.** That was wrong and the way it was wrong is worth keeping. It found call targets
-by scanning every byte for `$20` and treating each as a `JSR`, which finds bytes that merely
-look like a call: `$0D2A` came from three such, none of them at an instruction boundary. The
-"routine" it produced was a 346-instruction span starting mid-instruction and running through
-the awards, the debris and the frame end - three blocks already ported - before stopping at
-their `RTS`. So the finale's own share was inflated by counting ported code twice, and the
-control that was supposed to prove the method worked was built on the phantom. The scan now
-walks only addresses `traverse` reached from `$0957`, and requires the target to be an
-instruction too.
+Two of those - `-$0004` and `+$07EC` - no whole routine can establish, because what they
+explain is a loop body. They are there on the regions they account for, in runs broken only
+where the finale's own code is spliced in. **The control is the distribution**: of 12,282 other
+offsets swept against what is left, four reach a run of twenty instructions. Agreement over
+hundreds is a correspondence, not an alignment.
 
-`probe_basestar.mjs` derives the mapping rather than storing it, so a module moving or a
-routine changing makes the check fail, and the control is now one of the finale's own
-routines failing to match.
+And every routine that fixes an offset is one the port already holds against the machine -
+`controls.js`, `damage.js`, `dispatch.js`, `entities.js`, `kill.js`, `sound.js`, `weapon.js`.
+They are not work; they are a lookup.
 
-What is still unported and genuinely the finale's: `$1544`, `$119E`, `$120B`, `$1382`,
-`$13C2`, `$15C5`, `$14FB` (the debris drawer), `$17A0`, `$15AC`, `$1591`, `$15F5`, `$1613`,
-`$1632`, `$171D`, `$1755`, `$175B`, `$1761` and `$177C`. They are named in `finale.js` rather
-than dropped.
+**Of the 299 that are left, 117 were blocks `finale.js` already had** - written by reading the
+finale's own listing, before any of this was known - which left **182 instructions nobody had
+written**, in four spans:
+
+| span | instructions | what it is |
+|---|---|---|
+| `$0D5F`-`$0E2B` | 73 | the base star takes aim and shoots back |
+| `$0FE3`-`$103D` | 31 | the tail of its shot's advance |
+| `$0957`-`$09A6` | 30 | the entry: the hit range, both hi-res pages, the viewer's X |
+| `$10AD`-`$10E4` | 22 | the tail of the debris block, and the damage it services |
+| `$0E2C`-`$0E47` | 10 | the base star reaching the ship, which does not kill it |
+
+**All five are now ported**, which leaves **sixteen instructions**, none of them a block:
+
+| site | what differs |
+|---|---|
+| `$0AAC` | `CPX #$26` - the burn limit on `$0956` |
+| `$0B2D` | `LDY #$03` - how much a hit takes off the missiles |
+| `$0C09` | the "is it alive" gate, on object 3's count, skipping to the shot at `$0FAC` |
+| `$0C22` | `LDY $0931` - the range and bearing on class 3's target, not class 1's |
+| eight `LDA`s | which template record each display-list patcher reads |
+
+36 of each patcher's 37 instructions are the main mission's. So every one of the sixteen is a
+place the finale names a different variable, constant or destination inside a block the port
+already has. **What is not built yet is the frame that drives them** - a `Finale` class
+composing the ported blocks the way `Game` does, which is now largely a matter of reusing
+`Game` itself.
+
+**Two earlier counts of this were wrong, and both are worth keeping.** The first said 19
+routines and 694 instructions, with `$0D2A` at 346 of them: it found call targets by scanning
+every byte for `$20` and treating each as a `JSR`, which finds bytes that merely look like a
+call. `$0D2A` came from three such, none at an instruction boundary, and the "routine" it
+produced started mid-instruction and ran through the awards, the debris and the frame end -
+three blocks already ported - before stopping at their `RTS`. The second said 18 routines of
+32 and "six gameplay routines still to write", and named `$17A0`, `$15AC`, `$1591` and `$14FB`
+among them. Four of those six are the main mission's: three are its sound, and `$14FB` is
+`$1D09`. The other two are the display-list patchers above.
+
+### The base star shoots back
+
+`$0D5F`-`$0E2B` is `dispatch.js`'s `$0D5B` four bytes along, on class 3's fields - object 3's
+heading, object 5 as the shot, `$093A` as the cooldown - and it is **the only enemy in either
+binary that fires at the ship**. Four things differ, and the first can be seen from the
+cockpit:
+
+1. **It tests four candidate headings where the main mission tests two.** Both try the heading
+   it is on and one unit past; the finale then tries `h + $7F + C` and one past that. A heading
+   is a byte and the circle is 256 units, so `+$80` is the reciprocal bearing: **the base star
+   shoots at you dead astern as readily as dead ahead.** Nothing else in the game can. The
+   carry is not an unknown - `$0D86 ADC #$7F` follows the compare at `$0D7B`, so `C` is
+   `(h + 1) >= target`.
+2. **It aims in scratch.** The main mission walks object 3's live heading with `INC` and `DEC`
+   and has to undo the probe before turning; the finale copies the heading into `$8147` -
+   object 2's heading operand, which it is not otherwise using - and leaves object 3 alone. So
+   the shot leaves on the candidate that matched, which can be the reciprocal, while the base
+   star goes on pointing where it was.
+3. **It decides which way to turn from the heading itself**, where the main mission's `$1593
+   BCS` is still carrying the flags from its probe at `h + 1`. One unit, and it shows only on
+   the frame where the two straddle the bearing.
+4. **Its cooldown is twelve frames, not fifteen**, and firing also writes the page toggle into
+   class 2's cooldown at `$0939` - a coupling the main mission has nothing like.
+
+Held over 112 cases: the display-list operands, both cooldowns and MATH's table byte for byte,
+with the directory put back first. The control is `dispatch.js`'s own class 3 given the same
+inputs, which fails to fire on seven of the eight reciprocal bearings the base star fires on.
+
+**Its shot is `entities.js`'s missile block**, at `$0FAC`-`$103D`, differing in exactly two
+things: three `INC $816D` a frame, so the shot **rolls as it flies** - nothing in the main
+mission turns a missile's bank - and `$101C`, which is one of the two instructions this copy
+has wrong. The flag it leaves in `$0941` is what the debris block picks up at `$10D8`.
+
+**And the debris block runs to `$10E4`, not `$10AA`.** `$10AA JMP $10CB` takes the winning path
+straight to the damage flags, skipping classes 2 and 3; the losing path falls out of `$109F
+BCC $10AD` into those two and reaches the flags after them. Classes 2 and 3 are on the same
+threshold of three but not the same terms: one burst instead of two, the counter is zeroed, and
+`$1FFF` is not touched - **only class 1 pays progress**, which is why killing the base star is
+the only thing that stages. `$10CB` and `$10D8` then service `$0942` and `$0941` through
+`$1486` and `$14EE`, which is where the base star's shots actually cost you anything.
+
+`finale.js` had `$10AD` down as a second way out of the block, and the parity harness had it
+down as an exit too, so everything from there to `$10E4` was out of scope - including both
+calls into the damage code. The harness could not have caught it: it only ever gave classes 2
+and 3 counters below the threshold, so nothing it ran ever reached `$10AD` by the falling path.
+The cases now straddle the threshold and set both damage flags.
 
 ### The route is not walkable, and that is a separate bug
 

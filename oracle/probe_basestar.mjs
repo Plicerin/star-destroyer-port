@@ -12,6 +12,7 @@
 // The differences that matter to a player are small and specific, and they are what this
 // probe pins down - because a port that assumed the main mission's constants would get all
 // of them wrong in ways no screenshot would show.
+import { readFileSync } from 'node:fs';
 import { openOracle } from './a2.mjs';
 import { openDisk, DISK } from './dsk.mjs';
 import { traverse, disasmRange, disasm1 } from './disasm6502.mjs';
@@ -178,130 +179,326 @@ console.log('\n=== the rules that differ, and would be silently wrong if assumed
 // branches name. That is either three coincidences or a pattern, and the difference decides
 // whether the finale is 1,369 instructions to write or a much smaller number.
 //
-// So every routine either binary is JSRed to is reduced to a **shape**: its instructions to
-// the first RTS, with a branch or JMP landing inside the routine written as an offset rather
-// than an address, and everything else - absolute operands, calls out - kept exactly. Two
-// routines with the same shape are the same code at different addresses. Two that differ
-// anywhere that matters do not match.
-console.log('\n=== how much of the finale is the main mission, relocated ===');
+// Asking it per routine was the wrong unit, three times over. It could only see JSR targets,
+// so a routine reached only by JMP - $168A is one - was neither relocated nor the finale's
+// own: it was invisible. It kept a routine's absolute operands literal, so the tone generator
+// did not match its twin even though the two differ in nothing but their address. And a loop
+// body is not a routine at all: the finale's frame loop has no RTS, so nothing could match it.
+//
+// So the question is asked of instructions instead. For a candidate pair of routines the delta
+// is fixed by the two entry addresses, and every instruction must then be either byte-identical
+// or differ only in an absolute operand off by exactly that delta. The deltas that survive are
+// then grown over every instruction they explain, in runs of four or more. A delta is never
+// fitted: each one is established by a whole routine matching, or by the contiguous region it
+// accounts for.
+console.log('\n=== how much of the finale is the main mission, moved ===');
 {
-  const BRANCH = /^(BCC|BCS|BEQ|BNE|BMI|BPL|BVC|BVS)$/;
-  // Only real instructions. The first version scanned every byte for $20 and called each one
-  // a JSR, which finds bytes that merely look like a call: $0D2A came from three such, none
-  // of them an instruction, and the "routine" it produced was a 346-instruction span running
-  // through three blocks already ported and stopping at their RTS. It inflated the finale's
-  // own share from 348 instructions to 694 by counting ported code twice.
   const image = (f) => {
     const mem = [];
     for (let i = 0; i < f.len; i++) mem[f.addr + i] = f.data[i];
     const { starts } = traverse(mem, [ENTRY], { lo: f.addr, hi: f.addr + f.len });
     return { mem, lo: f.addr, hi: f.addr + f.len, starts };
   };
-  const shape = (img, entry, map = new Map()) => {
+  const bsImg = image(BS), sdImg = image(SD);
+
+  /** A routine's instructions, to the first RTS, or null if it does not reach one. */
+  const body = (img, entry) => {
     const insts = [];
     let a = entry;
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 500; i++) {
       if (!img.starts.has(a)) return null;
       const l = disasm1(img.mem, a);
       insts.push({ at: a, op: l.op, len: l.len, bytes: [...l.bytes] });
       if (l.op === 'RTS') break;
       a += l.len;
     }
-    if (!insts.length || insts[insts.length - 1].op !== 'RTS') return null;
-    const end = insts[insts.length - 1].at;
-    return { count: insts.length, key: insts.map((x) => {
-      if (BRANCH.test(x.op)) {
-        return `${x.op}+${x.bytes[1] > 127 ? x.bytes[1] - 256 : x.bytes[1]}`;
-      }
-      const abs = x.len === 3 ? (x.bytes[1] | (x.bytes[2] << 8)) : -1;
-      if (x.op === 'JMP' && abs >= entry && abs <= end + 2) return `JMP@${abs - entry}`;
-      // A call to a routine already known to be a relocation is rewritten through the
-      // mapping, so two routines that are the same code except that each calls its own copy
-      // of a helper can match. That is why this runs to a fixpoint below rather than once:
-      // learning one helper lets its callers match, which can expose further callers.
-      if ((x.op === 'JSR' || x.op === 'JMP') && map.has(abs)) {
-        return `${x.op}=${hx(map.get(abs))}`;
-      }
-      return x.bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
-    }).join(' ') };
+    return insts.length && insts[insts.length - 1].op === 'RTS' ? insts : null;
   };
-  const targets = (img) => {
+
+  /** Is the finale's routine at `f` the main mission's at `m`, moved by m - f? */
+  const sameMoved = (f, m) => {
+    const A = body(bsImg, f), B = body(sdImg, m);
+    if (!A || !B || A.length !== B.length || A.length < 4) return null;
+    const delta = m - f;
+    for (let i = 0; i < A.length; i++) {
+      const x = A[i], y = B[i];
+      if (x.bytes[0] !== y.bytes[0] || x.len !== y.len) return null;
+      if (x.len === 2 && x.bytes[1] !== y.bytes[1]) return null;
+      if (x.len === 3) {
+        const ax = x.bytes[1] | (x.bytes[2] << 8), ay = y.bytes[1] | (y.bytes[2] << 8);
+        if (ax !== ay && ay - ax !== delta) return null;
+      }
+    }
+    return { count: A.length, delta };
+  };
+
+  /** Every address a JSR or a JMP names, when the target is itself an instruction. */
+  const called = (img) => {
     const out = new Set();
     for (const a of img.starts) {
-      if (img.mem[a] !== 0x20) continue;
+      if (img.mem[a] !== 0x20 && img.mem[a] !== 0x4c) continue;
       const t = img.mem[a + 1] | (img.mem[a + 2] << 8);
-      // The target has to be an instruction too, or it is not a routine.
       if (t >= img.lo && t < img.hi && img.starts.has(t)) out.add(t);
     }
     return [...out].sort((x, y) => x - y);
   };
+  const bsT = called(bsImg), sdT = called(sdImg);
 
-  const bsImg = image(BS), sdImg = image(SD);
-  const bsT = targets(bsImg), sdT = targets(sdImg);
-  const main = new Map();
-  const selfMap = new Map(sdT.map((x) => [x, x]));
-  for (const t of sdT) {
-    const s = shape(sdImg, t, selfMap);
-    if (s && s.count >= 4) main.set(s.key, t);
-  }
-  let map = new Map();
-  for (let i = 0; i < 8; i++) {
-    const next = new Map();
-    for (const t of bsT) {
-      const s = shape(bsImg, t, map);
-      if (s && s.count >= 4 && main.has(s.key)) next.set(t, main.get(s.key));
+  // Only an unambiguous match counts. A routine that matches two main-mission routines at two
+  // different deltas has said nothing about which one it is.
+  const matched = new Map();
+  for (const f of bsT) {
+    const hits = [];
+    for (const m of sdT) {
+      const r = sameMoved(f, m);
+      if (r) hits.push({ m, ...r });
     }
-    const grew = next.size !== map.size;
-    map = next;
-    if (!grew) break;
+    if (hits.length === 1) matched.set(f, hits[0]);
   }
-  const relocated = [], own = [];
-  for (const t of bsT) {
-    const s = shape(bsImg, t, map);
-    if (!s || s.count < 4) continue;
-    if (map.has(t)) relocated.push({ from: t, to: map.get(t), n: s.count });
-    else own.push({ from: t, n: s.count });
+  const fromRoutines = [...new Set([...matched.values()].map((r) => r.delta))];
+
+  // Two more that no whole routine can establish, because what they explain is a loop body and
+  // a loop body has no RTS. They are here on the regions they account for - -$0004 covers
+  // $09A7-$0D31 and +$07EC covers $0E66-$0F51, both in runs broken only where the finale's own
+  // code is spliced in - and the control at the end is what says those regions are not luck.
+  const DELTAS = [...new Set([...fromRoutines, -0x0004, 0x07ec])].sort((a, b) => a - b);
+  const sgn = (d) => `${d < 0 ? '-' : '+'}$${Math.abs(d).toString(16).padStart(4, '0')}`;
+
+  /** Is the instruction at `a` the main mission's at `a + delta`, moved? */
+  const movedAt = (a, delta) => {
+    if (!bsImg.starts.has(a) || !sdImg.starts.has(a + delta)) return false;
+    const x = disasm1(bsImg.mem, a), y = disasm1(sdImg.mem, a + delta);
+    if (x.bytes[0] !== y.bytes[0] || x.len !== y.len) return false;
+    if (x.len === 2 && x.bytes[1] !== y.bytes[1]) return false;
+    if (x.len === 3) {
+      const ax = x.bytes[1] | (x.bytes[2] << 8), ay = y.bytes[1] | (y.bytes[2] << 8);
+      // An operand may move by any of the deltas, not only its own region's: the parameter
+      // bytes a routine patches are not always in the region the routine is in. $17A0's code
+      // moves +$0812 while the two bytes it pokes move +$080E.
+      if (ax !== ay && !DELTAS.includes(ay - ax)) return false;
+    }
+    return true;
+  };
+
+  const reached = [...bsImg.starts].sort((a, b) => a - b);
+  const owner = new Map();
+  for (const delta of DELTAS) {
+    let run = [];
+    const flush = () => {
+      // Four in a row at least, so a lone LDA that happens to line up is not called ported.
+      if (run.length >= 4) for (const a of run) if (!owner.has(a)) owner.set(a, delta);
+      run = [];
+    };
+    for (const a of reached) {
+      if (movedAt(a, delta)) run.push(a);
+      else flush();
+    }
+    flush();
   }
-  const sum = (a) => a.reduce((n, x) => n + x.n, 0);
-  console.log(`  ${relocated.length} relocated (${sum(relocated)} instructions),`
-    + ` ${own.length} the finale's own (${sum(own)} instructions)`);
-  for (const r of relocated.sort((a, b) => b.n - a.n)) {
-    console.log(`    ${hx(r.from)} -> ${hx(r.to)}  ${r.n}`);
+  const un = reached.filter((a) => !owner.has(a));
+  console.log(`  ${reached.length} instructions reachable from ${hx(ENTRY)}:`
+    + ` ${owner.size} are the main mission's, moved; ${un.length} are not`);
+  for (const delta of DELTAS) {
+    const n = [...owner.values()].filter((d) => d === delta).length;
+    console.log(`    ${sgn(delta)}  ${n} instructions`);
   }
 
-  check('over half of the finale\'s routines are main-mission routines moved',
-    relocated.length === 18 && sum(relocated) === 274,
-    `${relocated.length} of ${relocated.length + own.length}, ${sum(relocated)} of`
-      + ` ${sum(relocated) + sum(own)} instructions - identical but for the addresses their`
-      + ' own branches name');
+  check('nearly four fifths of the finale is the main mission at a different address',
+    owner.size === 1070 && reached.length === 1369,
+    `${owner.size} of ${reached.length} instructions, over ${DELTAS.length} deltas, none of`
+      + ' them further than $08ED - one binary with blocks spliced into the other');
 
-  // Every one of them is a routine the port has already written and already holds against
-  // the machine, so they are not work: they are a lookup.
-  const PORTED = { 0x1A1E: 'kill.js', 0x1AE8: 'dispatch.js', 0x1C3D: 'entities.js',
-    0x1B2B: 'kill.js', 0x1B60: 'weapon.js', 0x1EFA: 'entities.js', 0x1A8B: 'kill.js',
-    0x1AC7: 'kill.js', 0x1C89: 'damage.js', 0x1C8B: 'damage.js', 0x1C1E: 'controls.js',
-    0x1C32: 'controls.js', 0x1ABE: 'kill.js', 0x1FA9: 'damage.js',
-    0x1B95: 'controls.js', 0x1BD5: 'controls.js', 0x1C15: 'controls.js',
-    0x1C29: 'controls.js' };
-  const missing = relocated.filter((r) => !PORTED[r.to]);
-  check('and every one of them is already in the port, named by its main-mission address',
-    missing.length === 0,
-    missing.length ? missing.map((r) => hx(r.to)).join(', ')
-      : [...new Set(Object.values(PORTED))].sort().join(', '));
+  // What is left divides again. Some of it the port has already transliterated from the
+  // finale's own listing - those blocks were written before any of this was known, by reading
+  // the finale rather than by matching it - and the rest is the work.
+  const FINALE_JS = [[0x10e5, 0x112e, 'endOfFrame'], [0x1476, 0x14fa, 'damage'],
+    [0x103e, 0x10e4, 'debris'], [0x0f53, 0x0fe2, 'the two awards'], [0x092f, 0x0956, 'hitTest'],
+    [0x0957, 0x09a6, 'enter'], [0x0d5f, 0x0e2b, 'aimAndFire'], [0x0e2c, 0x0e47, 'reached'],
+    [0x0fe3, 0x103d, 'shotAdvance']];
+  const written = new Set();
+  for (const a of un) for (const [lo, hi] of FINALE_JS) if (a >= lo && a <= hi) written.add(a);
+  const todo = un.filter((a) => !written.has(a));
+  console.log(`  of the ${un.length} that are not, ${written.size} are blocks finale.js`
+    + ` already has and ${todo.length} are not written anywhere`);
 
-  own.sort((a, b) => b.n - a.n);
-  check('and the rest is the finale\'s own, in routines of ordinary size',
-    own.length === 14 && sum(own) === 282,
-    `${own.length} routines, ${sum(own)} instructions, the largest ${hx(own[0].from)} at`
-      + ` ${own[0].n} - and the damage block is among them, already ported`);
+  // The spans that are left are the work, and they want to be few and contiguous. A result
+  // scattered over fifty one-instruction holes would mean the deltas are slightly wrong, not
+  // that the finale differs in fifty places.
+  const spans = [];
+  for (const a of todo) {
+    const last = spans[spans.length - 1], l = disasm1(bsImg.mem, a);
+    if (last && a >= last.hi && a <= last.hi + 3) { last.hi = a + l.len - 1; last.n++; }
+    else spans.push({ lo: a, hi: a + l.len - 1, n: 1 });
+  }
+  console.log(`  what is left, in ${spans.length} spans:`);
+  for (const s of spans) {
+    console.log(`    ${hx(s.lo)}-${hx(s.hi)}  ${s.n}  ${disasm1(bsImg.mem, s.lo).text}`);
+  }
+  // Every span that was a block of its own has been written. What is left is sixteen
+  // instructions scattered through blocks the port already has, and each is a place the finale
+  // names a different variable, constant or destination rather than a block nobody has read:
+  //
+  //   $0AAC  CPX #$26        the burn limit on $0956
+  //   $0B2D  LDY #$03        how much a hit takes off the missiles
+  //   $0C09  the "is it alive" gate, on object 3's count, skipping to the shot at $0FAC
+  //   $0C22  LDY $0931       the range-and-bearing on class 3's target, not class 1's
+  //   eight LDAs             which template record each display-list patcher reads
+  //
+  // So the finale is accounted for. What is not yet built is the frame that drives it.
+  check('and what is left is sixteen operands, not blocks',
+    todo.length === 16 && spans.length === 12 && Math.max(...spans.map((x) => x.n)) === 5,
+    `${todo.length} instructions in ${spans.length} spans, the largest ${hx(0x0C09)} at 5 -`
+      + ' the gate that names object 3; the four spans that were the work (the entry, the aim,'
+      + ' the reach and the shot) are ported');
 
-  // The control. One of the finale's own has to fail to match, or "relocated" is not
-  // measuring anything: a key that matched everything would say the same thing.
-  const theirs = own.find((o) => o.n >= 30);
-  check('control: one of the finale\'s own routines matches nothing in the main mission',
-    !main.has(shape(bsImg, theirs.from).key),
-    `${hx(theirs.from)}, ${theirs.n} instructions, has no twin - so a match means the code is`
-      + ' the same and not merely the same shape of thing');
+  // Eight of the singles are the two display-list patchers' LDA: 36 of each patcher's 37
+  // instructions are the main mission's, and the one that differs is which template record it
+  // reads. That is a parameter, not code to write.
+  const singles = spans.filter((s) => s.n === 1).map((s) => s.lo);
+  const patcher = singles.filter((a) => a >= 0x119e && a <= 0x125e);
+  check('the single instructions are mostly which record a display-list patcher reads',
+    patcher.length === 8 && patcher.every((a) => disasm1(bsImg.mem, a).op === 'LDA'),
+    'eight LDAs in $119E and $120B - the other 72 instructions of those two routines are the'
+      + " main mission's, so what differs is the template and not the patching");
+
+  // Every delta has to be established by a routine, and every such routine has to be one the
+  // port already holds against the machine - otherwise "moved" names code nobody has written.
+  //
+  // So each one names the module that has the code **and the address that module names for
+  // it**, and the check reads the module to confirm. The first version of this was a map from
+  // address to module name with nothing testing the name, which is how four of these came to
+  // be labelled wrongly and two of the labels pointed at a module that never mentions the
+  // address at all.
+  //
+  // Four are not named by their own address, because they are not routines of their own:
+  // `$1B01` and `$1B22` are fall-through tails inside `$1AE8`, and `$1C15`/`$1C29` are the
+  // three-step wrappers that fall into `$1C1E`/`$1C32`. Each matched here because it ends in
+  // an `RTS` and something jumps to it, which is not the same as being a routine.
+  const PORTED = {
+    0x1A1E: ['kill.js', 0x1A1E], 0x1A8B: ['kill.js', 0x1A8B], 0x1ABE: ['kill.js', 0x1ABE],
+    0x1AC7: ['kill.js', 0x1AC7], 0x1AE8: ['dispatch.js', 0x1AE8],
+    0x1B01: ['dispatch.js', 0x1AE8], 0x1B22: ['dispatch.js', 0x1AE8],
+    0x1B2B: ['kill.js', 0x1B2B], 0x1B60: ['weapon.js', 0x1B60],
+    0x1B95: ['controls.js', 0x1B95], 0x1BD5: ['controls.js', 0x1BD5],
+    0x1C15: ['controls.js', 0x1C1E], 0x1C1E: ['controls.js', 0x1C1E],
+    0x1C29: ['controls.js', 0x1C32], 0x1C32: ['controls.js', 0x1C32],
+    0x1C3D: ['geometry.js', 0x1C3D], 0x1C89: ['damage.js', 0x1C89],
+    0x1C8B: ['damage.js', 0x1C8B], 0x1D09: ['kill.js', 0x1D09],
+    0x1D52: ['sound.js', 0x1D52], 0x1D9F: ['sound.js', 0x1D9F],
+    0x1DA2: ['sound.js', 0x1DA2], 0x1DBA: ['sound.js', 0x1DBA],
+    0x1E98: ['kill.js', 0x1E98], 0x1EC9: ['kill.js', 0x1EC9], 0x1EFA: ['kill.js', 0x1EFA],
+    0x1FA9: ['damage.js', 0x1FA9],
+  };
+  const PORT_DIR = new URL('../port/src/game/', import.meta.url);
+  const names = (file, addr) => {
+    let text;
+    try { text = readFileSync(new URL(file, PORT_DIR), 'utf8'); } catch { return false; }
+    const u = addr.toString(16).toUpperCase().padStart(4, '0');
+    return text.includes(`$${u}`) || text.includes(`0x${u}`)
+      || text.includes(`0x${u.toLowerCase()}`);
+  };
+  const unwritten = [];
+  for (const r of matched.values()) {
+    const entry = PORTED[r.m];
+    if (!entry) { unwritten.push(`${hx(r.m)} is not claimed by any module`); continue; }
+    const [file, at] = entry;
+    if (!names(file, at)) unwritten.push(`${file} does not name ${hx(at)}, for ${hx(r.m)}`);
+  }
+  check('and every routine that fixes a delta is code the port already holds, by name',
+    unwritten.length === 0 && Object.keys(PORTED).length === matched.size,
+    unwritten.slice(0, 3).join('; ')
+      || `${matched.size} routines across`
+        + ` ${[...new Set(Object.values(PORTED).map((e) => e[0]))].sort().join(', ')} - each`
+        + ' one read out of the module that has it');
+
+  // The control: a module that stops naming its address has to break the check above, or the
+  // check is reading nothing. Ask it about an address no module mentions.
+  check('control: the same test fails for an address no module names',
+    !names('kill.js', 0x1B01) && !names('controls.js', 0x1C15),
+    '$1B01 and $1C15 appear in no module under their own names, which is why they are'
+      + ' listed against the routines they fall inside');
+
+  // The control. Sweeping every delta and keeping whichever explains the most would be fitting
+  // a free parameter, so: the longest run each delta in a wide range can explain against what
+  // is left, as a distribution. The two taken on their regions alone have to stand outside it.
+  const unSet = new Set(un);
+  const longest = (delta) => {
+    let best = 0, run = 0;
+    for (const a of reached) {
+      if (unSet.has(a) && movedAt(a, delta)) { run++; if (run > best) best = run; }
+      else run = 0;
+    }
+    return best;
+  };
+  let over20 = 0, swept = 0;
+  for (let delta = -0x1800; delta <= 0x1800; delta++) {
+    if (!delta || DELTAS.includes(delta)) continue;
+    swept++;
+    if (longest(delta) >= 20) over20++;
+  }
+  check('control: hardly any other delta explains a run of any length',
+    swept > 3000 && over20 <= 6,
+    `of ${swept} deltas swept, ${over20} reach a 20-instruction run against what is left - so`
+      + ' agreement over hundreds of instructions is a correspondence, not an alignment');
+}
+
+// ------------------------------------------------- two instructions this copy has wrong ---
+// `$0F7E` and `$101C` disassemble as `ROL abs`. The main mission has the same two blocks, and
+// at the matching instruction in each it has `LDX abs` on the same operand - `AE` against
+// `2E`, bit 7 of one byte, with the operand and everything either side identical.
+//
+// That alone would only say the two binaries differ. What settles it is what the operands are:
+// both are entries in the directory at `$08F2`, so the instruction after each one uses the
+// byte as a table index. `ROL` cannot load an index, it can only double one - and `parity_
+// finale.mjs` measures the consequence in a running mission: those two bytes, and no others
+// of the 65, no longer hold what the build put there. So the port reads both as `LDX`.
+console.log('\n=== two instructions this copy has wrong ===');
+{
+  const image = (f) => {
+    const mem = [];
+    for (let i = 0; i < f.len; i++) mem[f.addr + i] = f.data[i];
+    return mem;
+  };
+  const bs = image(BS), sd = image(SD);
+  // at: the finale's instruction, twin: the main mission's, operand: what both name.
+  const PAIRS = [
+    { at: 0x0F7E, twin: 0x0F55, operand: 0x0907, what: 'the second award block\'s third copy' },
+    { at: 0x101C, twin: 0x13F4, operand: 0x0914, what: 'the shot advance\'s third copy' },
+  ];
+  const wrong = [];
+  for (const q of PAIRS) {
+    const here = [bs[q.at], bs[q.at + 1] | (bs[q.at + 2] << 8)];
+    const there = [sd[q.twin], sd[q.twin + 1] | (sd[q.twin + 2] << 8)];
+    if (here[0] !== 0x2E || there[0] !== 0xAE || here[1] !== q.operand
+      || there[1] !== q.operand) {
+      wrong.push(`${hx(q.at)} is ${hx(here[0], 2)}/${hx(here[1])} and ${hx(q.twin)} is`
+        + ` ${hx(there[0], 2)}/${hx(there[1])}`);
+    }
+  }
+  check('both are $2E where the main mission has $AE, on the same operand',
+    wrong.length === 0, wrong.join('; ')
+      || PAIRS.map((q) => `${hx(q.at)} vs ${hx(q.twin)} on ${hx(q.operand)}`).join(', ')
+        + ' - one bit each, and $AE is LDX abs');
+
+  // The operands are directory entries, which is what makes the difference matter: three
+  // apart from their neighbours, inside the 65 the frame loop loads into X and Y.
+  const inDirectory = PAIRS.every((q) => {
+    const i = q.operand - 0x08F2;
+    return i >= 0 && i < 65 && bs[q.operand] === sd[q.operand];
+  });
+  check('and both operands are directory entries, which is why it cannot be a design',
+    inDirectory,
+    PAIRS.map((q) => `${hx(q.operand)} holds ${bs[q.operand]}`).join(', ')
+      + ' in both images - a table offset, used as an index by the instruction after it');
+
+  // The control: the matching instruction in the *other* award block is intact in both, so
+  // this is two bytes and not a difference running through the whole file.
+  const first = { at: 0x0F36, twin: 0x0F0D, operand: 0x0906 };
+  check('control: the first award block\'s copy is $AE in both, so it is these two and no more',
+    bs[first.at] === 0xAE && sd[first.twin] === 0xAE
+      && (bs[first.at + 1] | (bs[first.at + 2] << 8)) === first.operand,
+    `${hx(first.at)} is ${hx(bs[first.at], 2)} on ${hx(first.operand)} - the same instruction`
+      + ' one block earlier, with the bit where it belongs');
 }
 
 // ---------------------------------------------------------------- the machine ------------

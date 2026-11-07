@@ -151,9 +151,14 @@ export function move(mem, math, c) {
  * Gated on the missile's count, which is the renderer's frame counter: zero means it is not
  * up and the whole block is skipped.
  *
+ * The finale's base star fires with this block too, at `$0FAC`, which is why two things here
+ * are the class's rather than fixed: `bankSpin` is how far the shot's bank turns each frame,
+ * which the main mission's three copies do not do at all, and `staleZ` reproduces an
+ * instruction the finale's copy has wrong. See `ROTATED_INDICES` in `finale.js`.
+ *
  * @returns {{flying: boolean, hit?: boolean}}
  */
-export function missile(mem, math, c) {
+export function missile(mem, math, c, { staleZ = false } = {}) {
   // $0F83 - `LDA count / CMP #$00 / BNE`, which is the same as a BEQ on the load.
   if (mem[field(c.missile, 'count')] === 0) return { flying: false };
 
@@ -164,6 +169,14 @@ export function missile(mem, math, c) {
     math.storeAcc(pos);
   }
 
+  // $0FD4 - and the base star's shot rolls as it goes: three increments of the bank operand
+  // every frame, which is the whole of the difference between its shot and the main
+  // mission's. Nothing in the main mission turns a missile's bank.
+  for (let k = 0; k < (c.bankSpin ?? 0); k++) {
+    const bank = field(c.missile, 'bank');
+    mem[bank] = (mem[bank] + 1) & 0xff;
+  }
+
   // $0FAB - publish to the missile and its scope twin.
   publish(mem, math, c.missilePos[0], [c.missile, c.missileTwin], 'x');
   publish(mem, math, c.missilePos[1], [c.missile, c.missileTwin], 'z');
@@ -172,7 +185,11 @@ export function missile(mem, math, c) {
   // leaves a new range in $090A, on top of the one the dispatch region worked out.
   math.copy(c.missilePos[0], GEOM.aX);
   math.copy(VAR.posX, GEOM.bX);
-  math.copy(c.missilePos[1], GEOM.aZ);
+  // $1007 LDX $0914, or, as the finale's copy has it, `ROL $0914`: X is never loaded, so it
+  // keeps what the copy above left it, and `$9C4B` walks X three bytes forward as it copies.
+  // Three past the ship's X entry is the next entry along, so the shot's Z argument becomes a
+  // value belonging to the ship.
+  math.copy(staleZ ? (VAR.posX + 3) & 0xff : c.missilePos[1], GEOM.aZ);
   math.copy(VAR.posZ, GEOM.bZ);
   rangeFromArgs(math);
 

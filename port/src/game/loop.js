@@ -90,8 +90,11 @@ export const SCORES = [0x1FFC, 0x1FFD, 0x1FFE];
  * the VIEWER instruction's operands and into object 12's, which is the thing that turns with
  * the ship. The setup at $098B does exactly this too, before the loop starts.
  */
-export function publishShip(mem, math) {
+export function publishShip(mem, math, { axes = ['x', 'z'] } = {}) {
   for (const [index, viewer, object] of [[VAR.posX, XI, 'x'], [VAR.posZ, ZI, 'z']]) {
+    // The finale's entry at $0992 publishes X alone, which is what `axes` is for. The loop's
+    // own two calls take both and do not pass it.
+    if (!axes.includes(object)) continue;
     for (const offset of [0, 1]) {
       const byte = math.table[(index + 1 + offset) & 0xff];
       mem[viewer + offset] = byte;

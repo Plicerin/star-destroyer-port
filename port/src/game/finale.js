@@ -1,10 +1,22 @@
 // The final mission's end-of-frame block: how the base star dies, and how you do.
 //
 // `BASE STAR.OBJ0` is the same *engine* as the main mission - same entry at `$0957`, same
-// eleven MATH entry points, same renderer, same paddle read - but it is **not the same code**.
-// The two binaries share exactly 105 bytes, the MATH directory they both read through, and
-// nothing else: 4% of 5,890 bytes match, and every routine the port knows by address in the
-// main mission is at a different address here. So this is a transliteration, not a reuse.
+// eleven MATH entry points, same renderer, same paddle read - and it is very largely the same
+// code. **1,070 of the 1,369 instructions reachable from `$0957` are the main mission's at a
+// different address**, over six offsets between `-$0004` and `+$08ED`: one binary with blocks
+// spliced into the other, not a second program.
+//
+// That is the opposite of what this file said when it was written. The figure then was 105
+// bytes, 4% - but that came of comparing the two images byte for byte *at the same address*,
+// which is the one arrangement under which moved code cannot match. `probe_basestar.mjs` now
+// compares a candidate pair under the offset its two entry addresses imply, which is what
+// "the same code, moved" means, and the deltas it uses are each established by a whole routine
+// matching rather than fitted to the result.
+//
+// So most of what follows is a transliteration of the blocks that are genuinely the finale's
+// own, and the rest reaches back into the main mission's modules - `dispatch.js` for the
+// launch, `damage.js` for the shield, `loop.js` for the frame the finale runs at `$09A7`,
+// which is `Game.pass`'s `$09A3` four bytes along.
 //
 // This is the block the frame ends on, `$10E5`-`$112E`, and it is the finale's answer to the
 // main mission's `$18D6`/`$18DD`. Four things happen in it and three of them differ from the
@@ -34,6 +46,9 @@
 // mission win on its first pass. See `oracle/exercise.mjs`'s `toFinale`.
 //
 // Measured and held by `oracle/probe_basestar.mjs` and `oracle/parity_finale.mjs`.
+import { field } from './objects.js';
+import { BEARING, fire, turnUp, turnDown } from './dispatch.js';
+import { selectPages, publishShip, PAGE, XI } from './loop.js';
 
 /** $0933 - the same hit count the main mission keeps, read by a different test. */
 export const HITS = 0x0933;
@@ -277,18 +292,37 @@ export const ONE_SHOTS = [
 /**
  * The debris drawer, the renderer and the two bursts the staged win plays.
  *
- * `$14FB` and `$15C5` are the finale's own and are not ported. `$6000` is A2-3D2, which the
- * port has had since phase 1.
+ * `$14FB` is the main mission's `$1D09`, moved; `$15C5` is `$1DBA`, the click generator.
+ * `$6000` is A2-3D2, which the port has had since phase 1.
  */
 export const DEBRIS_CALLS = { draw: 0x14FB, render: 0x6000, stagedWin: 0x15C5 };
 
 /**
- * `$103E`-`$10AA` - tick the debris, render, service the flags, and test for the staged win.
+ * `$10CB` and `$10D8` - the two flags that say the ship was hit, and what each one calls.
+ *
+ * Nothing in the main mission sets either. They are written by the base star's own aim-and-fire
+ * block at `$0DE0` and by its launch at `$1039` - which is to say by the only enemy in this
+ * game that shoots back. Each is serviced once and then cleared.
+ */
+export const DAMAGE_FLAGS = [
+  { flag: 0x0942, at: 0x1486, hit: rammed },        // $10CB - something reached the ship
+  { flag: 0x0941, at: 0x14EE, hit: missileHit },    // $10D8 - a missile did
+];
+
+/**
+ * `$103E`-`$10E4` - tick the debris, render, service the flags, and test for the staged win.
+ *
+ * The block runs past `$10AA` in both directions. `$10AA JMP $10CB` takes the winning path
+ * straight to the damage flags, skipping the other two classes; the losing path falls out of
+ * `$109F BCC $10AD` into those two and reaches the flags after them. An earlier reading had
+ * `$10AD` down as a second way out of the block, which cost it everything from there to
+ * `$10E4` - including both calls into the damage code. The parity harness could not catch
+ * that, because it only ever gave classes 2 and 3 counters below the threshold.
  *
  * @returns {{calls: number[], won: boolean}} `won` is `$10A7`, which does **not** end the
- *   mission: `$10AA` jumps back into the frame and it carries on to the block above.
+ *   mission: it carries on to the block above.
  */
-export function debrisFrame(mem) {
+export function debrisFrame(mem, shrink) {
   const calls = [];
   mem[0x8289] = 0;                                           // $1040
   mem[0x8165] = 0;                                           // $1043
@@ -311,16 +345,34 @@ export function debrisFrame(mem) {
 
   // $1098 - class 1's counter at three or more kills the base star. Note what it is not:
   // there is no test of the other two counters here, and no test of anything else.
+  let won = false;
   if (mem[DEBRIS[0]] !== 0 && mem[DEBRIS[0]] >= DEBRIS_WIN) {
     calls.push(DEBRIS_CALLS.stagedWin, DEBRIS_CALLS.stagedWin);   // $10A1, $10A4
     mem[BASE_STAR] = (mem[BASE_STAR] + 1) & 0xff;                 // $10A7
-    return { calls, won: true };                                  // $10AA - and it goes on
+    won = true;                                                   // $10AA JMP $10CB
+  } else {
+    // $10AD, $10BC - classes 2 and 3, on the same threshold but not the same terms: one
+    // burst instead of two, the counter is zeroed, and `$1FFF` is not touched. Only class 1
+    // pays progress, which is why killing the base star is the only thing that stages.
+    for (const counter of [DEBRIS[1], DEBRIS[2]]) {
+      if (mem[counter] < DEBRIS_WIN) continue;                    // CPX #$03 / BCC
+      calls.push(DEBRIS_CALLS.stagedWin);
+      mem[counter] = 0;
+    }
   }
-  return { calls, won: false };
+
+  // $10CB, $10D8 - and now the damage the base star did this frame.
+  for (const { flag, at, hit } of DAMAGE_FLAGS) {
+    if (mem[flag] === 0) continue;
+    calls.push(at);
+    hit(mem, shrink);
+    mem[flag] = 0;
+  }
+  return { calls, won };                                          // and it falls into $10E5
 }
 
 // ---------------------------------------------------------------------------------------
-// The two award blocks, $0F21-$0F61 and $0F69-$0FA9 - and a one-bit difference between them.
+// The two award blocks, $0F21-$0F61 and $0F69-$0FA9 - and an instruction this copy has wrong.
 //
 // Each is the same seven steps: four `JSR $9C4B` calls that hand MATH its operands, a
 // `JSR $142A`, a `JSR $99D2` compare, and a `BPL` that skips everything when the answer is
@@ -332,16 +384,28 @@ export function debrisFrame(mem) {
 // third: class 1's counter at `$093E` is written by nothing but `$10FF`, the staged win
 // itself, which is why class 1 is the base star rather than an enemy.
 //
-// **The second block has `ROL $0907` where the first has `LDX $0906`.** The bytes are
-// `AE 06 09` against `2E 07 09` - one bit of one opcode - with identical alignment either
-// side, so it is not a disassembly artefact. Measured in the machine: it rotates `$0907`
-// left through carry ($12 becomes $24, or $25 with carry in; $81 becomes $02) and leaves X
-// holding whatever `$0F75 LDX $0930` put there. So the second block corrupts its own operand
-// every time it runs, and hands MATH the previous one twice.
+// **The second block has `ROL $0907` where it should have `LDX $0907`.** `AE` against `2E` -
+// bit 7 of one opcode byte - and the operand and the alignment either side are identical, so
+// it is not a disassembly artefact. Measured in the machine, it rotates `$0907` left through
+// carry and leaves X holding whatever `$0F75 LDX $0930` put there, so the block hands MATH
+// the previous operand twice and damages `$0907` on its way past.
 //
-// Whether that was a typo or bit rot is not knowable from here. What it does is measurable,
-// so it is written as what it does. `$0907` is one of the bytes this file has never managed
-// to name, and now there is a reason to want to: it is the one the game damages itself.
+// This file once said that whether that was intended was not knowable from here. It is. The
+// same block exists in the main mission, at `$0F40`, and `$0F55` is `LDX $0907` - the same
+// operand, the same place in the sequence, the opcode intact. And `$0907` is not an ordinary
+// byte: it is a **directory entry**, one of the 65 at `$08F2` that hold table offsets, so the
+// next instruction uses it as an index. Rotating it cannot do anything but aim the copy
+// somewhere else, and after enough passes it reaches zero and the copy lands on table[0].
+// There is no reading of that as a design.
+//
+// There are two of them, and the other is in the shot's advance block at `$101C ROL $0914`,
+// against `LDX $0914` at the main mission's `$13F4`. Same single bit, same shape of damage:
+// `$0914` is a directory entry too, class 3's missile Z.
+//
+// **So both are repaired, and the repair is the default.** `ROTATED_INDICES` below is the
+// evidence and `rotatedIndices: true` reproduces what this copy does, which is what the
+// parity harness compares against the machine - the machine is running the same copy. On an
+// undamaged image the repair is a no-op, which is the argument for doing it by default.
 
 /** $1FF7 again, by the only two instructions that raise it: `$0F53` and `$0F9B`. */
 export const AWARD_SITES = [0x0F53, 0x0F9B];
@@ -354,6 +418,19 @@ export const SECOND_GATE = 0x817F;
 
 /** $0907 - the byte `$0F7E` rotates instead of loading. */
 export const ROTATED = 0x0907;
+
+/**
+ * The two `ROL abs` that should be `LDX abs`, and the main-mission instruction that says so.
+ *
+ * `twin` is an address in `STAR DESTROYER.OBJ0`. Each one holds `AE` with the same operand
+ * where this file's copy of the finale holds `2E`, which is the single bit.
+ */
+export const ROTATED_INDICES = [
+  /** The second award block's third operand - the shot's Z. */
+  { at: 0x0F7E, operand: 0x0907, twin: 0x0F55 },
+  /** The shot advance's third operand - the same axis, a different variable. */
+  { at: 0x101C, operand: 0x0914, twin: 0x13F4 },
+];
 
 /**
  * What each block calls when the kill lands.
@@ -444,26 +521,31 @@ export const TARGET = { x: 0x0930, z: 0x0931 };
  * @param {Uint8Array} mem
  * @param {import('./math.js').Math24} math
  * @param {number} which 0 or 1
- * @param {{copy: Function, compare: Function}} geom `rangeFromArgs`, passed in so this file
- *   does not reach across into the main mission's modules for anything but the arithmetic
- *   and `carry` for the flag `$0F7E` rotates in, which MATH's model does not carry
- * @returns {{hit: boolean, stale: boolean}} `stale` marks the copy the ROL spoiled
+ * @param {object} geom `rangeFromArgs`, `GEOM` and `dir`, passed in so this file does not
+ *   reach across into the main mission's modules for anything but the arithmetic; `carry` is
+ *   the flag `$0F7E` rotates in, which MATH's model does not carry, and `rotatedIndices`
+ *   turns the repair off
+ * @returns {{hit: boolean, stale: boolean}} `stale` marks the copy the ROL spoiled, and is
+ *   false whenever the repair is in force
  */
-export function hitTest(mem, math, which, { rangeFromArgs, GEOM, dir, carry = 0 }) {
+export function hitTest(mem, math, which, { rangeFromArgs, GEOM, dir, carry = 0,
+  rotatedIndices = false }) {
   const shot = SHOTS[which];
   // Every operand goes through the directory at $08F2, because `JSR $9C4B` takes table
   // indices and not addresses - which is what these are written as above.
   math.copy(dir(shot.x), GEOM.aX);                  // $0F21 / $0F69
   math.copy(dir(TARGET.x), GEOM.bX);                // $0F2A / $0F72
-  // $0F33 / $0F7B: block A loads $0906 here. Block B's LDX is a ROL, so X is never loaded
-  // and keeps whatever the copy above left in it - and `$9C4B` walks X forward three bytes
-  // as it copies, so it ends on the index *after* its source. Table entries are three bytes,
-  // so "three past $0930" is exactly $0931. Measured: X is 218, which is $0931's index.
+
+  // $0F33 / $0F7B - the shot's own Z, which is what both blocks mean to copy.
   //
-  // So block B copies the target's Z into **both** points: aZ and bZ get the same value, the
-  // Z delta is always zero, and the range it measures is the X distance alone. The second
-  // weapon hits on how far across the target is and not on how far away.
-  const stale = which === 1;
+  // As found, block B's LDX is a ROL, so X is never loaded and keeps whatever the copy above
+  // left in it - and `$9C4B` walks X forward three bytes as it copies, so it ends on the
+  // index *after* its source. Table entries are three bytes, so "three past $0930" is exactly
+  // $0931. Measured: X is 218, which is $0931's index. Block B then copies the target's Z into
+  // **both** points, the Z delta is always zero, and the range it measures is the X distance
+  // alone - the second weapon hitting on how far across the target is rather than how far
+  // away. That is the behaviour `rotatedIndices` asks for.
+  const stale = rotatedIndices && which === 1;
   math.copy(dir(stale ? TARGET.z : shot.z), GEOM.aZ);
   math.copy(dir(TARGET.z), GEOM.bZ);                // $0F3C / $0F84
   if (stale) {
@@ -474,6 +556,269 @@ export function hitTest(mem, math, which, { rangeFromArgs, GEOM, dir, carry = 0 
     mem[ROTATED] = rotate(mem[ROTATED], carry).value;
   }
   rangeFromArgs(math);                              // $0F45 / $0F8D JSR $142A
-  // $0F4E / $0F96 - range <= threshold is a hit, equality included.
-  return { hit: math.compare(GEOM.range, dir(HIT_RANGE)) >= 0, stale };
+  // $0F4E / $0F96 - `LDY $090A / LDX $092F / JSR $99D2 / BPL`, so the threshold is the X
+  // operand and the range is the Y operand, and `BPL` skips the award. `BPL` is taken on
+  // zero, so **the range has to be strictly inside the threshold**: equality is not a hit.
+  //
+  // This read `compare(GEOM.range, dir(HIT_RANGE)) >= 0` and called equality a hit, which is
+  // the two operands the wrong way round. The swap cancels itself everywhere except on the
+  // boundary, which is why thirteen cases agreed with the machine and none of them could
+  // tell. `parity_finale.mjs` now stands a case exactly on it.
+  return { hit: math.compare(dir(HIT_RANGE), GEOM.range) < 0, stale };
+}
+
+// ---------------------------------------------------------------------------------------
+// $0D5F-$0E2B - the base star takes aim and shoots back.
+//
+// This is the only enemy in either binary that fires at the ship, and it is the main mission's
+// own dispatch doing it: `$0D5F` is `dispatch.js`'s `$0D5B` four bytes along, reached from the
+// same place in the frame, on class 3's fields - object 3's heading, object 5 as the shot,
+// `$093A` as the cooldown. Four things differ, and the first of them is the one that can be
+// seen from the cockpit.
+//
+// **It tests four candidate headings where the main mission tests two.** Both try the heading
+// it is on and one unit past; the finale then tries `h + $7F + C` and one past *that*. A
+// heading is a byte and the circle is 256 units, so `+$80` is the reciprocal bearing: the base
+// star will shoot at you when you are dead astern exactly as readily as dead ahead. Nothing
+// else in the game can.
+//
+// The carry in `h + $7F + C` is not an unknown. `$0D86 ADC #$7F` follows `$0D7B CMP`, which
+// compared the second candidate against the bearing, so `C` is `(h + 1) >= target` and the
+// third candidate is the reciprocal when that compare went one way and one short of it when
+// it went the other.
+//
+// **It aims in scratch.** The main mission walks object 3's live heading with `INC` and `DEC`
+// and has to undo the probe before turning; the finale copies the heading into `$8147` -
+// object 2's heading operand, which it is not otherwise using - and leaves object 3 alone. So
+// the shot leaves on the candidate that matched, which can be the reciprocal, while the base
+// star itself goes on pointing where it was.
+//
+// **It decides which way to turn from the heading itself.** `$0D9E CMP` compares `$8154`,
+// where the main mission's `$1593 BCS` is still carrying the flags from its probe at `h + 1`.
+// One unit, and it only shows on the frame where the two straddle the bearing.
+//
+// **Its cooldown is twelve frames, not fifteen** - and firing also writes the page toggle into
+// class 2's cooldown at `$0939`, which has no counterpart in the main mission at all.
+
+/** $8147 - object 2's heading operand, which the aim test borrows as scratch. */
+export const AIM_SCRATCH = field(2, 'heading');
+
+/**
+ * The base star, as one of `dispatch.js`'s classes.
+ *
+ * Class 3's fields throughout, because that is whose block this is, with the two values the
+ * finale changed. `twin`, `missile` and `missileTwin` are objects 15, 5 and 17 exactly as in
+ * the main mission: the shot the base star fires is the same display-list record that classes
+ * 2 and 3 share there.
+ */
+export const BASE_STAR_CLASS = {
+  name: 'the base star',
+  at: 0x0D5F,
+  enemy: 3,
+  twin: 15,
+  missile: 5,
+  missileTwin: 17,
+  /** $093A, and `$0DDB LDX #$0C` where the main mission loads 15. */
+  cooldown: 0x093A,
+  cooldownFrames: 0x0C,
+  /** $0945, stored from the accumulator, which holds the candidate that matched. */
+  launchSound: 0x0945,
+  soundStoresHeading: true,
+  coolingTurn: 'down',
+  /** $0DE0 LDX $0947 / STX $0939 - the page toggle into class 2's cooldown. */
+  alsoCool: { at: 0x0939, from: TOGGLE },
+  enemyPos: [0x0930, 0x0931],
+  missilePos: [0x0912, 0x0914],
+  missileStep: [0x0928, 0x092A],
+  /** $0FD4 - three increments of the shot's bank a frame, so it rolls as it flies. */
+  bankSpin: 3,
+};
+
+/** `BASE_STAR_CLASS` with its variable addresses turned into table indices. */
+export const baseStarClass = (dir) => ({
+  ...BASE_STAR_CLASS,
+  enemyPos: BASE_STAR_CLASS.enemyPos.map(dir),
+  missilePos: BASE_STAR_CLASS.missilePos.map(dir),
+  missileStep: BASE_STAR_CLASS.missileStep.map(dir),
+});
+
+/**
+ * `$0D5F`-`$0E2B` - aim at the ship, and fire if any of four headings matches.
+ *
+ * The class's `enemyPos`, `missilePos` and `missileStep` have to be table indices rather than
+ * addresses, so pass them through `dir`; `BASE_STAR_CLASS` carries the addresses as the
+ * listing writes them.
+ *
+ * @param {Uint8Array} mem a 64K image: the display list at $80FB and the state at $0900
+ * @param {import('./math.js').Math24} math
+ * @param {(address: number) => number} dir the directory at $08F2
+ * @returns {{action: string, candidate?: number, direction?: string}}
+ */
+export function aimAndFire(mem, math, dir) {
+  const c = baseStarClass(dir);
+
+  // $0D5F - cooling, and it turns without looking at the bearing at all.
+  if (mem[c.cooldown] !== 0) return { ...turnDown(mem, c), action: 'cooling' };
+
+  const target = math.table[(BEARING + 1) & 0xff];     // $0D67 LDY $090B
+  const h = field(3, 'heading');                       // $8154
+
+  // $0D6D-$0D99 - the four candidates, every one of them tested in scratch.
+  mem[AIM_SCRATCH] = mem[h];                                     // $0D6D STA $8147
+  if (mem[AIM_SCRATCH] === target) return shoot(mem, math, c);   // $0D70 / $0D73
+  mem[AIM_SCRATCH] = (mem[h] + 1) & 0xff;                        // $0D75 INC
+  if (mem[AIM_SCRATCH] === target) return shoot(mem, math, c);   // $0D7B / $0D7E
+  // The carry the compare at $0D7B just left: CMP sets it when A is at or above the operand,
+  // and A was the candidate above. $0D83 LDA does not disturb it, so the ADC takes it in.
+  const carry = mem[AIM_SCRATCH] >= target ? 1 : 0;
+  mem[AIM_SCRATCH] = (mem[h] + 0x7F + carry) & 0xff;             // $0D80 DEC / $0D86 ADC #$7F
+  if (mem[AIM_SCRATCH] === target) return shoot(mem, math, c);   // $0D8B / $0D8E
+  mem[AIM_SCRATCH] = (mem[AIM_SCRATCH] + 1) & 0xff;              // $0D90 INC
+  if (mem[AIM_SCRATCH] === target) return shoot(mem, math, c);   // $0D96 / $0D99
+
+  // $0D9B - and otherwise turn, on the heading itself rather than on the probe.
+  return mem[h] >= target ? turnDown(mem, c) : turnUp(mem, c);   // $0DA1 BCS
+}
+
+/** `$0DC6`-`$0E2B` - the launch, on whichever candidate matched. */
+function shoot(mem, math, c) {
+  const candidate = mem[AIM_SCRATCH];                  // $0DF8 LDY $8147
+  return { ...fire(mem, math, c, candidate), candidate };
+}
+
+/**
+ * `$0FAC`-`$103D` - one frame of the base star's shot in flight.
+ *
+ * `entities.js`'s `missile` is this block: the only differences are the bank spin, which
+ * `BASE_STAR_CLASS` carries, and `$101C`, which `rotatedIndices` turns back on.
+ *
+ * `$1039 STA $0941` is `missile`'s own `mem[HIT] = 1` - the same address - so a hit here is
+ * already recorded by the time this returns, and `debrisFrame` picks it up at `$10D8`.
+ *
+ * @param {Uint8Array} mem
+ * @param {import('./math.js').Math24} math
+ * @param {(address: number) => number} dir the directory at $08F2
+ * @param {object} opts `missile` is `entities.js`'s, passed in so this file keeps its one
+ *   direction of dependency; `rotatedIndices` reproduces what this copy does, and `carry` is
+ *   the bit that rotation takes in - the flag `$1016 JSR $9C4B` left, which MATH's model does
+ *   not carry, so the harness supplies the machine's
+ */
+export function shotAdvance(mem, math, dir, { missile, rotatedIndices = false, carry = 0 }) {
+  const r = missile(mem, math, baseStarClass(dir), { staleZ: rotatedIndices });
+  // `flying` is the gate at `$0FAC`: with the shot not up, `$0FB3` leaves the block and
+  // `$101C` never runs, so the byte is only damaged on the frames the shot is in the air.
+  if (rotatedIndices && r.flying) {
+    // $101C ROL $0914 - the other half of what the rotation does. The substituted index is
+    // what the block uses this frame; this is the damage it leaves for the next one, and it
+    // is applied after the fact because nothing between $101C and the end of the block reads
+    // the byte again.
+    const at = ROTATED_INDICES[1].operand;
+    mem[at] = rotate(mem[at], carry).value;
+  }
+  return r;
+}
+
+// ---------------------------------------------------------------------------------------
+// $0957-$09A6 - the entry, which is everything before the frame starts.
+//
+// Thirty instructions, and nothing in them is a surprise once the rest of the file is read:
+// the hit range is set, the stage counter cleared, the keyboard strobe cleared, both hi-res
+// pages primed, the page toggle cleared, and the viewer's X published. Then `$09A7` begins
+// the frame, which is `loop.js`'s `Game.pass` at `$09A3`, four bytes along.
+//
+// **The hit range is fifteen, and it is set here rather than built into the data.** `$0958
+// LDY $092F / LDA #$0F / STA $9801,Y` writes the *middle* byte of the entry, which is the
+// integer part - the table is byte-indexed little-endian, so the low byte is a fraction this
+// leaves alone. `$092F` is the same threshold an enemy rams the ship at in the main mission.
+//
+// **The two renders prime both pages.** `$8110` takes $54 then $55, the low bytes of the two
+// page soft switches, and the clear and draw operands take 1 then 0 - which is `selectPages`
+// with the toggle at 0 and then at 1. Running the renderer once for each means neither page
+// is showing whatever was left in it when the mission before this one ended.
+
+/** `$0958` - fifteen, into the middle byte of `$092F`'s entry. */
+export const ENTRY_HIT_RANGE = 0x0F;
+
+/** $C010 - the keyboard strobe, cleared at `$096A` by a write of any value. */
+export const STROBE = 0xC010;
+
+/**
+ * `$0957`-`$09A6` - set the mission up, and leave the frame to run.
+ *
+ * @param {Uint8Array} mem a 64K image: the display list at $80FB and the state at $0900
+ * @param {import('./math.js').Math24} math
+ * @param {(address: number) => number} dir the directory at $08F2
+ * @param {object} [opts] `render` is called for each of the two priming passes
+ * @returns {{renders: number}}
+ */
+export function enter(mem, math, dir, { render = () => {} } = {}) {
+  // $0958 - the middle byte only. The other two are whatever the data file left.
+  math.table[(dir(HIT_RANGE) + 1) & 0xff] = ENTRY_HIT_RANGE;
+
+  mem[PROGRESS] = 0;                        // $0960 LDA #$00 / STA $1FF7
+  mem[STROBE] = 0;                          // $096A STX $C010
+
+  // $096D, $097D - once with the toggle at 0 and once at 1, so both pages are drawn.
+  let renders = 0;
+  for (const toggle of [0, 1]) {
+    mem[PAGE] = toggle;
+    selectPages(mem);
+    render();                               // $097A, $098A JSR $6000
+    renders += 1;
+  }
+
+  // $098D - and the toggle starts the frame at zero, whatever the priming left it.
+  // `TOGGLE` and `loop.js`'s `PAGE` are the same byte under two names.
+  mem[TOGGLE] = 0;
+
+  // $0992 - the viewer's X, into the VIEWER instruction and object 12's record. This is
+  // `publishShip` with the Z half left out: the entry publishes one axis, and the frame
+  // publishes both from $0A63 onward.
+  publishShip(mem, math, { axes: ['x'] });
+
+  return { renders };
+}
+
+// ---------------------------------------------------------------------------------------
+// $0E2C-$0E47 - the base star reaches the ship, and does not die for it.
+//
+// Ten instructions, and the main mission has the same ten at `$0E05` with the last three
+// different - which is the whole difference between an enemy and the base star:
+//
+//     main    LDX #$01 / STX $0942      the ram flag
+//             LDX #$00 / STX $8131 / STX $8255      object 1's count and its twin's: dead
+//     finale  LDX #$01 / STX $0942      the same flag
+//                        STX $814B / STX $826F      object 3's count and its twin's: ONE
+//             DEC $1FFB                 and the third wave counter goes down
+//
+// **Ramming the ship kills a main-mission enemy and does not kill the base star.** Its count
+// goes to 1 rather than 0, so it is still there next frame - and `$814B` at 1 is also what
+// keeps `endOfFrame`'s "is the field empty" test from ending the mission.
+//
+// **The compare is the award block's compare with the branch the other way up.** `LDY $092F /
+// LDX $090A / JSR $99D2 / BPL` - the same threshold and the same range, but here `BPL` is the
+// branch that *acts* rather than the one that skips. `BPL` is taken on zero either way, so a
+// range exactly equal to the threshold **is** a ram and **is not** an award.
+
+/** $1FFB - the third wave counter, which only this block decrements in the finale. */
+export const WAVE3 = 0x1FFB;
+
+/**
+ * `$0E2C`-`$0E47` - is the base star on top of the ship?
+ *
+ * @param {Uint8Array} mem
+ * @param {import('./math.js').Math24} math
+ * @param {object} geom `GEOM` and `dir`
+ * @returns {{reached: boolean}}
+ */
+export function reached(mem, math, { GEOM, dir }) {
+  // $0E32 - the threshold is the Y operand here and the range is the X one, so this is the
+  // award block's comparison with its arguments swapped as well as its branch.
+  if (math.compare(GEOM.range, dir(HIT_RANGE)) < 0) return { reached: false };  // $0E37
+
+  mem[DAMAGE_FLAGS[0].flag] = 1;                      // $0E3C STX $0942
+  mem[OBJ3_COUNT] = 1;                                // $0E3F STX $814B
+  mem[field(15, 'count')] = 1;                        // $0E42 STX $826F
+  mem[WAVE3] = (mem[WAVE3] - 1) & 0xff;               // $0E45 DEC $1FFB
+  return { reached: true };
 }
