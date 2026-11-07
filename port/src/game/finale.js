@@ -310,7 +310,15 @@ export const DAMAGE_FLAGS = [
 ];
 
 /**
- * `$103E`-`$10E4` - tick the debris, render, service the flags, and test for the staged win.
+ * `$1046`-`$10E4` - tick the debris, render, service the flags, and test for the staged win.
+ *
+ * **It starts at `$1046`, not `$103E`.** `$1037 BPL $1046` jumps over `$1039`-`$1045`, and so
+ * does `$0FB3 JMP $1046` when the shot is not up, so those four instructions are not the head
+ * of this block at all: they are the shot's hit path - the flag, and then zeroing object 5's
+ * count and its twin's to take the shot off the screen. `entities.js`'s `missile` already does
+ * both, at the same two addresses. This block had them at its head, which zeroed the counts on
+ * every frame and would have taken the base star's shot away the moment it launched. A trace
+ * of one real frame is what found it: `$103E` is never reached in a frame where nothing hits.
  *
  * The block runs past `$10AA` in both directions. `$10AA JMP $10CB` takes the winning path
  * straight to the damage flags, skipping the other two classes; the losing path falls out of
@@ -324,9 +332,6 @@ export const DAMAGE_FLAGS = [
  */
 export function debrisFrame(mem, shrink) {
   const calls = [];
-  mem[0x8289] = 0;                                           // $1040
-  mem[0x8165] = 0;                                           // $1043
-
   for (const [i, counter] of DEBRIS.entries()) {             // $1047, $1054, $1061
     if (mem[counter] === 0) continue;
     calls.push(DEBRIS_CALLS.draw);                           // JSR $14FB, Y = the class

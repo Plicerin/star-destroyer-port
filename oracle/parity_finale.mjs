@@ -200,7 +200,9 @@ try {
       const st = cpu.getState();
       wr(0x100 + st.sp, 0xFF); st.sp = (st.sp - 1) & 0xff;
       wr(0x100 + st.sp, 0xFE); st.sp = (st.sp - 1) & 0xff;
-      st.pc = 0x103E; cpu.setState(st);
+      // $1046, the block's real head. Entering at $103E ran the shot's hit path first, so the
+      // two counts it zeroes were compared only ever having been zeroed.
+      st.pc = 0x1046; cpu.setState(st);
       const calls = []; let site1 = 0;
       cpu.stepCyclesDebug(8000000, () => {
         const pc = cpu.getPC();
@@ -302,7 +304,11 @@ try {
                   // Shield, warp and missiles full and the hit count clear, so the ordinary
                   // damage path runs rather than the fatal one - the three checks above
                   // already drive that directly.
-                  [SHLD]: 0xFF, [WARP]: 0xFF, [MSL]: 0xFF, [HITS]: 0 };
+                  [SHLD]: 0xFF, [WARP]: 0xFF, [MSL]: 0xFF, [HITS]: 0,
+                  // The shot up, with a count of its own, so the comparison can tell a block
+                  // that leaves it alone from one that zeroes it. With these at 0 the check
+                  // passed whichever the port did.
+                  [field(5, 'count')]: 20, [field(17, 'count')]: 20 };
                 const r = await frame(pokes);
                 const mem = new Uint8Array(0x10000);
                 for (const [a, v] of Object.entries(r.seeded)) mem[a] = v;
@@ -325,6 +331,26 @@ try {
                 }
                 if (!said && got.won !== (r.site1 > 0)) {
                   wrong.push(`${why}: won ${got.won} vs ${r.site1 > 0}`);
+                  said = true;
+                }
+                // Object 5's count and its twin's are not compared byte for byte, because
+                // `$106E JSR $6000` is in this block and the count is the renderer's own frame
+                // counter - the port records the render rather than running it here. What is
+                // asserted is the thing that was wrong: the block does not *zero* them. Those
+                // two writes are at $1040 and $1043, above this block's head at $1046, and
+                // they belong to the shot's hit path.
+                for (const a of [field(5, 'count'), field(17, 'count')]) {
+                  if (said) break;
+                  if (r.after[a] === 0 || r.after[a] < r.seeded[a] - 1) {
+                    wrong.push(`${why}: ${hx(a)} went ${r.seeded[a]} -> ${r.after[a]} in the`
+                      + ' machine, which is more than the renderer');
+                    said = true;
+                  }
+                  if (mem[a] !== r.seeded[a]) {
+                    wrong.push(`${why}: the port moved ${hx(a)} to ${mem[a]}, and only the`
+                      + ' renderer may');
+                    said = true;
+                  }
                 }
               }
             }
@@ -1070,6 +1096,68 @@ try {
         `$814B and $826F come out at 1, not 0, and object 1's count at ${hx(0x8131)} is`
           + ' untouched - the main mission\'s $0E18 zeroes its enemy here');
     }
+  }
+
+  // --------------------------------------------------------------- the order of the frame ---
+  // The blocks are ported; what is not built yet is the frame that drives them, and that needs
+  // the order the machine runs them in rather than the order they sit at in memory. So one real
+  // frame is run from `$09A7` and every arrival at the head of a known block is recorded.
+  //
+  // This is also what found the debris block's real head. `$103E` is never reached in a frame
+  // where nothing hits the ship - `$1037 BPL $1046` goes over it - so the four instructions
+  // there are the shot's hit path and not this block's beginning.
+  console.log('\n=== the order of the frame ===');
+  {
+    const MARKS = [
+      [0x09D5, 'the ship'], [0x0A67, 'publishShip'], [0x0A96, 'the throttle'],
+      [0x0AC0, 'selectPages'], [0x0ADF, 'the trigger'], [0x0B6E, 'shot 1'], [0x0BBB, 'shot 2'],
+      [0x0C08, 'the enemy region'], [0x0C09, 'the gate on object 3'], [0x0C13, 'rangeToTarget'],
+      [0x0D5F, 'aimAndFire'], [0x0E2C, 'reached'], [0x0E66, 'move'], [0x0FAC, 'shotAdvance'],
+      [0x1046, 'debrisFrame'], [0x10CB, 'the damage flags'], [0x10E5, 'endOfFrame'],
+      [0x112E, 'round again'],
+    ];
+    const r = JSON.parse(await a2.ev(`JSON.stringify((() => {
+      const cpu = window.M.cpu;
+      const want = new Set(${JSON.stringify(MARKS.map((m) => m[0]))});
+      const seen = [];
+      const st = cpu.getState(); st.pc = 0x09A7; cpu.setState(st);
+      cpu.stepCyclesDebug(60000000, () => {
+        const pc = cpu.getPC();
+        if (want.has(pc) && seen[seen.length - 1] !== pc) seen.push(pc);
+        if (pc === 0x112E || pc === 0x112D || pc === 0x10EC) return true;
+      });
+      return { seen, at: cpu.getPC() };
+    })())`));
+
+    // $09A7 itself is left out: the debugger's callback runs after the first instruction, so
+    // the entry address is never offered to it.
+    const expected = MARKS.map((m) => m[0]);
+    const same = r.seen.length === expected.length && r.seen.every((v, i) => v === expected[i]);
+    console.log(`  ${r.seen.map((pc) =>
+      MARKS.find((m) => m[0] === pc)[1]).join(' -> ')}`);
+    check('one frame runs the ported blocks in the order a Finale class will have to',
+      same,
+      same ? `${r.seen.length} blocks, ending on ${hx(0x112E)} - and every one of them is`
+        + ' ported, so the frame is composition rather than transliteration'
+        : `got ${r.seen.map((x) => hx(x)).join(' ')}`);
+
+    // The control: the debris block's head is $1046 and the machine does not reach $103E on a
+    // frame where nothing hits, which is what the two writes there being the shot's rests on.
+    const reached103E = JSON.parse(await a2.ev(`JSON.stringify((() => {
+      const cpu = window.M.cpu;
+      const st = cpu.getState(); st.pc = 0x09A7; cpu.setState(st);
+      let hit = false;
+      cpu.stepCyclesDebug(60000000, () => {
+        const pc = cpu.getPC();
+        if (pc === 0x103E) hit = true;
+        if (pc === 0x112E || pc === 0x112D || pc === 0x10EC) return true;
+      });
+      return hit;
+    })())`));
+    check('control: $103E is not reached, so its two writes are the shot\'s and not the block\'s',
+      reached103E === false,
+      'the frame above ran the debris block without ever touching $103E - $1040 and $1043 zero'
+        + " object 5's count and its twin's, which is `missile` taking the shot off the screen");
   }
 } finally {
   await a2.close();

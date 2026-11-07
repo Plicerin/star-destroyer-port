@@ -2615,6 +2615,37 @@ calls into the damage code. The harness could not have caught it: it only ever g
 and 3 counters below the threshold, so nothing it ran ever reached `$10AD` by the falling path.
 The cases now straddle the threshold and set both damage flags.
 
+**And the block begins at `$1046`, not `$103E`.** `$1037 BPL $1046` jumps over `$1039`-`$1045`,
+and so does `$0FB3 JMP $1046` when the shot is not up, so those four instructions are not this
+block's head at all: they are the shot's hit path - the flag at `$0941`, then zeroing object 5's
+count and its twin's to take the shot off the screen, which is what `entities.js`'s `missile`
+already does at those same two addresses. `finale.js` had them at the head of the debris block,
+running every frame, which would have deleted the base star's shot the moment it launched.
+
+Two things had to be true for the harness to miss that, and both are the death bug's lesson
+again: **the driver chose `$103E` as its entry**, so the only path it ever compared was the one
+where those writes had already happened, and **object 5's count was never seeded non-zero**, so
+zeroing it and leaving it alone gave the same answer. A trace of one real frame is what found
+it - `$103E` is never reached in a frame where nothing hits the ship.
+
+The counts are not compared byte for byte, because `$106E JSR $6000` is inside this block and
+the count is the renderer's own frame counter; what is asserted is that the block may not *zero*
+them. Confirmed failable by putting the bug back.
+
+### The order of the frame
+
+One frame, run from `$09A7` and recorded at the head of every known block:
+
+> the ship -> publishShip -> the throttle -> selectPages -> the trigger -> shot 1 -> shot 2 ->
+> the enemy region -> the gate on object 3 -> rangeToTarget -> aimAndFire -> reached -> move ->
+> shotAdvance -> debrisFrame -> the damage flags -> endOfFrame -> round again
+
+Every one of those is ported, so the frame is composition rather than transliteration. Two
+things differ from `Game.pass`, which is otherwise the same frame: the finale has **one** enemy
+region where the main mission has three, and the awards sit inside that region's shot-hit tests
+rather than at the end of the frame, with the damage serviced by the debris block instead of a
+closing `applyDamage`.
+
 ### The route is not walkable, and that is a separate bug
 
 The honest way in is to finish a flight and let `SD PART2` line 175 route to `HYPERDRIVE 3`,
