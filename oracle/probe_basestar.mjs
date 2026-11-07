@@ -186,13 +186,22 @@ console.log('\n=== the rules that differ, and would be silently wrong if assumed
 console.log('\n=== how much of the finale is the main mission, relocated ===');
 {
   const BRANCH = /^(BCC|BCS|BEQ|BNE|BMI|BPL|BVC|BVS)$/;
-  const image = (f) => { const mem = []; for (let i = 0; i < f.len; i++) mem[f.addr + i] = f.data[i];
-    return { mem, lo: f.addr, hi: f.addr + f.len }; };
+  // Only real instructions. The first version scanned every byte for $20 and called each one
+  // a JSR, which finds bytes that merely look like a call: $0D2A came from three such, none
+  // of them an instruction, and the "routine" it produced was a 346-instruction span running
+  // through three blocks already ported and stopping at their RTS. It inflated the finale's
+  // own share from 348 instructions to 694 by counting ported code twice.
+  const image = (f) => {
+    const mem = [];
+    for (let i = 0; i < f.len; i++) mem[f.addr + i] = f.data[i];
+    const { starts } = traverse(mem, [ENTRY], { lo: f.addr, hi: f.addr + f.len });
+    return { mem, lo: f.addr, hi: f.addr + f.len, starts };
+  };
   const shape = (img, entry) => {
     const insts = [];
     let a = entry;
     for (let i = 0; i < 400; i++) {
-      if (a < img.lo || a >= img.hi || img.mem[a] === undefined) return null;
+      if (!img.starts.has(a)) return null;
       const l = disasm1(img.mem, a);
       insts.push({ at: a, op: l.op, len: l.len, bytes: [...l.bytes] });
       if (l.op === 'RTS') break;
@@ -213,10 +222,11 @@ console.log('\n=== how much of the finale is the main mission, relocated ===');
   };
   const targets = (img) => {
     const out = new Set();
-    for (let a = img.lo; a < img.hi - 2; a++) {
+    for (const a of img.starts) {
       if (img.mem[a] !== 0x20) continue;
       const t = img.mem[a + 1] | (img.mem[a + 2] << 8);
-      if (t >= img.lo && t < img.hi) out.add(t);
+      // The target has to be an instruction too, or it is not a routine.
+      if (t >= img.lo && t < img.hi && img.starts.has(t)) out.add(t);
     }
     return [...out].sort((x, y) => x - y);
   };
@@ -244,8 +254,9 @@ console.log('\n=== how much of the finale is the main mission, relocated ===');
 
   check('a third of the finale\'s routines are main-mission routines moved',
     relocated.length === 14 && sum(relocated) === 208,
-    `${relocated.length} of ${relocated.length + own.length}, ${sum(relocated)} instructions`
-      + ' - identical but for the addresses their own branches name');
+    `${relocated.length} of ${relocated.length + own.length}, ${sum(relocated)} of`
+      + ` ${sum(relocated) + sum(own)} instructions - identical but for the addresses their`
+      + ' own branches name');
 
   // Every one of them is a routine the port has already written and already holds against
   // the machine, so they are not work: they are a lookup.
@@ -259,12 +270,19 @@ console.log('\n=== how much of the finale is the main mission, relocated ===');
     missing.length ? missing.map((r) => hx(r.to)).join(', ')
       : [...new Set(Object.values(PORTED))].sort().join(', '));
 
-  // The control: the finale's biggest routine is not one of them.
-  const biggest = own.sort((a, b) => b.n - a.n)[0];
-  check('control: the finale\'s own largest routine matches nothing in the main mission',
-    biggest && biggest.n > 300,
-    `${hx(biggest.from)} is ${biggest.n} instructions and has no twin - half of the`
-      + ` ${sum(own)} that still have to be written`);
+  own.sort((a, b) => b.n - a.n);
+  check('and the rest is the finale\'s own, in routines of ordinary size',
+    own.length === 18 && sum(own) === 348,
+    `${own.length} routines, ${sum(own)} instructions, the largest ${hx(own[0].from)} at`
+      + ` ${own[0].n} - and the damage block is among them, already ported`);
+
+  // The control. One of the finale's own has to fail to match, or "relocated" is not
+  // measuring anything: a key that matched everything would say the same thing.
+  const theirs = own.find((o) => o.n >= 30);
+  check('control: one of the finale\'s own routines matches nothing in the main mission',
+    !main.has(shape(bsImg, theirs.from).key),
+    `${hx(theirs.from)}, ${theirs.n} instructions, has no twin - so a match means the code is`
+      + ' the same and not merely the same shape of thing');
 }
 
 // ---------------------------------------------------------------- the machine ------------

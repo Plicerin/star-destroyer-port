@@ -2487,14 +2487,29 @@ And **every one of them is a routine the port already holds against the machine*
 work; they are a lookup. Four of them had been written down in `finale.js` as gaps before
 anyone checked.
 
-That leaves **19 routines and 694 instructions** that are the finale's own, and `$0D2A` is 346
-of them - half the remaining job in one routine. `probe_basestar.mjs` derives the mapping
-rather than storing it, so a module moving or a routine changing makes the check fail.
+That leaves **18 routines and 348 instructions** that are the finale's own, and the largest
+is `$1544` at 40. There is no monster routine in it: every one is of ordinary size, and the
+damage block is among them and already ported.
 
-What is still unported and genuinely the finale's: `$0D2A`, `$1544`, `$119E`, `$120B`,
-`$1382`, `$13C2`, `$15C5`, `$14FB` (the debris drawer), `$17A0`, `$15AC`, `$1591`, `$15F5`,
-`$1613`, `$1632`, `$171D`, `$1755`, `$175B`, `$1761` and `$177C`. They are named in
-`finale.js` rather than dropped.
+**The first version of this analysis said 19 routines and 694 instructions, with `$0D2A` at
+346 of them.** That was wrong and the way it was wrong is worth keeping. It found call targets
+by scanning every byte for `$20` and treating each as a `JSR`, which finds bytes that merely
+look like a call: `$0D2A` came from three such, none of them at an instruction boundary. The
+"routine" it produced was a 346-instruction span starting mid-instruction and running through
+the awards, the debris and the frame end - three blocks already ported - before stopping at
+their `RTS`. So the finale's own share was inflated by counting ported code twice, and the
+control that was supposed to prove the method worked was built on the phantom. The scan now
+walks only addresses `traverse` reached from `$0957`, and requires the target to be an
+instruction too.
+
+`probe_basestar.mjs` derives the mapping rather than storing it, so a module moving or a
+routine changing makes the check fail, and the control is now one of the finale's own
+routines failing to match.
+
+What is still unported and genuinely the finale's: `$1544`, `$119E`, `$120B`, `$1382`,
+`$13C2`, `$15C5`, `$14FB` (the debris drawer), `$17A0`, `$15AC`, `$1591`, `$15F5`, `$1613`,
+`$1632`, `$171D`, `$1755`, `$175B`, `$1761` and `$177C`. They are named in `finale.js` rather
+than dropped.
 
 ### The route is not walkable, and that is a separate bug
 
