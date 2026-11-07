@@ -307,3 +307,71 @@ export function debrisFrame(mem) {
   }
   return { calls, won: false };
 }
+
+// ---------------------------------------------------------------------------------------
+// The two award blocks, $0F21-$0F61 and $0F69-$0FA9 - and a one-bit difference between them.
+//
+// Each is the same seven steps: four `JSR $9C4B` calls that hand MATH its operands, a
+// `JSR $142A`, a `JSR $99D2` compare, and a `BPL` that skips everything when the answer is
+// positive. When it is not, the enemy died: the progress counter goes up by one, that class's
+// debris counter is loaded with four, and three routines run.
+//
+// **$1FF7 is only ever incremented here.** Fifteen of these is what fires the staged win in
+// the debris block, so these two sites are the whole of the finale's scoring. There is no
+// third: class 1's counter at `$093E` is written by nothing but `$10FF`, the staged win
+// itself, which is why class 1 is the base star rather than an enemy.
+//
+// **The second block has `ROL $0907` where the first has `LDX $0906`.** The bytes are
+// `AE 06 09` against `2E 07 09` - one bit of one opcode - with identical alignment either
+// side, so it is not a disassembly artefact. Measured in the machine: it rotates `$0907`
+// left through carry ($12 becomes $24, or $25 with carry in; $81 becomes $02) and leaves X
+// holding whatever `$0F75 LDX $0930` put there. So the second block corrupts its own operand
+// every time it runs, and hands MATH the previous one twice.
+//
+// Whether that was a typo or bit rot is not knowable from here. What it does is measurable,
+// so it is written as what it does. `$0907` is one of the bytes this file has never managed
+// to name, and now there is a reason to want to: it is the one the game damages itself.
+
+/** $1FF7 again, by the only two instructions that raise it: `$0F53` and `$0F9B`. */
+export const AWARD_SITES = [0x0F53, 0x0F9B];
+
+/** `LDA #$04` - what each block loads into its class's debris counter. */
+export const DEBRIS_ON_KILL = 4;
+
+/** `$0F64 LDX $817F / BEQ` - object 7's count, which gates the second block entirely. */
+export const SECOND_GATE = 0x817F;
+
+/** $0907 - the byte `$0F7E` rotates instead of loading. */
+export const ROTATED = 0x0907;
+
+/** What each block calls when the kill lands. None is ported. */
+export const AWARD_CALLS = [
+  { debris: 0x093F, calls: [0x119E, 0x1755, 0x1278] },   // $0F5B, $0F5E, $0F61
+  { debris: 0x0940, calls: [0x120B, 0x175B, 0x12B4] },   // $0FA3, $0FA6, $0FA9
+];
+
+/**
+ * `$0F7E ROL $0907` - rotate left through carry, as the 6502 does it.
+ *
+ * @returns {{value: number, carry: number}} the byte and the bit that fell out of the top
+ */
+export function rotate(value, carry = 0) {
+  const out = (value >> 7) & 1;
+  return { value: ((value << 1) | (carry & 1)) & 0xff, carry: out };
+}
+
+/**
+ * `$0F53`-`$0F61` and `$0F9B`-`$0FA9` - what an award does.
+ *
+ * The test above it is MATH's and is not ported; this is the consequence, which is the part
+ * the rest of the mission reads.
+ *
+ * @param {Uint8Array} mem
+ * @param {number} which 0 for the first block, 1 for the second
+ */
+export function award(mem, which) {
+  const { debris, calls } = AWARD_CALLS[which];
+  mem[PROGRESS] = (mem[PROGRESS] + 1) & 0xff;          // $0F53 / $0F9B INC $1FF7
+  mem[debris] = DEBRIS_ON_KILL;                        // $0F56 / $0F9E LDA #$04
+  return { calls: [...calls], debris };
+}

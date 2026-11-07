@@ -2411,10 +2411,32 @@ The `$0947` toggle beside it is `INX / CPX #$02 / BNE / LDX #$00`, a plain 0/1 f
 Held across 240 cases - every combination of the three counters either side of the threshold,
 the toggle including an out-of-range 2, and both one-shot flags.
 
-What is still unported is everything these blocks call out to: `$1131` and `$12AB` at the
-fifteenth stage, `$171D`, `$1613`, `$1632`, `$15F5`, `$14FB` (the debris drawer), `$1761` and
-`$177C`, and the mission's kill and firing code. They are named in `finale.js` rather than
-dropped.
+### The two award blocks, and one bit that is wrong
+
+`$0F21`-`$0F61` and `$0F69`-`$0FA9` are the same seven steps twice: four `JSR $9C4B` calls
+handing MATH its operands, a `JSR $142A`, a `JSR $99D2` compare, and a `BPL` that skips
+everything when the answer is positive. When it is not, the enemy died - `$1FF7` goes up by
+one, that class's debris counter is loaded with four, and three routines run.
+
+**`$1FF7` is raised at these two sites and nowhere else**, so fifteen of them is the whole of
+the finale's scoring. There is no third: `$093E` is written by nothing but `$10FF`, the staged
+win itself, which is why class 1 is the base star rather than an enemy.
+
+**The second block has `ROL $0907` where the first has `LDX $0906`.** The bytes are `AE 06 09`
+against `2E 07 09` - one bit of one opcode - with identical alignment on both sides, so it is
+not a disassembly artefact. Run in the machine as the single instruction it is: it rotates
+`$0907` left through carry (`$12` to `$24`, or `$25` with carry in; `$81` to `$02`) and leaves
+X holding what `$0F75 LDX $0930` put there. So the block **corrupts its own operand every time
+it runs** and hands MATH the previous one twice.
+
+Typo or bit rot is not knowable from here, and this file does not guess. What it does is
+measurable and the port does the same. `$0907` is one of the bytes open question 15 has never
+managed to name, and there is now a reason to want it named: it is the one the game damages.
+
+What is still unported is everything these blocks call out to: the MATH test above each award,
+`$1131` and `$12AB` at the fifteenth stage, `$171D`, `$1613`, `$1632`, `$15F5`, `$14FB` (the
+debris drawer), `$1761`, `$177C`, `$119E`, `$1278`, `$120B` and `$12B4`, and the mission's
+firing code. They are named in `finale.js` rather than dropped.
 
 ### The route is not walkable, and that is a separate bug
 

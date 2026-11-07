@@ -22,7 +22,7 @@ import { openOracle } from './a2.mjs';
 import { toFinale } from './exercise.mjs';
 import { endOfFrame, pauses, DONE, HITS, FATAL, PROGRESS, STAGE, BASE_STAR, OBJ3_COUNT,
   DEBRIS1, FRAME_TOP, STAGE_CALLS, SHLD, WARP, MSL, EMPTY, rammed, missileHit, systems,
-  secondEight, debrisFrame, DEBRIS, DEBRIS_WIN, TOGGLE, ONE_SHOTS }
+  secondEight, debrisFrame, DEBRIS, DEBRIS_WIN, TOGGLE, ONE_SHOTS, award, rotate, ROTATED }
   from '../port/src/game/finale.js';
 import { shrink } from '../port/src/game/damage.js';
 
@@ -336,6 +336,85 @@ try {
       r.baseStar !== 1,
       'SD PART3 line 175 tests = 0 so it is a win, but INITIALS line 2016 tests = 1 for the'
         + ' bonus, and the byte holds 2. Reproduced, not worked around');
+  }
+
+  // ------------------------------------------------- the awards, and the one-bit difference
+  console.log('\n=== the two award blocks ===');
+  {
+    const run = (addr, stop, pokes) => a2.ev(`JSON.stringify((() => {
+      const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+      const WATCH = [${PROGRESS}, 0x093F, 0x0940, ${ROTATED}];
+      const before = cpu.getState();
+      const snap = {}; for (const a of WATCH) snap[a] = rd(a);
+      for (const [a, v] of Object.entries(${JSON.stringify(pokes)})) wr(Number(a), v & 0xff);
+      const seeded = {}; for (const a of WATCH) seeded[a] = rd(a);
+      const st = cpu.getState(); st.pc = ${addr}; cpu.setState(st);
+      const calls = [];
+      cpu.stepCyclesDebug(400000, () => {
+        const pc = cpu.getPC();
+        if ([0x119E, 0x1755, 0x1278, 0x120B, 0x175B, 0x12B4].includes(pc)) calls.push(pc);
+        if (pc === ${stop}) return true;
+      });
+      const after = {}; for (const a of WATCH) after[a] = rd(a);
+      for (const [a, v] of Object.entries(snap)) wr(Number(a), v);
+      cpu.setState(before);
+      return { seeded, after, calls };
+    })())`).then(JSON.parse);
+
+    const wrong = [];
+    for (const [which, addr, stop] of [[0, 0x0F53, 0x0F64], [1, 0x0F9B, 0x0FAC]]) {
+      for (const progress of [0, 1, STAGE - 1, STAGE, 255]) {
+        const pokes = { [PROGRESS]: progress, 0x093F: 0, 0x0940: 0 };
+        const r = await run(addr, stop, pokes);
+        const mem = new Uint8Array(0x10000);
+        for (const [a, v] of Object.entries(r.seeded)) mem[a] = v;
+        const got = award(mem, which);
+        for (const a of [PROGRESS, 0x093F, 0x0940]) {
+          if (mem[a] !== r.after[a]) {
+            wrong.push(`block ${which} progress ${progress}: ${hx(a)} port ${mem[a]}`
+              + ` machine ${r.after[a]}`);
+            break;
+          }
+        }
+        if (got.calls.join() !== r.calls.join()) {
+          wrong.push(`block ${which} progress ${progress}: calls ${got.calls} vs ${r.calls}`);
+        }
+      }
+    }
+    check('both award blocks agree: the counter, the debris load and the three calls',
+      wrong.length === 0, wrong.slice(0, 2).join('; ')
+        || '10 cases across both, including the counter wrapping at 255');
+
+    // The one-bit difference, run as the single instruction it is.
+    const rolled = JSON.parse(await a2.ev(`JSON.stringify((() => {
+      const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+      const out = [];
+      for (const [carry, v] of [[0, 0x12], [1, 0x12], [0, 0x81], [1, 0x81], [0, 0x00]]) {
+        const before = cpu.getState();
+        wr(${ROTATED}, v);
+        const st = cpu.getState();
+        st.pc = 0x0F7E; st.x = 0x55;
+        st.s = carry ? (st.s | 1) : (st.s & 0xFE);
+        cpu.setState(st);
+        cpu.stepCyclesDebug(20, () => cpu.getPC() !== 0x0F7E);
+        const end = cpu.getState();
+        out.push({ carry, v, after: rd(${ROTATED}), x: end.x });
+        cpu.setState(before);
+      }
+      return out;
+    })())`));
+    const mismatched = rolled.filter((o) => rotate(o.v, o.carry).value !== o.after);
+    check('$0F7E is ROL $0907, not LDX, and the port rotates the same way',
+      mismatched.length === 0 && rolled.every((o) => o.x === 0x55),
+      `$12 -> ${hx(rolled[0].after, 2)}, with carry in -> ${hx(rolled[1].after, 2)},`
+        + ` $81 -> ${hx(rolled[2].after, 2)} - and X is left alone, so the JSR after it`
+        + ' gets the previous operand');
+
+    const bytes = JSON.parse(await a2.ev('JSON.stringify(window.M.range(0x0F36, 0x0F39))'));
+    const twin = JSON.parse(await a2.ev('JSON.stringify(window.M.range(0x0F7E, 0x0F81))'));
+    check('control: the mirrored instruction really is LDX, so this is one bit and not a habit',
+      bytes[0] === 0xAE && twin[0] === 0x2E,
+      `$0F36 is ${hx(bytes[0], 2)} (LDX abs) against $0F7E's ${hx(twin[0], 2)} (ROL abs)`);
   }
 
   // ------------------------------------------------------------------ controls ------------
