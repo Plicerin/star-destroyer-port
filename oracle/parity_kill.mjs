@@ -176,6 +176,45 @@ console.log('\n=== the six shot blocks ===');
     bad.length === 0 && hits > 5 && misses > 20 && off > 3, bad.slice(0, 2).join('; ')
       || `114 cases: ${hits} hits, ${misses} misses, ${off} with the shot not up`);
 }
+// --- the shot block's boundary -------------------------------------------------------------
+// `$0F1F LDY $090A / LDX $092F / JSR $99D2 / BPL` skips the kill, and `BPL` is taken on zero,
+// so **a range exactly equal to the threshold is not a hit**. The cases above put the shot on
+// top of the enemy, near it and far from it, but never at the distance that makes the compare
+// come out at zero - and the two readings of it differ nowhere else.
+//
+// The range is computed by `$1C3D` from the two positions, so the way onto the boundary is to
+// let the block compute it and then seed the threshold with the answer.
+console.log('\n=== the shot block at exactly the threshold ===');
+{
+  const c = CLASSES[0], shot = SHOTS[0], at = c.shotAt[0];
+  const place = { [shot.pos[0]]: u24(40 * 256), [shot.pos[1]]: 0,
+    [c.enemyPos[0]]: 0, [c.enemyPos[1]]: 0 };
+
+  // One run to learn the range this geometry produces.
+  const probe = await runEngine(at, [at + 0x48], shotCase(c, shot), place);
+  const range = [0, 1, 2].map((k) => probe.after[0x9800 + GEOM.range + k]);
+
+  // And again with the threshold set to exactly it.
+  const edge = await runEngine(at, [at + 0x48], shotCase(c, shot),
+    { ...place, [RAM_RANGE]: u24(range[0] | (range[1] << 8) | (range[2] << 16)) });
+  const port = toPort(edge.seeded);
+  const r = shotHit(port.mem, port.math, shot, c);
+
+  const seededThreshold = [0, 1, 2].map((k) => edge.seeded[0x9800 + RAM_RANGE + k]);
+  check('the threshold really is set to the range the block computes',
+    seededThreshold.every((v, k) => v === range[k]),
+    `table[${RAM_RANGE}..] is ${range.join(',')} - the three bytes $090A came back with, so`
+      + ' the compare stands exactly on zero');
+
+  // The machine's answer is whether it reached the kill, which `diff` then checks in full.
+  const d = diff(edge, port);
+  check('and equality is NOT a hit: the machine takes the BPL',
+    r.hit === false && d.length === 0,
+    `port ${r.hit ? 'hit' : 'missed'}, and the display list, the state and the table all`
+      + ` agree${d.length ? ` - except ${d[0]}` : ''} - BPL is taken on zero, so the kill`
+      + ' needs the range strictly inside the threshold');
+}
+
 {
   // The four subroutines on their own, so a failure says which one.
   const bad = [];

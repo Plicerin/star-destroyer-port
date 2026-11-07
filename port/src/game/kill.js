@@ -177,8 +177,16 @@ export function shotHit(mem, math, shot, c) {
   math.copy(c.enemyPos[1], GEOM.bZ);
   rangeFromArgs(math);
 
-  // $0F1F - the same comparison `reach` uses, including the equality: range <= threshold.
-  if (math.compare(GEOM.range, RAM_RANGE) < 0) return { up: true, hit: false };
+  // $0F1F - `LDY $090A / LDX $092F / JSR $99D2 / BPL`, so the threshold is the X operand and
+  // the range is the Y one, and `BPL` skips the kill. `BPL` is taken on zero, so **the range
+  // has to be strictly inside the threshold**: a shot exactly at the threshold does not kill.
+  //
+  // This is NOT the comparison `reach` uses, which is what this comment used to say. `$0E05`
+  // loads the same two variables the other way round *and* branches the other way, so the ram
+  // includes the boundary and this does not. Written with reach's operand order, the two agree
+  // everywhere except exactly on it, which is why 114 cases could not tell them apart;
+  // `parity_kill.mjs` now stands one there.
+  if (math.compare(RAM_RANGE, GEOM.range) >= 0) return { up: true, hit: false };
 
   mem[c.debrisCounter] = DEBRIS_FRAMES;
   placeDebris(mem, c);

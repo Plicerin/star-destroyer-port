@@ -2632,6 +2632,38 @@ The counts are not compared byte for byte, because `$106E JSR $6000` is inside t
 the count is the renderer's own frame counter; what is asserted is that the block may not *zero*
 them. Confirmed failable by putting the bug back.
 
+### One comparison, two readings, and the boundary neither harness stood on
+
+`$99D2` is a signed compare and every call site follows it with `BPL`, so which of the two
+operands goes in X decides the sense and the `BPL` decides which way it branches. Two sites use
+the *same two variables* - the range at `$090A` and the threshold at `$092F` - with both of
+those choices flipped:
+
+| | operands | `BPL` | so |
+|---|---|---|---|
+| `$0F1F` the shot hit | `LDY $090A / LDX $092F` | skips the kill | `range < threshold`, strict |
+| `$0E05` the ram | `LDY $092F / LDX $090A` | takes the ram | `range <= threshold`, inclusive |
+
+Two of the port's readings of this were written with the wrong operand order, and **a swap
+cancels itself everywhere except exactly on the boundary** - which is why both passed for a long
+time. `finale.js`'s `hitTest` had it (thirteen cases, none on the boundary) and `kill.js`'s
+`shotHit` had it for the main mission (114 cases, none on the boundary); `shotHit`'s comment
+asserted it was "the same comparison `reach` uses, including the equality", which is backwards.
+
+Both are fixed, and both harnesses now stand a case exactly on it. The technique is the same in
+each: the range is computed inside the block from the positions, so let the block compute it and
+then seed the threshold with the answer. The machine's verdict at equality is "no kill" and "no
+award" - it takes the `BPL` - and before the fix the port killed and awarded.
+
+All six `compare()` call sites in the game modules were then read against their listings:
+`reach`, `hold`, `missile`, `hitTest` and `reached` are right; `shotHit` was the only other one
+wrong.
+
+**How to apply:** a comparison whose two readings differ only at equality will not be caught by
+random or spread-out cases, however many. When a block compares a computed quantity against a
+threshold, construct the case where they are equal - and the way to do that is to let the block
+compute, then set the threshold.
+
 ### The order of the frame
 
 One frame, run from `$09A7` and recorded at the head of every known block:
