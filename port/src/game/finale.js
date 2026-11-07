@@ -375,3 +375,85 @@ export function award(mem, which) {
   mem[debris] = DEBRIS_ON_KILL;                        // $0F56 / $0F9E LDA #$04
   return { calls: [...calls], debris };
 }
+
+// ---------------------------------------------------------------------------------------
+// The hit test above each award, $0F21-$0F51 and $0F69-$0F99.
+//
+// **The routine it turns on is already written.** `$142A` is the main mission's `$1C3D`
+// relocated and otherwise untouched - 26 instructions, same operands, same MATH calls, same
+// order, not one difference - so `geometry.js`'s `rangeFromArgs` is reused exactly. That is
+// the only routine the two binaries genuinely share beyond the MATH directory and the shrink
+// primitive, and it is worth saying out loud: the finale's weapons use the main mission's
+// range.
+//
+// The idiom is `kill.js`'s, to the instruction: four `JSR $9C4B` calls to fill `$1C3D`'s
+// argument slots, the range, then `LDY $090A / LDX $092F / JSR $99D2 / BPL` - the same
+// `$092F` threshold an enemy rams the ship at, and the same "range <= threshold is a hit"
+// including the equality.
+//
+// **What the ROL costs, concretely.** `JSR $9C4B` is `table[Y] := table[X]`, so the copies
+// are destination-then-source, and block B's third one never loads its source:
+//
+//     block A   aX := $0904   bX := $0930   aZ := $0906   bZ := $0931
+//     block B   aX := $0905   bX := $0930   aZ := $0931   bZ := $0931
+//                                                ^ never loaded
+//
+// where the second row's aZ reads $0931 because `$9C4B` leaves X three bytes past its
+// source, and table entries are three bytes. So block B puts the target's Z into **both**
+// points: the Z delta is always zero and the range it measures is the X distance alone. The
+// second weapon hits on how far across the target is, never on how far away. The port does
+// the same copy.
+
+/**
+ * `$092F` - the ram range, and the hit threshold, as in the main mission.
+ *
+ * The address, not the table index. Everything that reaches MATH goes through the directory
+ * at `$08F2` first, which is what `dir` is for - writing the address straight into a compare
+ * reads a slot that has nothing to do with it, and the comparison then answers confidently
+ * about the wrong bytes.
+ */
+export const HIT_RANGE = 0x092F;
+
+/** The two shots' position entries, and the target's. */
+export const SHOTS = [{ x: 0x0904, z: 0x0906 }, { x: 0x0905, z: 0x0907 }];
+export const TARGET = { x: 0x0930, z: 0x0931 };
+
+/**
+ * `$0F21`-`$0F51` / `$0F69`-`$0F99` - fill the argument slots, take the range, compare.
+ *
+ * @param {Uint8Array} mem
+ * @param {import('./math.js').Math24} math
+ * @param {number} which 0 or 1
+ * @param {{copy: Function, compare: Function}} geom `rangeFromArgs`, passed in so this file
+ *   does not reach across into the main mission's modules for anything but the arithmetic
+ *   and `carry` for the flag `$0F7E` rotates in, which MATH's model does not carry
+ * @returns {{hit: boolean, stale: boolean}} `stale` marks the copy the ROL spoiled
+ */
+export function hitTest(mem, math, which, { rangeFromArgs, GEOM, dir, carry = 0 }) {
+  const shot = SHOTS[which];
+  // Every operand goes through the directory at $08F2, because `JSR $9C4B` takes table
+  // indices and not addresses - which is what these are written as above.
+  math.copy(dir(shot.x), GEOM.aX);                  // $0F21 / $0F69
+  math.copy(dir(TARGET.x), GEOM.bX);                // $0F2A / $0F72
+  // $0F33 / $0F7B: block A loads $0906 here. Block B's LDX is a ROL, so X is never loaded
+  // and keeps whatever the copy above left in it - and `$9C4B` walks X forward three bytes
+  // as it copies, so it ends on the index *after* its source. Table entries are three bytes,
+  // so "three past $0930" is exactly $0931. Measured: X is 218, which is $0931's index.
+  //
+  // So block B copies the target's Z into **both** points: aZ and bZ get the same value, the
+  // Z delta is always zero, and the range it measures is the X distance alone. The second
+  // weapon hits on how far across the target is and not on how far away.
+  const stale = which === 1;
+  math.copy(dir(stale ? TARGET.z : shot.z), GEOM.aZ);
+  math.copy(dir(TARGET.z), GEOM.bZ);                // $0F3C / $0F84
+  if (stale) {
+    // $0F7E ROL $0907. The bit rotated in is the carry, and the carry here is whatever the
+    // `JSR $9C4B` above left - which is data-dependent and which `math.js` does not model,
+    // because nothing else in the port has ever needed MATH's flags. So it is an input
+    // rather than an assumption; `parity_finale.mjs` supplies the machine's.
+    mem[ROTATED] = rotate(mem[ROTATED], carry).value;
+  }
+  rangeFromArgs(math);                              // $0F45 / $0F8D JSR $142A
+  // $0F4E / $0F96 - range <= threshold is a hit, equality included.
+  return { hit: math.compare(GEOM.range, dir(HIT_RANGE)) >= 0, stale };
+}

@@ -2433,10 +2433,39 @@ Typo or bit rot is not knowable from here, and this file does not guess. What it
 measurable and the port does the same. `$0907` is one of the bytes open question 15 has never
 managed to name, and there is now a reason to want it named: it is the one the game damages.
 
-What is still unported is everything these blocks call out to: the MATH test above each award,
-`$1131` and `$12AB` at the fifteenth stage, `$171D`, `$1613`, `$1632`, `$15F5`, `$14FB` (the
-debris drawer), `$1761`, `$177C`, `$119E`, `$1278`, `$120B` and `$12B4`, and the mission's
-firing code. They are named in `finale.js` rather than dropped.
+### The hit test, and what the ROL actually costs
+
+**`$142A` is `$1C3D` relocated and otherwise identical** - 26 instructions, same operands,
+same MATH calls, same order, not one difference - so `geometry.js`'s `rangeFromArgs` is reused
+exactly. Beyond the MATH directory and the shrink primitive, that is the only code the two
+binaries genuinely share, and it means the finale's weapons use the main mission's range.
+
+The idiom is `kill.js`'s to the instruction: four `JSR $9C4B` calls filling `$1C3D`'s argument
+slots, the range, then `LDY $090A / LDX $092F / JSR $99D2 / BPL` - the same `$092F` threshold
+an enemy rams the ship at, equality included.
+
+**And the `ROL` is worse than it looked.** `$9C4B` walks X forward three bytes as it copies,
+so it ends on the index *after* its source; table entries are three bytes, so after copying
+`$0930` the register holds `$0931`'s index. Block B's third copy never reloads X, so:
+
+|  | aX | bX | aZ | bZ |
+|---|---|---|---|---|
+| block A | `$0904` | `$0930` | `$0906` | `$0931` |
+| block B | `$0905` | `$0930` | **`$0931`** | `$0931` |
+
+Both points get the target's Z. **The Z delta is always zero**, so the range block B measures
+is the X distance alone: the second weapon hits on how far across the target is and never on
+how far away. Measured against the machine's MATH table byte for byte, from twelve different
+mission states, plus a forced hit with the threshold raised.
+
+One gap named rather than hidden: the bit `$0F7E` rotates in is the carry left by the `JSR`
+above it, which is data-dependent, and `math.js` does not model MATH's flags because nothing
+else has needed them. `hitTest` takes the carry as an input and the harness supplies the
+machine's.
+
+What is still unported: `$1131` and `$12AB` at the fifteenth stage, `$171D`, `$1613`, `$1632`,
+`$15F5`, `$14FB` (the debris drawer), `$1761`, `$177C`, `$119E`, `$1278`, `$120B` and `$12B4`,
+and the mission's firing code. They are named in `finale.js` rather than dropped.
 
 ### The route is not walkable, and that is a separate bug
 

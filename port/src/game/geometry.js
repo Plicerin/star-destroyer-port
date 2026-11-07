@@ -53,7 +53,8 @@
 import { VARS } from './tables.js';
 
 /** A directory entry, by the address in $08F2-$0932 that holds it. */
-const dir = (address) => VARS[address - 0x08F2];
+/** The directory at $08F2: an address in the binary's state to its index in MATH's table. */
+export const dir = (address) => VARS[address - 0x08F2];
 
 /**
  * The table indices these two blocks name, each through the directory at $08F2.

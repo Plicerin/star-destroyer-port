@@ -22,9 +22,12 @@ import { openOracle } from './a2.mjs';
 import { toFinale } from './exercise.mjs';
 import { endOfFrame, pauses, DONE, HITS, FATAL, PROGRESS, STAGE, BASE_STAR, OBJ3_COUNT,
   DEBRIS1, FRAME_TOP, STAGE_CALLS, SHLD, WARP, MSL, EMPTY, rammed, missileHit, systems,
-  secondEight, debrisFrame, DEBRIS, DEBRIS_WIN, TOGGLE, ONE_SHOTS, award, rotate, ROTATED }
+  secondEight, debrisFrame, DEBRIS, DEBRIS_WIN, TOGGLE, ONE_SHOTS, award, rotate,
+  ROTATED, hitTest }
   from '../port/src/game/finale.js';
 import { shrink } from '../port/src/game/damage.js';
+import { Math24 } from '../port/src/game/math.js';
+import { rangeFromArgs, GEOM, dir } from '../port/src/game/geometry.js';
 
 const results = [];
 const check = (what, ok, detail = '') => {
@@ -415,6 +418,94 @@ try {
     check('control: the mirrored instruction really is LDX, so this is one bit and not a habit',
       bytes[0] === 0xAE && twin[0] === 0x2E,
       `$0F36 is ${hx(bytes[0], 2)} (LDX abs) against $0F7E's ${hx(twin[0], 2)} (ROL abs)`);
+  }
+
+  // ----------------------------------------------------- the hit test above each award ----
+  // `$142A` is `$1C3D` relocated and otherwise identical, so geometry.js's rangeFromArgs is
+  // reused. What is compared here is the whole block: the four argument copies, the range,
+  // and the BPL - against the machine's MATH table, byte for byte.
+  console.log('\n=== the hit test ===');
+  {
+    const run = (from, to, award) => a2.ev(`JSON.stringify((() => {
+      const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+      const before = cpu.getState();
+      const snapT = []; for (let i = 0; i < 0xF3; i++) snapT.push(rd(0x9800 + i));
+      const snapR = rd(${ROTATED});
+      const seeded = []; for (let i = 0; i < 0xF3; i++) seeded.push(rd(0x9800 + i));
+      const st = cpu.getState(); st.pc = ${from}; cpu.setState(st);
+      let hit = false, carry = 0;
+      cpu.stepCyclesDebug(2000000, () => {
+        const pc = cpu.getPC();
+        if (pc === 0x0F7E) carry = cpu.getState().s & 1;
+        if (pc === ${award}) hit = true;
+        if (pc === ${to} || pc === ${award}) return true;
+      });
+      const after = []; for (let i = 0; i < 0xF3; i++) after.push(rd(0x9800 + i));
+      const rotated = rd(${ROTATED});
+      for (let i = 0; i < 0xF3; i++) wr(0x9800 + i, snapT[i]);
+      wr(${ROTATED}, snapR);
+      cpu.setState(before);
+      return { seeded, after, hit, rotated, rotatedWas: snapR, carry };
+    })())`).then(JSON.parse);
+
+    const wrong = [];
+    let hits = 0, n = 0;
+    for (const [which, from, to, awardAt] of [[0, 0x0F21, 0x0F64, 0x0F53],
+      [1, 0x0F69, 0x0FAC, 0x0F9B]]) {
+      // Each pass starts from wherever the mission happens to be, so the table differs
+      // every time and the comparison is against a moving target rather than one state.
+      for (let i = 0; i < 6; i++) {
+        await a2.ev('(() => { window.M.cpu.stepCyclesDebug(300000, () => {}); return 1; })()');
+        const r = await run(from, to, awardAt);
+        const math = new Math24();
+        for (let k = 0; k < 0xF3; k++) math.table[k] = r.seeded[k];
+        const mem = new Uint8Array(0x10000);
+        mem[ROTATED] = r.rotatedWas;
+        const got = hitTest(mem, math, which, { rangeFromArgs, GEOM, dir, carry: r.carry });
+        n++;
+        if (got.hit) hits++;
+        const why = `block ${which} pass ${i}`;
+        if (got.hit !== r.hit) {
+          wrong.push(`${why}: port ${got.hit ? 'hit' : 'miss'}, machine`
+            + ` ${r.hit ? 'hit' : 'miss'}`);
+          continue;
+        }
+        let bad = -1;
+        for (let k = 0; k < 0xF3; k++) {
+          if (math.table[k] !== r.after[k]) { bad = k; break; }
+        }
+        if (bad >= 0) {
+          wrong.push(`${why}: table[${bad}] port ${math.table[bad]} machine ${r.after[bad]}`);
+        } else if (mem[ROTATED] !== r.rotated) {
+          wrong.push(`${why}: $0907 port ${mem[ROTATED]} machine ${r.rotated}`);
+        }
+      }
+    }
+    check('both hit tests agree with the machine over every byte of MATH\'s table',
+      wrong.length === 0, wrong.slice(0, 2).join('; ')
+        || `${n} passes from twelve different mission states, ${hits} of them hits`);
+
+    // Twelve live passes and not one landed a hit, which leaves half the branch untested.
+    // So the threshold is raised until everything is in range and both blocks are run again:
+    // $092F's table entry set to the largest positive 24-bit value MATH holds.
+    const forced = [];
+    for (const [which, from, to, awardAt] of [[0, 0x0F21, 0x0F64, 0x0F53],
+      [1, 0x0F69, 0x0FAC, 0x0F9B]]) {
+      const idx = Number(await a2.ev('window.M.rd(0x092F)'));
+      await a2.ev(`(() => { const wr = window.M.wr;
+        wr(0x9800 + ${idx}, 0xFF); wr(0x9801 + ${idx}, 0xFF); wr(0x9802 + ${idx}, 0x7F);
+        return 1; })()`);
+      const r = await run(from, to, awardAt);
+      const math = new Math24();
+      for (let k = 0; k < 0xF3; k++) math.table[k] = r.seeded[k];
+      const mem = new Uint8Array(0x10000);
+      mem[ROTATED] = r.rotatedWas;
+      const got = hitTest(mem, math, which, { rangeFromArgs, GEOM, dir, carry: r.carry });
+      forced.push({ which, machine: r.hit, port: got.hit });
+    }
+    check('and with the threshold raised so everything is in range, both say hit',
+      forced.every((f) => f.machine === true && f.port === true),
+      forced.map((f) => `block ${f.which}: machine ${f.machine}, port ${f.port}`).join('; '));
   }
 
   // ------------------------------------------------------------------ controls ------------
