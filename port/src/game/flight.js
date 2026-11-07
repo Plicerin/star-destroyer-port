@@ -118,9 +118,14 @@ export class Flight {
    * @param {Math24} [math] the one MATH the rest of the loop shares. Left out, it makes its own
    *   and seeds it from TABLE_INIT, which is what the standalone harnesses want.
    */
-  constructor(math = null) {
+  constructor(math = null, { burnFrames = WARP_FRAMES_PER_UNIT } = {}) {
     this.math = math || new Math24();
     if (!math) this.math.table.set(TABLE_INIT, 0);
+    /**
+     * `$0AA8 CPX #$37` - frames per unit of warp burned. The finale's copy of this block has
+     * `CPX #$26`, 38 frames against 55, so its warp drains about half again as fast.
+     */
+    this.burnFrames = burnFrames;
     /** $0948, the gate. */
     this.gate = 0;
     /** $0956, the counter that paces warp consumption. */
@@ -176,7 +181,8 @@ export class Flight {
    * $0A8D - the throttle, read from paddle 1.
    *
    * Warp engages when the paddle reads below the threshold AND there is warp left. While it
-   * is engaged a counter ticks, and every 55 frames one unit of WARP is spent. The gate this
+   * is engaged a counter ticks, and every `burnFrames` frames - 55 here, 38 in the finale - one
+   * unit of WARP is spent. The gate this
    * sets is read by the NEXT frame's movement block, because $09D7 comes before $0A8D in the
    * loop - so throttling on takes a frame to bite.
    *
@@ -191,7 +197,7 @@ export class Flight {
     }
     this.gate = GATE_OPEN;
     this.burnCounter = (this.burnCounter + 1) & 0xff;
-    if (this.burnCounter === WARP_FRAMES_PER_UNIT) {
+    if (this.burnCounter === this.burnFrames) {
       this.burnCounter = 0;
       return (warpLeft - 1) & 0xff;
     }

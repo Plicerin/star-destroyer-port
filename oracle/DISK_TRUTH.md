@@ -2961,3 +2961,21 @@ promoted to fact.
     the renderer, the starbase scene itself, and the nine bytes `toFinale`'s first attempt
     poked to make the flight exit - and nothing distinguishes them yet. It is why the finale
     is reached through `SD START2`'s setup rather than by walking the chain.
+
+18. **What switches the player's shot off inside the finale's frame.** `parity_finale.mjs`
+    runs `Finale` against the machine pass for pass, with both damaged instructions repaired
+    on the machine so the two sides are running the same code. Six of eight passes agree over
+    every byte of the display list, the state, zero page `$00` and all 243 bytes of MATH's
+    table. The two with the trigger down differ on **object 6's count and nothing else**: the
+    machine reaches `$0B0C` and launches, exactly as the port does, then ends the frame with
+    that count back at zero where the port leaves it running.
+
+    So something in the frame takes the shot off and the port does not do it. `$0F53`'s award
+    is the suspect - the main mission's `shotHit` calls `switchOffShot` ( `$1F67` ) at that
+    point and the finale's three calls are `$119E`, `$1755` and `$1278`, none of which is
+    obviously it. `$1755` has been read as a sound only because it sits in the sound region.
+
+    The check encodes this rather than skipping it: it fails if a pass without the trigger
+    disagrees at all, if a pass with it disagrees anywhere other than that one byte, or if the
+    number of either changes. So `Finale` is **not yet held frame for frame**, and the gap is
+    one byte wide and reproducible.

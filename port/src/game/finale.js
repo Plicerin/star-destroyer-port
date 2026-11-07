@@ -47,8 +47,18 @@
 //
 // Measured and held by `oracle/probe_basestar.mjs` and `oracle/parity_finale.mjs`.
 import { field } from './objects.js';
-import { BEARING, fire, turnUp, turnDown } from './dispatch.js';
-import { selectPages, publishShip, PAGE, XI } from './loop.js';
+import { BEARING, fire, turnUp, turnDown, coolDown } from './dispatch.js';
+import { selectPages, publishShip, PAGE, XI, GATE, BURN } from './loop.js';
+import { Math24 } from './math.js';
+import { TABLE_INIT } from './tables.js';
+import { Flight } from './flight.js';
+import { Engine } from '../a23d2/engine.js';
+import { steer, turnDirection, panStars, H1, OBJ12_HEADING } from './controls.js';
+import { GEOM, rangeToTarget, bearing, rangeFromArgs, dir } from './geometry.js';
+import { hold, move, missile } from './entities.js';
+import { SHOTS as PLAYER_SHOTS, placeDebris, aimDebris, respawn } from './kill.js';
+import { fire as pullTrigger, moveShot } from './weapon.js';
+import { shrink } from './damage.js';
 
 /** $0933 - the same hit count the main mission keeps, read by a different test. */
 export const HITS = 0x0933;
@@ -471,11 +481,23 @@ export function rotate(value, carry = 0) {
  * @param {Uint8Array} mem
  * @param {number} which 0 for the first block, 1 for the second
  */
-export function award(mem, which) {
+export function award(mem, which, { placeDebris, aimDebris, SHOTS } = {}) {
   const { debris, calls } = AWARD_CALLS[which];
   mem[PROGRESS] = (mem[PROGRESS] + 1) & 0xff;          // $0F53 / $0F9B INC $1FF7
   mem[debris] = DEBRIS_ON_KILL;                        // $0F56 / $0F9E LDA #$04
-  return { calls: [...calls], debris };
+
+  // $0F5B / $0FA3 - `$119E` and `$120B` are `kill.js`'s `placeDebris` with the shot's scope
+  // twin as the source instead of the enemy, so the debris appears where the shot landed.
+  // $0F61 / $0FA9 - `$1278` and `$12B4` are `$1A8B` and `$1AC7`, this shot's `aimDebris`.
+  //
+  // Both are optional only so the award can still be measured on its own, as the first
+  // version of it was: without them it reports the calls instead of making them.
+  if (placeDebris && aimDebris && SHOTS) {
+    placeDebris(mem, SHOTS[which].twin);
+    aimDebris(mem, SHOTS[which]);
+  }
+  // The middle call of the three is the sound; the other two are done above.
+  return { calls: [...calls], debris, sound: calls[1] };
 }
 
 // ---------------------------------------------------------------------------------------
@@ -483,15 +505,16 @@ export function award(mem, which) {
 //
 // **The routine it turns on is already written.** `$142A` is the main mission's `$1C3D`
 // relocated and otherwise untouched - 26 instructions, same operands, same MATH calls, same
-// order, not one difference - so `geometry.js`'s `rangeFromArgs` is reused exactly. That is
-// the only routine the two binaries genuinely share beyond the MATH directory and the shrink
-// primitive, and it is worth saying out loud: the finale's weapons use the main mission's
-// range.
+// order, not one difference - so `geometry.js`'s `rangeFromArgs` is reused exactly. (This
+// once said it was the only routine the two binaries genuinely share. It is one of twenty-
+// seven; see the head of this file.)
 //
 // The idiom is `kill.js`'s, to the instruction: four `JSR $9C4B` calls to fill `$1C3D`'s
-// argument slots, the range, then `LDY $090A / LDX $092F / JSR $99D2 / BPL` - the same
-// `$092F` threshold an enemy rams the ship at, and the same "range <= threshold is a hit"
-// including the equality.
+// argument slots, the range, then `LDY $090A / LDX $092F / JSR $99D2 / BPL` - the same `$092F`
+// byte an enemy rams the ship at, read the same way round. **And like the main mission's shot
+// hit, it is strict**: `BPL` skips the award and is taken on zero, so a range exactly at the
+// threshold does not score. It is the ram at `$0E2C` that includes the boundary, by loading
+// the two operands the other way round and branching the other way.
 //
 // **What the ROL costs, concretely.** `JSR $9C4B` is `table[Y] := table[X]`, so the copies
 // are destination-then-source, and block B's third one never loads its source:
@@ -637,6 +660,12 @@ export const BASE_STAR_CLASS = {
   missileStep: [0x0928, 0x092A],
   /** $0FD4 - three increments of the shot's bank a frame, so it rolls as it flies. */
   bankSpin: 3,
+  // What `$16EC` - class 3's respawn at `$1EFA`, moved - reads when the ram puts the base
+  // star back. `cascadeTo` is null because there is no class 2 here to fall through from.
+  /** $1FFB, which `WAVE3` below names too - declared after this, so written out here. */
+  wave: 0x1FFB,
+  bump: 20,
+  cascadeTo: null,
 };
 
 /** `BASE_STAR_CLASS` with its variable addresses turned into table indices. */
@@ -826,4 +855,173 @@ export function reached(mem, math, { GEOM, dir }) {
   mem[field(15, 'count')] = 1;                        // $0E42 STX $826F
   mem[WAVE3] = (mem[WAVE3] - 1) & 0xff;               // $0E45 DEC $1FFB
   return { reached: true };
+}
+
+// ---------------------------------------------------------------------------------------
+// $0957-$112E - the mission, as one class.
+//
+// This is `loop.js`'s `Game` with a handful of substitutions, and that is the shape of it: the
+// frame at `$09A7` is `Game.pass`'s `$09A3` four bytes along, and `probe_basestar.mjs` accounts
+// for 1,070 of the finale's 1,369 instructions as the main mission's at a different address.
+// The two missions are the same port, driven differently.
+//
+// **One enemy, not three.** The finale's frame has a single enemy region, and the objects its
+// code touches say which: object 3 and its twin 15 as the enemy, 5 and 17 as its shot, 6 and 7
+// as the player's two shots, 8-11 and 20-23 for debris, 12 for the thing that turns with the
+// ship. Objects 1, 4, 13, 14 and 16 are **never touched** - there is no class 1 or class 2
+// here, and no class-1 missile. Which is why `BASE_STAR_CLASS` is class 3's descriptor and
+// nothing new was needed.
+//
+// **The tail is a different shape.** `Game.pass` ends with the debris ticks, the render, the
+// page toggle, the sound flags, the three awards, `applyDamage` and two ways out. The finale
+// ends with `debrisFrame` - which holds its own render and toggle, services the two one-shot
+// sound flags and then the two damage flags the base star set - and `endOfFrame`, which has
+// four ways out rather than two. Its awards are not in the tail at all: they are inside the
+// enemy region, fired by the shot-hit tests, which is what makes a kill score once.
+//
+// **Two numbers differ, and both matter in play.** Warp burns a unit every 38 frames instead
+// of 55, and pulling the trigger takes two off the missile bar instead of one. The second is
+// not an immediate: both missions enter `shrink`'s four-instruction loop partway in, and the
+// finale enters one step earlier. Measured in the machine, both of them.
+
+/** `$0AAC CPX #$26` - frames per unit of warp, against the main mission's `$37`. */
+export const BURN_FRAMES = 0x26;
+
+/** `$0B2D LDY #$03` - where the trigger enters `shrink`, against the main mission's `#$04`. */
+export const FINALE_MISSILE_ENTRY = 3;
+
+export class Finale {
+  /**
+   * @param {Uint8Array} mem a 64K image with A2-3D2 at $6000, SV DATA2 at $80FB, BASE STAR
+   *   DATA at $83AE and BASE STAR.OBJ0 at $08EF - what `SD START2` leaves resident
+   * @param {object} [options]
+   * @param {boolean} [options.render] false drives the frame with no renderer, which means no
+   *   object ever expires, because the count is the renderer's to decrement
+   * @param {boolean} [options.rotatedIndices] true reproduces the two instructions this copy
+   *   of the binary has wrong instead of repairing them
+   */
+  constructor(mem, { render = true, rotatedIndices = false } = {}) {
+    this.mem = mem;
+    this.rotatedIndices = rotatedIndices;
+    this.math = new Math24();
+    this.math.table.set(TABLE_INIT, 0);
+    this.flight = new Flight(this.math, { burnFrames: BURN_FRAMES });
+    // The hi-res pages are memory, so the renderer draws into the image rather than a buffer.
+    this.engine = render
+      ? new Engine(mem, {
+        pages: [mem.subarray(0x2000, 0x4000), mem.subarray(0x4000, 0x6000)],
+      })
+      : null;
+    /** What the frame asked the sound to play, in order. Phase 6 is not wired up. */
+    this.sounds = [];
+  }
+
+  /** The renderer, where `$106E` and the entry call it. */
+  render() {
+    if (!this.engine) return;
+    this.engine.reset();
+    this.engine.run();
+  }
+
+  /** `$0957`-`$09A6` - once, before the frame. */
+  enter() {
+    return enter(this.mem, this.math, dir, { render: () => this.render() });
+  }
+
+  /**
+   * `$0C08`-`$103D` - the one enemy region: the base star, and its shot.
+   *
+   * `$0C09 LDX $814B / CPX #$01 / BCS` is the gate and `$0C10 JMP $0FAC` is where it goes when
+   * the base star is not there - straight to the shot, which keeps flying either way.
+   */
+  enemy() {
+    const { mem, math } = this;
+    const c = baseStarClass(dir);
+
+    if (mem[field(BASE_STAR_CLASS.enemy, 'count')] >= 1) {       // $0C09
+      const target = GEOM.targets[2];                            // $0C13, on $0930/$0931
+      rangeToTarget(math, target.x, target.z);
+      bearing(math);                                             // $0C5E
+
+      aimAndFire(mem, math, dir);                                // $0D5F
+
+      // $0E2C, and $0E48 - **the ram does not finish the base star off.** It sets the damage
+      // flag, puts object 3's count to 1, takes the third wave counter down, and then falls
+      // into `JSR $16EC`, which is class 3's respawn: the count goes straight back to 255 and
+      // the base star reappears a bump further out. Measured by watching $814B through a real
+      // frame - $0E3F puts it to 1 and $16F6 puts it back - which is how this call was found
+      // missing in the first place.
+      if (reached(mem, math, { GEOM, dir }).reached) {
+        respawn(mem, math, c, true, [c]);                        // $0E48 JSR $16EC
+      }
+
+      // $0E48 - a cooling base star jumps past the hold test, so it always moves.
+      if (coolDown(mem, c) || !hold(math)) move(mem, math, c);    // $0E66
+
+      // $0F1C, $0F64 - the player's two shots, each gated on its own count. The award is the
+      // finale's own: it scores, loads a debris counter, places the debris where the SHOT is
+      // and aims it. It does not switch the shot's own record off the way the main mission's
+      // `shotHit` does - only the twin, inside `aimDebris` - so the shot expires by count.
+      for (const [which, shot] of PLAYER_SHOTS.entries()) {
+        if (mem[field(shot.object, 'count')] === 0) continue;
+        const r = hitTest(mem, math, which, {
+          rangeFromArgs, GEOM, dir, rotatedIndices: this.rotatedIndices,
+        });
+        if (!r.hit) continue;
+        const a = award(mem, which, { placeDebris, aimDebris, SHOTS: PLAYER_SHOTS });
+        this.sounds.push(a.sound);                               // $0F5E / $0FA6
+      }
+    }
+
+    // $0FAC - and the base star's shot moves whether the base star is there or not.
+    return shotAdvance(mem, math, dir, { missile, rotatedIndices: this.rotatedIndices });
+  }
+
+  /**
+   * `$09A7`-`$112E` - one pass of the frame.
+   *
+   * @param {object} input
+   * @param {number} input.paddle0 what PREAD would return for the steering paddle
+   * @param {number} input.paddle1 and for the throttle
+   * @param {boolean} input.button0 BUTTON0, the trigger
+   * @param {number} input.latch $C000, which `$1107` reads to decide whether to pause
+   * @returns {{done: string|null, paused: boolean, stage: boolean, sounds: number[]}}
+   */
+  pass({ paddle0 = 128, paddle1 = 255, button0 = false, latch = 0 } = {}) {
+    const { mem, math } = this;
+    this.sounds = [];
+
+    // $09A7 - the controls, which are `controls.js`'s and held against the machine already.
+    const heading = steer(mem[H1], paddle0);
+    const turn = turnDirection(paddle0);
+    mem[H1] = heading;
+    mem[OBJ12_HEADING] = heading;
+    if (turn !== 0) panStars(mem, turn);
+
+    this.flight.step(heading);                                   // $09D5
+    publishShip(mem, math);                                      // $0A67
+
+    mem[WARP] = this.flight.throttle(paddle1, mem[WARP]);        // $0A96
+    mem[GATE] = this.flight.gate;
+    mem[BURN] = this.flight.burnCounter;
+    selectPages(mem);                                            // $0AC0
+
+    // $0ADF - the trigger, and two off the bar rather than one.
+    const shot = pullTrigger(mem, math, button0, { cost: FINALE_MISSILE_ENTRY });
+    if (shot.sound) this.sounds.push(shot.sound);
+    for (const s of PLAYER_SHOTS) moveShot(mem, math, s);        // $0B6E, $0BBB
+
+    this.enemy();                                                // $0C08-$103D
+
+    // $1046 - the debris, the render, the toggle, the sound flags and the damage. The render
+    // is inside this block in the finale, where the main mission has it in the frame's tail.
+    const debris = debrisFrame(mem, shrink);
+    for (const call of debris.calls) {
+      if (call === DEBRIS_CALLS.render) this.render();
+      else if (call !== DEBRIS_CALLS.draw) this.sounds.push(call);
+    }
+
+    // $10E5 - and the four ways out.
+    return { ...endOfFrame(mem, { latch }), sounds: this.sounds };
+  }
 }

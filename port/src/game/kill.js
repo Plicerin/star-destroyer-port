@@ -113,11 +113,17 @@ export const ALWAYS_ON = 0xFF;
 /** `CPX #$03` - the award fires while the debris counter is at least this. */
 export const AWARD_AT = 3;
 
-/** $1944 / $19B1 / $1A1E - put all eight debris objects where the enemy is. */
-export function placeDebris(mem, c) {
+/** $1944 / $19B1 / $1A1E - put all eight debris objects where the enemy is. *
+ * **`from` is the object whose position the debris takes.** The main mission's `$1944` reads
+ * the enemy's, because `shotHit` is where it is called and the enemy is what is dying. The
+ * finale's `$119E` and `$120B` are this routine with the *shot's* scope twin as the source -
+ * objects 18 and 19 - so its debris appears where the shot landed rather than where the base
+ * star is.
+ */
+export function placeDebris(mem, from) {
   for (const name of ['x', 'z']) {
     for (const offset of [0, 1]) {
-      const byte = mem[field(c.enemy, name) + offset];
+      const byte = mem[field(from, name) + offset];
       for (const [a, b] of [...DEBRIS, DEBRIS_UNUSED]) {
         mem[field(a, name) + offset] = byte;
         mem[field(b, name) + offset] = byte;
@@ -189,7 +195,7 @@ export function shotHit(mem, math, shot, c) {
   if (math.compare(RAM_RANGE, GEOM.range) >= 0) return { up: true, hit: false };
 
   mem[c.debrisCounter] = DEBRIS_FRAMES;
-  placeDebris(mem, c);
+  placeDebris(mem, c.enemy);
   switchOffShot(mem, shot);
   aimDebris(mem, shot);
   switchOffEnemy(mem, c);

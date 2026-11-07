@@ -95,11 +95,20 @@ export const SOUND = {
  * Takes and returns the value rather than the address, because the two calls $1C99 makes in a
  * row chain through the X register and only the second one's result is stored.
  *
+ * **`from` is where the caller enters the loop**, which is how the original gets different
+ * amounts out of the same four instructions. `$1C89` is `LDY #$01` and `$1C8B` is the loop
+ * body, so a caller that jumps to `$1C8B` with Y already loaded gets `4 - Y + 1` decrements:
+ * the shield's four come from entering at `$1C89`, the main mission's trigger takes one by
+ * entering at `$1C8B` with `LDY #$04`, and the finale's takes two with `LDY #$03`. Measured
+ * in the machine for all three.
+ *
+ * @param {number} x the bar's value
+ * @param {number} [from] Y on entry: 1 for the whole loop, 4 for a single decrement
  * @returns {{value: number, steps: number}} steps is Y: 4 for a full four, less if it bottomed
  */
-export function shrink(x) {
+export function shrink(x, from = 1) {
   let value = x & 0xff;
-  let steps = 1;
+  let steps = from;
   for (;;) {
     value = (value - 1) & 0xff;
     if (value === EMPTY) return { value, steps };

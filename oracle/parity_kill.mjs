@@ -219,7 +219,7 @@ console.log('\n=== the shot block at exactly the threshold ===');
   // The four subroutines on their own, so a failure says which one.
   const bad = [];
   const SUBS = [
-    ['$1944 place', (c, shot) => [c.debrisPlace, (p) => placeDebris(p.mem, c)]],
+    ['$1944 place', (c, shot) => [c.debrisPlace, (p) => placeDebris(p.mem, c.enemy)]],
     ['$1A8B aim', (c, shot) => [shot.aimAt, (p) => aimDebris(p.mem, shot)]],
     ['$1F67 shot off', (c, shot) => [shot.offAt, (p) => switchOffShot(p.mem, shot)]],
     ['$1AAC enemy off', (c, shot) => [c.enemyOff, (p) => switchOffEnemy(p.mem, c)]],

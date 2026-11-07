@@ -24,9 +24,14 @@ import { endOfFrame, pauses, DONE, HITS, FATAL, PROGRESS, STAGE, BASE_STAR, OBJ3
   DEBRIS1, FRAME_TOP, STAGE_CALLS, SHLD, WARP, MSL, EMPTY, rammed, missileHit, systems,
   secondEight, debrisFrame, DEBRIS, DEBRIS_WIN, TOGGLE, ONE_SHOTS, DAMAGE_FLAGS, award,
   rotate, ROTATED, ROTATED_INDICES, hitTest, AIM_SCRATCH, aimAndFire, shotAdvance,
-  enter, ENTRY_HIT_RANGE, reached, WAVE3 }
+  enter, ENTRY_HIT_RANGE, reached, WAVE3, Finale, BURN_FRAMES,
+  FINALE_MISSILE_ENTRY }
   from '../port/src/game/finale.js';
 import { shrink } from '../port/src/game/damage.js';
+import { Flight } from '../port/src/game/flight.js';
+import { MISSILE_ENTRY } from '../port/src/game/weapon.js';
+import { placeDebris, aimDebris, SHOTS, DEBRIS as DEBRIS_OBJECTS, DEBRIS_UNUSED }
+  from '../port/src/game/kill.js';
 import { Math24 } from '../port/src/game/math.js';
 import { field } from '../port/src/game/objects.js';
 import { VARS } from '../port/src/game/tables.js';
@@ -402,11 +407,17 @@ try {
   {
     const run = (addr, stop, pokes) => a2.ev(`JSON.stringify((() => {
       const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+      // The display list too, because the award's first and third calls place and aim eight
+      // debris objects and its second switches a shot's twin off. With only the four state
+      // bytes here, the port could report the calls without making them and nothing noticed.
       const WATCH = [${PROGRESS}, 0x093F, 0x0940, ${ROTATED}];
+      const LIST = [0x80FB, 0x82E6];
       const before = cpu.getState();
-      const snap = {}; for (const a of WATCH) snap[a] = rd(a);
+      const all = [...WATCH];
+      for (let a = LIST[0]; a < LIST[1]; a++) all.push(a);
+      const snap = {}; for (const a of all) snap[a] = rd(a);
       for (const [a, v] of Object.entries(${JSON.stringify(pokes)})) wr(Number(a), v & 0xff);
-      const seeded = {}; for (const a of WATCH) seeded[a] = rd(a);
+      const seeded = {}; for (const a of all) seeded[a] = rd(a);
       const st = cpu.getState(); st.pc = ${addr}; cpu.setState(st);
       const calls = [];
       cpu.stepCyclesDebug(400000, () => {
@@ -414,7 +425,7 @@ try {
         if ([0x119E, 0x1755, 0x1278, 0x120B, 0x175B, 0x12B4].includes(pc)) calls.push(pc);
         if (pc === ${stop}) return true;
       });
-      const after = {}; for (const a of WATCH) after[a] = rd(a);
+      const after = {}; for (const a of all) after[a] = rd(a);
       for (const [a, v] of Object.entries(snap)) wr(Number(a), v);
       cpu.setState(before);
       return { seeded, after, calls };
@@ -423,12 +434,32 @@ try {
     const wrong = [];
     for (const [which, addr, stop] of [[0, 0x0F53, 0x0F64], [1, 0x0F9B, 0x0FAC]]) {
       for (const progress of [0, 1, STAGE - 1, STAGE, 255]) {
-        const pokes = { [PROGRESS]: progress, 0x093F: 0, 0x0940: 0 };
+        // The shot's scope twin is given a position and a heading nothing else has, and the
+        // eight debris objects are cleared, so that placing and aiming them is visible. With
+        // the mission's own values in place the writes landed on what was already there and
+        // the comparison could not tell them from nothing.
+        const shot = SHOTS[which];
+        const pokes = { [PROGRESS]: progress, 0x093F: 0, 0x0940: 0,
+          [field(shot.twin, 'x')]: 0x11, [field(shot.twin, 'x') + 1]: 0x22,
+          [field(shot.twin, 'z')]: 0x33, [field(shot.twin, 'z') + 1]: 0x44,
+          [field(shot.twin, 'count')]: 7,
+          [field(shot.object, 'heading')]: 0x5A };
+        for (const [a, b] of [...DEBRIS_OBJECTS, DEBRIS_UNUSED]) {
+          for (const o of [a, b]) {
+            for (const name of ['x', 'z']) {
+              pokes[field(o, name)] = 0;
+              pokes[field(o, name) + 1] = 0;
+            }
+            pokes[field(o, 'heading')] = 0;
+          }
+        }
         const r = await run(addr, stop, pokes);
         const mem = new Uint8Array(0x10000);
         for (const [a, v] of Object.entries(r.seeded)) mem[a] = v;
-        const got = award(mem, which);
-        for (const a of [PROGRESS, 0x093F, 0x0940]) {
+        const got = award(mem, which, { placeDebris, aimDebris, SHOTS });
+        const watched = [PROGRESS, 0x093F, 0x0940];
+        for (let a = 0x80FB; a < 0x82E6; a++) watched.push(a);
+        for (const a of watched) {
           if (mem[a] !== r.after[a]) {
             wrong.push(`block ${which} progress ${progress}: ${hx(a)} port ${mem[a]}`
               + ` machine ${r.after[a]}`);
@@ -1158,6 +1189,214 @@ try {
       reached103E === false,
       'the frame above ran the debris block without ever touching $103E - $1040 and $1043 zero'
         + " object 5's count and its twin's, which is `missile` taking the shot off the screen");
+  }
+
+  // ------------------------------------------------------- the whole frame, as one class ----
+  // Everything above holds a block. This holds the frame: `Finale` run against the machine
+  // pass for pass, over the display list, the binary's state, zero page $00 and all 243 bytes
+  // of MATH's table.
+  //
+  // The paddles are set on the machine and then **read back out of it** rather than assumed -
+  // `$09AC`, `$0A96` and `$0AE2` are where PREAD's Y and the button's A land - so the port is
+  // driven with the numbers the machine actually saw. The keyboard strobe is cleared on the way
+  // in, because `$1107` spins for ever on a pending key and the pause is not what is compared.
+  //
+  // The port runs **with** its renderer, because an object's count is the renderer's own frame
+  // counter: without one those 24 bytes would drift from the machine's by a unit a frame, and
+  // `endOfFrame`'s win test reads one of them. The hi-res pages themselves are not compared -
+  // `parity_frame.mjs` holds the renderer on scenes of its own - but every byte of state it
+  // touches is.
+  //
+  // **The two damaged instructions are put back on the machine, and the port runs repaired.**
+  // Repairing the directory bytes is not enough on its own: the machine still *executes*
+  // `ROL $0914` at `$101C`, so its X stays stale and `GEOM.aZ` gets a value belonging to the
+  // ship where the repaired port puts the shot's Z - which then moves the Z delta at `$0909`
+  // and the range at `$090A`. That is the repair working, not a disagreement, and the only way
+  // to compare the two end to end is to let the machine run the instruction the author wrote.
+  // `AE` is `LDX abs`; the operand bytes either side are already right.
+  //
+  // So this check is also the strongest statement the repair has: the machine, running
+  // `LDX $0907` and `LDX $0914`, agrees with the port byte for byte over a whole frame.
+  //
+  // **The directory is put back too, and the port runs repaired.** This is
+  // the one comparison that cannot be made against the damaged copy, and the reason is worth
+  // keeping: `rotatedIndices` reproduces what the two `ROL`s do at their own instruction, but
+  // the bytes they damage are *directory entries*, and every other instruction in the frame
+  // that names one reads it out of memory. The port reads them through `dir`, which is the
+  // build's table. So with the damage left in, the two sides disagree wherever `$0914` is used
+  // for anything else - object 5's published Z, for one - and no amount of modelling the ROL
+  // at `$101C` fixes that. Repaired, `dir` and memory say the same thing and the frame can be
+  // compared end to end. Which is itself an argument for the repair being the default.
+  console.log('\n=== the whole frame, as one class ===');
+  {
+    const WINDOWS = [[0x80FB, 0x82E6], [0x0900, 0x0960], [0x1FF3, 0x2000]];
+    await a2.ev(`(() => {
+      const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+      const WINDOWS = ${JSON.stringify(WINDOWS)};
+      const grab = () => {
+        const out = {};
+        for (const [lo, hi] of WINDOWS) { for (let a = lo; a < hi; a++) out[a] = rd(a); }
+        out[0] = rd(0);
+        for (let i = 0; i < 0xF3; i++) out[0x9800 + i] = rd(0x9800 + i);
+        return out;
+      };
+      window.M.finaleSnap = () => ({ out: grab(), page: window.M.range(0x2000, 0x6000) });
+      window.M.finalePass = (paddle0, paddle1, button) => {
+        const io = window.M.a2.getIO();
+        io.paddle(0, paddle0);
+        io.paddle(1, paddle1);
+        if (button) io.buttonDown(0); else io.buttonUp(0);
+        wr(0xC010, 0);
+        const st = cpu.getState();
+        st.pc = 0x09A7;
+        cpu.setState(st);
+        let read0 = null, read1 = null, trigger = null, exit = 0;
+        const marks = [];
+        const writes = [];
+        let watch = rd(0x814B), prev = 0;
+        const WANT = [0x0C13, 0x0D5F, 0x0DC6, 0x0E2C, 0x0E3A, 0x0E66, 0x0FAC, 0x1046,
+          0x0AE7, 0x0AEE, 0x0AF4, 0x0AFB, 0x0B0C, 0x0B38];
+        cpu.stepCyclesDebug(8000000, () => {
+          const pc = cpu.getPC();
+          if (pc === 0x09AC && read0 === null) read0 = cpu.getState().y;
+          if (pc === 0x0A96 && read1 === null) read1 = cpu.getState().y;
+          if (pc === 0x0AE2 && trigger === null) trigger = cpu.getState().a;
+          const now = rd(0x814B);
+          if (now !== watch) { writes.push([prev, watch, now]); watch = now; }
+          prev = pc;
+          if (WANT.includes(pc) && marks[marks.length - 1] !== pc) marks.push(pc);
+          if (pc === 0x09A7 || pc === 0x112D || pc === 0x10EC) { exit = pc; return true; }
+        });
+        return { exit, read0, read1, trigger, marks, writes, out: grab() };
+      };
+      return 'ok';
+    })()`);
+    const machineSnap = () => a2.ev('JSON.stringify(window.M.finaleSnap())').then(JSON.parse);
+    /** Put `LDX` back where this copy has `ROL`, and say what was there. */
+    const repairCode = () => a2.ev('JSON.stringify((() => { const wr = window.M.wr,'
+      + ' rd = window.M.rd; const was = [rd(0x0F7E), rd(0x101C)];'
+      + ' wr(0x0F7E, 0xAE); wr(0x101C, 0xAE); return was; })())').then(JSON.parse);
+    const wasRol = await repairCode();
+    check('the two instructions really were $2E before this check put $AE back',
+      wasRol[0] === 0x2E && wasRol[1] === 0x2E,
+      `$0F7E and $101C held ${wasRol.map((b) => hx(b, 2)).join(' and ')}, and now hold $AE -`
+        + ' so from here the machine is running the code the main mission has');
+    const machinePass = (p0, p1, b) => a2.ev('JSON.stringify(window.M.finalePass('
+      + p0 + ',' + p1 + ',' + b + '))').then(JSON.parse);
+
+    /** A `Finale` whose memory, pages, table and Flight state are the machine's, right now. */
+    const sync = (snap, over = {}) => {
+      const mem = new Uint8Array(0x10000);
+      for (const [lo, hi] of WINDOWS) for (let a = lo; a < hi; a++) mem[a] = snap.out[a];
+      mem[0] = snap.out[0];
+      for (let i = 0; i < 0x4000; i++) mem[0x2000 + i] = snap.page[i];
+      const f = new Finale(mem, { render: true, ...over });
+      for (let i = 0; i < 0xF3; i++) f.math.table[i] = snap.out[0x9800 + i];
+      // Flight keeps three bytes of its state in the object as well as in memory.
+      f.flight.gate = mem[0x0948];
+      f.flight.burnCounter = mem[0x0956];
+      f.flight.heading = mem[0x0949];
+      return f;
+    };
+
+    const diff = (machine, f, was) => {
+      const out = [];
+      const say = (a, label) => out.push(`${label ?? hx(a)} was ${was.out[a]},`
+        + ` port ${f.mem[a]}, machine ${machine.out[a]}`);
+      for (const [lo, hi] of WINDOWS) {
+        for (let a = lo; a < hi; a++) {
+          if (f.mem[a] !== machine.out[a]) { say(a); if (out.length > 2) return out; }
+        }
+      }
+      if (f.mem[0] !== machine.out[0]) say(0, '$0000');
+      for (let i = 0; i < 0xF3; i++) {
+        if (f.math.table[i] !== machine.out[0x9800 + i]) {
+          out.push(`table[${i}] was ${was.out[0x9800 + i]}, port ${f.math.table[i]},`
+            + ` machine ${machine.out[0x9800 + i]}`);
+          if (out.length > 2) return out;
+        }
+      }
+      return out;
+    };
+
+    const drive = (f, machine) => f.pass({
+      paddle0: machine.read0 === null ? 128 : machine.read0,
+      paddle1: machine.read1 === null ? 255 : machine.read1,
+      button0: machine.trigger !== null && (machine.trigger & 0x80) !== 0,
+      latch: 0,
+    });
+
+    const SCRIPT = [
+      { p0: 128, p1: 255, b: false },
+      { p0: 255, p1: 255, b: false },
+      { p0: 0, p1: 255, b: false },
+      { p0: 128, p1: 0, b: false },
+      { p0: 200, p1: 0, b: true },
+      { p0: 50, p1: 255, b: true },
+      { p0: 128, p1: 255, b: true },
+      { p0: 128, p1: 0, b: true },
+    ];
+    const bad = [];
+    const exits = new Set();
+    let passes = 0, warped = 0;
+    for (const [i, input] of SCRIPT.entries()) {
+      // Let the machine move on between samples, so each pass starts from a different state
+      // rather than eight passes all from one.
+      await a2.ev('(() => { window.M.cpu.stepCyclesDebug(500000, () => {}); return 1; })()');
+      await intact();
+      const was = await machineSnap();
+      const machine = await machinePass(input.p0, input.p1, input.b);
+      const f = sync(was);
+      drive(f, machine);
+      passes++;
+      exits.add(machine.exit);
+      if (f.flight.gate !== 0) warped++;
+      const d = diff(machine, f, was);
+      if (d.length) bad.push({ i, d, launched: machine.marks.includes(0x0B0C) });
+    }
+
+    // The six passes where the trigger stays up agree over every byte. The two where it goes
+    // down disagree on **object 6's count and nothing else**: the machine reaches `$0B0C` and
+    // launches, exactly as the port does, and then ends the frame with that count back at zero
+    // where the port leaves it running. So something inside the frame switches the player's
+    // shot off that this port does not, and `$0F53`'s award is the suspect - the main mission's
+    // `shotHit` calls `switchOffShot` at that point and the finale's three calls do not
+    // obviously include it. **Open question 18.**
+    //
+    // It is encoded rather than skipped: this fails if a pass without the trigger disagrees at
+    // all, if a pass with it disagrees anywhere other than that one byte, or if the count of
+    // either changes.
+    const clean = bad.filter((b) => !b.d.every((x) => x.startsWith(hx(0x8172))));
+    const only8172 = bad.filter((b) => b.d.length === 1 && b.d[0].startsWith(hx(0x8172)));
+    check('every pass agrees over every byte, but for the player shot on the two that fire',
+      clean.length === 0 && only8172.length === 2 && passes === SCRIPT.length
+        && only8172.every((b) => b.launched),
+      clean.length ? `pass ${clean[0].i}: ${clean[0].d.join(' | ')}`
+        : `${passes} passes from eight different mission states, ${warped} under warp, exits`
+          + ` ${[...exits].map((x) => hx(x)).join(' ')} - ${passes - only8172.length} agree to`
+          + ` the byte and ${only8172.length} differ only at ${hx(0x8172)}, object 6's count,`
+          + ' which is open question 18');
+
+    // The control. Both numbers have to change what the frame does, or they are decoration -
+    // and both can be shown without a machine pass, which keeps the control independent of
+    // the comparison above rather than a second reading of the same run.
+    {
+      const burn = (frames) => {
+        const f = new Flight(null, { burnFrames: frames });
+        let warp = 0xFF;
+        // 120, not 60: both rates spend exactly one unit in sixty frames, so the two
+        // readings agree there and the control could not fail.
+        for (let k = 0; k < 120; k++) warp = f.throttle(0, warp);
+        return warp;
+      };
+      const cost = (from) => 0xFF - shrink(0xFF, from).value;
+      check("control: the main mission's two numbers put the frame out of step",
+        burn(BURN_FRAMES) !== burn(0x37)
+          && cost(FINALE_MISSILE_ENTRY) !== cost(MISSILE_ENTRY),
+        `a hundred and twenty frames of warp leave ${burn(BURN_FRAMES)} at the finale's rate`
+          + ` against ${burn(0x37)} at the main mission's, and a shot costs`
+          + ` ${cost(FINALE_MISSILE_ENTRY)} off the bar against ${cost(MISSILE_ENTRY)}`);
+    }
   }
 } finally {
   await a2.close();

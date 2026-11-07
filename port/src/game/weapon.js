@@ -37,7 +37,7 @@ import { VARS, VAR } from './tables.js';
 import { field } from './objects.js';
 import { buildStepOperands } from './flight.js';
 import { SHOTS } from './kill.js';
-import { MSL, EMPTY, SOUND } from './damage.js';
+import { MSL, EMPTY, SOUND, shrink } from './damage.js';
 import { SAVED_HEADING } from './entities.js';
 import { H1 } from './controls.js';
 
@@ -54,6 +54,12 @@ export const SHOT_LIFETIME = 0x14;
 
 /** `CPX #$0B` - the other slot's count has to be below this before this one may fire. */
 export const RELOAD = 0x0B;
+
+/**
+ * `$0B29 LDY #$04` - where the trigger enters `shrink`'s loop, which is what makes the cost
+ * one unit rather than four. The finale's copy of this block loads 3 and so takes two.
+ */
+export const MISSILE_ENTRY = 4;
 
 /** `LDA #$F0 / LDA #$FF` - the Y the publish writes, to the wrong object. */
 export const PUBLISHED_Y = -16;
@@ -102,7 +108,7 @@ function launch(mem, math, shot) {
  * @param {boolean} button BUTTON0, $C061, read as its sign bit
  * @returns {{fired: object|null, sound?: number}} the slot that went, and the sound asked for
  */
-export function fire(mem, math, button) {
+export function fire(mem, math, button, { cost = MISSILE_ENTRY } = {}) {
   // $0ADB - `LDA BUTTON0 / BMI`, so it is the high bit that counts.
   if (!button) return { fired: null };
 
@@ -114,8 +120,10 @@ export function fire(mem, math, button) {
   if (mem[field(SHOTS[0].object, 'count')] < 1) {
     if (mem[field(SHOTS[1].object, 'count')] >= RELOAD) return { fired: null };
     launch(mem, math, SHOTS[0]);
-    // $0B26 - one unit off the bar, by entering $1C89's loop with Y already at 4.
-    mem[MSL] = (mem[MSL] - 1) & 0xff;
+    // $0B26 - `LDX MSL / LDY #$04 / JSR $1C8B`, which is `shrink`'s loop entered at the point
+    // where one decrement is all it does. The finale's copy of this block enters with Y at 3
+    // and takes two off, so the entry point is a parameter and the loop is what is shared.
+    mem[MSL] = shrink(mem[MSL], cost).value;
     return { fired: SHOTS[0], spent: true };
   }
 
