@@ -22,7 +22,8 @@ import { openOracle } from './a2.mjs';
 import { toFinale } from './exercise.mjs';
 import { endOfFrame, pauses, DONE, HITS, FATAL, PROGRESS, STAGE, BASE_STAR, OBJ3_COUNT,
   DEBRIS1, FRAME_TOP, STAGE_CALLS, SHLD, WARP, MSL, EMPTY, rammed, missileHit, systems,
-  secondEight } from '../port/src/game/finale.js';
+  secondEight, debrisFrame, DEBRIS, DEBRIS_WIN, TOGGLE, ONE_SHOTS }
+  from '../port/src/game/finale.js';
 import { shrink } from '../port/src/game/damage.js';
 
 const results = [];
@@ -175,6 +176,34 @@ try {
     };
     return 'ok';
   })()`);
+  await a2.ev(`(() => {
+    const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+    const WATCH = [0x093E, 0x093F, 0x0940, 0x0947, 0x094B, 0x0945, 0x1FFF, 0x8289, 0x8165];
+    window.M.frame = (pokes) => {
+      const before = cpu.getState();
+      const snap = {}; for (const a of WATCH) snap[a] = rd(a);
+      for (const [a, v] of Object.entries(pokes)) wr(Number(a), v & 0xff);
+      const seeded = {}; for (const a of WATCH) seeded[a] = rd(a);
+      const st = cpu.getState();
+      wr(0x100 + st.sp, 0xFF); st.sp = (st.sp - 1) & 0xff;
+      wr(0x100 + st.sp, 0xFE); st.sp = (st.sp - 1) & 0xff;
+      st.pc = 0x103E; cpu.setState(st);
+      const calls = []; let site1 = 0;
+      cpu.stepCyclesDebug(8000000, () => {
+        const pc = cpu.getPC();
+        if (pc === 0x10A7) site1++;
+        if (pc === 0x10AD || pc === 0x10AA) return true;   // the block's two ways out
+      });
+      const after = {}; for (const a of WATCH) after[a] = rd(a);
+      for (const [a, v] of Object.entries(snap)) wr(Number(a), v);
+      cpu.setState(before);
+      return { seeded, after, calls, site1 };
+    };
+    return 'ok';
+  })()`);
+  const frame = (pokes) => a2.ev('JSON.stringify(window.M.frame('
+    + JSON.stringify(pokes) + '))').then(JSON.parse);
+
   const dmg = (addr, pokes) => a2.ev('JSON.stringify(window.M.dmg(' + addr + ','
     + JSON.stringify(pokes) + '))').then(JSON.parse);
 
@@ -229,6 +258,84 @@ try {
       miss.after[HITS] === 1,
       `two went in and ${miss.after[HITS]} came out - $14B2 LDA #$01 / STA $0933, which`
         + ' nothing in the main mission does');
+  }
+
+  // ---------------------------------------------------- the debris block, and the two wins
+  // `$103E`-`$10AA` ticks the three debris counters, renders, services two one-shot flags
+  // and then tests class 1's counter. That test is the first of the two places `$1FFF` is
+  // incremented, and the pair of them is how the mission is won.
+  console.log('\n=== the debris block ===');
+  {
+    const wrong = [];
+    let n = 0, wins = 0;
+    for (const d1 of [0, 1, 3, 4, 255]) {
+      for (const d2 of [0, 2]) {
+        for (const d3 of [0, 2]) {
+          for (const toggle of [0, 1, 2]) {
+            for (const flags of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+              const pokes = { [DEBRIS[0]]: d1, [DEBRIS[1]]: d2, [DEBRIS[2]]: d3,
+                [TOGGLE]: toggle, [ONE_SHOTS[0].flag]: flags[0],
+                [ONE_SHOTS[1].flag]: flags[1], [BASE_STAR]: 0 };
+              const r = await frame(pokes);
+              const mem = new Uint8Array(0x10000);
+              for (const [a, v] of Object.entries(r.seeded)) mem[a] = v;
+              const got = debrisFrame(mem);
+              n++;
+              if (got.won) wins++;
+              const why = `debris ${d1}/${d2}/${d3} toggle ${toggle} flags ${flags}`;
+              const watched = [...DEBRIS, TOGGLE, ONE_SHOTS[0].flag, ONE_SHOTS[1].flag,
+                BASE_STAR];
+              let said = false;
+              for (const a of watched) {
+                if (mem[a] !== r.after[a]) {
+                  wrong.push(`${why}: ${hx(a)} port ${mem[a]} machine ${r.after[a]}`);
+                  said = true; break;
+                }
+              }
+              if (!said && got.won !== (r.site1 > 0)) {
+                wrong.push(`${why}: won ${got.won} vs ${r.site1 > 0}`);
+              }
+            }
+          }
+        }
+      }
+    }
+    check('the debris block agrees: the three ticks, the toggle, both flags and $1FFF',
+      wrong.length === 0, wrong.slice(0, 2).join('; ')
+        || `${n} cases, ${wins} of them taking the staged win at $10A7`);
+  }
+
+  // The question this port left open, answered by running it.
+  console.log('\n=== how the base star actually dies ===');
+  {
+    const r = JSON.parse(await a2.ev(`JSON.stringify((() => {
+      const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+      const snap = {}; for (const a of [0x1FF7, 0x1FFF, 0x0933, 0x814B, 0x093E]) snap[a] = rd(a);
+      const before = cpu.getState();
+      wr(0x1FF7, 15); wr(0x1FFF, 0); wr(0x0933, 0); wr(0x814B, 0); wr(0x093E, 0);
+      const st = cpu.getState(); st.pc = ${FRAME_TOP}; st.sp = 0xF8; cpu.setState(st);
+      let site1 = 0, site2 = 0, frames = 0, ended = false;
+      cpu.stepCyclesDebug(60000000, () => {
+        const pc = cpu.getPC();
+        if (pc === ${FRAME_TOP}) frames++;
+        if (pc === 0x10A7) site1++;
+        if (pc === 0x112A) site2++;
+        if (pc === 0x112D) { ended = true; return true; }
+        if (frames > 60) return true;
+      });
+      const out = { site1, site2, frames, ended, baseStar: rd(0x1FFF) };
+      for (const [a, v] of Object.entries(snap)) wr(Number(a), v);
+      cpu.setState(before);
+      return out;
+    })())`));
+    check('a won mission fires BOTH increments, and $1FFF ends at two',
+      r.site1 === 1 && r.site2 === 1 && r.baseStar === 2 && r.ended,
+      `$10A7 once and $112A once over ${r.frames} frames - the staged win does not end the`
+        + ' mission, $10AA carries it on until the field empties');
+    check('which means the ten thousand for the base star is never paid',
+      r.baseStar !== 1,
+      'SD PART3 line 175 tests = 0 so it is a win, but INITIALS line 2016 tests = 1 for the'
+        + ' bonus, and the byte holds 2. Reproduced, not worked around');
   }
 
   // ------------------------------------------------------------------ controls ------------

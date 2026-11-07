@@ -2275,10 +2275,30 @@ shares two thirds of its structure and differs in the shapes themselves.
 Carrying the main mission's four hits across would make the finale twice as survivable, and
 nothing on screen would say so.
 
-**`$1FFF` is incremented, not set.** Two places mark the base star dead - `$10A7` and
-`$112A` - and both `INC`. So it can reach 2, and `SD PART3` tests it against 0 while
-`INITIALS` tests it against 1: a game that reached both sites would be won and pay no bonus.
-Whether both can be reached in one mission is not established.
+**`$1FFF` is incremented, not set, and both sites fire in every winning mission.** ~~Whether
+both can be reached in one mission is not established.~~ Established, by setting the progress
+counter to fifteen in the machine and letting it run:
+
+```
+frame 1   $1FF7 reaches 15, so $10FF sets $093E to 4 and resets the counter
+frame 2   the tick takes $093E to 3; $109D CPX #$03 / BCC does not branch;
+          $10A7 INC $1FFF -> 1, and $10AA JMP $10CB keeps the mission running
+frame 3   $093E to 2
+frame 4   $093E to 1, then 0 - and with the field empty $112A INC $1FFF -> 2,
+          and $112D RTS ends the mission
+```
+
+The staged win does not end anything; only `$112D` does. So **a won mission leaves `$1FFF`
+holding 2**, and that is a bug in the original with a visible consequence:
+
+| program | line | test | at 2 |
+|---|---|---|---|
+| `SD PART3` | 175 | `IF PEEK(8191) = 0 THEN RUN MONOLITH` | you win |
+| `INITIALS` | 2016 | `IF PEEK(8191) = 1 THEN BN = BN + 10000` | **no bonus** |
+
+So the ten thousand points for killing the base star are never paid. Being paid for it needed
+the byte to hold 1, which needs the mission to end before the field empties. The port
+reproduces it; `parity_finale.mjs` holds it.
 
 ### Getting it into a real mission
 
@@ -2381,9 +2401,20 @@ the count managed to pass two.
 All four entry points - `$1486`, `$14EE`, `$14BF`, `$149E` - are held against the machine
 across the shield's whole boundary, 189 cases each.
 
-What is still unported is everything these call out to: `$1131` and `$12AB` at the fifteenth
-stage, `$171D`, `$1613`, `$1632` and `$15F5`, and the mission's kill and firing code. They
-are named in `finale.js` rather than dropped.
+### The debris block, $103E-$10AA
+
+Three debris counters tick down a frame at a time, the scene renders, two one-shot flags are
+serviced and cleared, and then class 1's counter alone is tested against three - which is the
+staged win above. Nothing else is tested there: not the other two counters, not the hit count.
+The `$0947` toggle beside it is `INX / CPX #$02 / BNE / LDX #$00`, a plain 0/1 flip.
+
+Held across 240 cases - every combination of the three counters either side of the threshold,
+the toggle including an out-of-range 2, and both one-shot flags.
+
+What is still unported is everything these blocks call out to: `$1131` and `$12AB` at the
+fifteenth stage, `$171D`, `$1613`, `$1632`, `$15F5`, `$14FB` (the debris drawer), `$1761` and
+`$177C`, and the mission's kill and firing code. They are named in `finale.js` rather than
+dropped.
 
 ### The route is not walkable, and that is a separate bug
 

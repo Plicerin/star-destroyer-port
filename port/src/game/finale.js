@@ -227,3 +227,83 @@ export function missileHit(mem, shrink) {
   if (mem[SHLD] >= EMPTY + 1) return secondEight(mem, shrink);  // $14F1 / $14F8
   return systems(mem, shrink);                                  // $14F5
 }
+
+// ---------------------------------------------------------------------------------------
+// The debris block, $103E-$10AA - and how the base star actually dies.
+//
+// Three debris counters tick down a frame at a time, the scene renders, two one-shot flags
+// are serviced, and then class 1's counter is tested. That last test is the first of the two
+// places `$1FFF` is incremented, and between them they answer a question this port left open:
+// **both of them fire, in every winning mission, four frames apart.**
+//
+// The sequence, measured in the machine by setting the progress counter to fifteen and
+// letting it run:
+//
+//     frame 1   $1FF7 reaches 15, so $10FF sets $093E to 4 and resets the counter
+//     frame 2   the tick takes $093E to 3; $109D CPX #$03 / BCC does not branch;
+//               $10A7 INC $1FFF  ->  1, and $10AA JMP $10CB keeps the mission running
+//     frame 3   $093E to 2
+//     frame 4   $093E to 1, then 0 - and with the field empty, $112A INC $1FFF  ->  2,
+//               and $112D RTS ends the mission
+//
+// **So a won mission leaves `$1FFF` holding 2, and that is a bug in the original.**
+// `SD PART3` line 175 is `IF PEEK(8191) = 0 THEN RUN MONOLITH`, so 2 is a win. But
+// `INITIALS` line 2016 is `IF PEEK(8191) = 1 THEN BN = BN + 10000` - an equality - so the
+// ten thousand points for killing the base star are **never paid**. Winning the game and
+// being paid for it needed that byte to be 1, and the only way it stays at 1 is for the
+// mission to end before the field empties. The port reproduces it.
+
+/** $093E, $093F, $0940 - the three debris counters, one per enemy class. */
+export const DEBRIS = [0x093E, 0x093F, 0x0940];
+
+/** `$109D CPX #$03 / BCC` - what class 1's counter has to reach to kill the base star. */
+export const DEBRIS_WIN = 3;
+
+/** $0947 - a 0/1 toggle, `INX / CPX #$02 / BNE / LDX #$00`. */
+export const TOGGLE = 0x0947;
+
+/** The two one-shot flags the block services and clears, with what each would have called. */
+export const ONE_SHOTS = [
+  { flag: 0x094B, call: 0x1761 },   // $107E
+  { flag: 0x0945, call: 0x177C },   // $108B
+];
+
+/** More that is not ported: the debris drawer and the two bursts the staged win plays. */
+export const DEBRIS_CALLS = { draw: 0x14FB, render: 0x6000, stagedWin: 0x15C5 };
+
+/**
+ * `$103E`-`$10AA` - tick the debris, render, service the flags, and test for the staged win.
+ *
+ * @returns {{calls: number[], won: boolean}} `won` is `$10A7`, which does **not** end the
+ *   mission: `$10AA` jumps back into the frame and it carries on to the block above.
+ */
+export function debrisFrame(mem) {
+  const calls = [];
+  mem[0x8289] = 0;                                           // $1040
+  mem[0x8165] = 0;                                           // $1043
+
+  for (const [i, counter] of DEBRIS.entries()) {             // $1047, $1054, $1061
+    if (mem[counter] === 0) continue;
+    calls.push(DEBRIS_CALLS.draw);                           // JSR $14FB, Y = the class
+    mem[counter] = (mem[counter] - 1) & 0xff;
+  }
+  calls.push(DEBRIS_CALLS.render);                           // $106E JSR $6000
+
+  mem[TOGGLE] = (mem[TOGGLE] + 1) & 0xff;                    // $1071 INX
+  if (mem[TOGGLE] === 2) mem[TOGGLE] = 0;                    // $1075 CPX #$02
+
+  for (const { flag, call } of ONE_SHOTS) {                  // $107E, $108B
+    if (mem[flag] === 0) continue;
+    calls.push(call);
+    mem[flag] = 0;
+  }
+
+  // $1098 - class 1's counter at three or more kills the base star. Note what it is not:
+  // there is no test of the other two counters here, and no test of anything else.
+  if (mem[DEBRIS[0]] !== 0 && mem[DEBRIS[0]] >= DEBRIS_WIN) {
+    calls.push(DEBRIS_CALLS.stagedWin, DEBRIS_CALLS.stagedWin);   // $10A1, $10A4
+    mem[BASE_STAR] = (mem[BASE_STAR] + 1) & 0xff;                 // $10A7
+    return { calls, won: true };                                  // $10AA - and it goes on
+  }
+  return { calls, won: false };
+}
