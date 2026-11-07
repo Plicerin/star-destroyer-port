@@ -14,7 +14,7 @@
 // of them wrong in ways no screenshot would show.
 import { openOracle } from './a2.mjs';
 import { openDisk, DISK } from './dsk.mjs';
-import { traverse, disasmRange } from './disasm6502.mjs';
+import { traverse, disasmRange, disasm1 } from './disasm6502.mjs';
 import { toFinale, FINALE_ENTRY, sdStart2Setup } from './exercise.mjs';
 import { FATAL, HITS } from '../port/src/game/damage.js';
 import { IFACE } from '../port/src/game/chain.js';
@@ -171,6 +171,100 @@ console.log('\n=== the rules that differ, and would be silently wrong if assumed
     !bsCode.starts.has(0x1803),
     'static traversal from $0957 never arrives at $1803 - recorded as found, not as a'
       + ' mechanism, because a routine nothing calls is not one');
+}
+
+// --------------------------------------------------- how much of it is already written ----
+// Three routines turned up identical to the main mission's except for the addresses their own
+// branches name. That is either three coincidences or a pattern, and the difference decides
+// whether the finale is 1,369 instructions to write or a much smaller number.
+//
+// So every routine either binary is JSRed to is reduced to a **shape**: its instructions to
+// the first RTS, with a branch or JMP landing inside the routine written as an offset rather
+// than an address, and everything else - absolute operands, calls out - kept exactly. Two
+// routines with the same shape are the same code at different addresses. Two that differ
+// anywhere that matters do not match.
+console.log('\n=== how much of the finale is the main mission, relocated ===');
+{
+  const BRANCH = /^(BCC|BCS|BEQ|BNE|BMI|BPL|BVC|BVS)$/;
+  const image = (f) => { const mem = []; for (let i = 0; i < f.len; i++) mem[f.addr + i] = f.data[i];
+    return { mem, lo: f.addr, hi: f.addr + f.len }; };
+  const shape = (img, entry) => {
+    const insts = [];
+    let a = entry;
+    for (let i = 0; i < 400; i++) {
+      if (a < img.lo || a >= img.hi || img.mem[a] === undefined) return null;
+      const l = disasm1(img.mem, a);
+      insts.push({ at: a, op: l.op, len: l.len, bytes: [...l.bytes] });
+      if (l.op === 'RTS') break;
+      a += l.len;
+    }
+    if (!insts.length || insts[insts.length - 1].op !== 'RTS') return null;
+    const end = insts[insts.length - 1].at;
+    return { count: insts.length, key: insts.map((x) => {
+      if (BRANCH.test(x.op)) {
+        return `${x.op}+${x.bytes[1] > 127 ? x.bytes[1] - 256 : x.bytes[1]}`;
+      }
+      if (x.op === 'JMP' && x.len === 3) {
+        const t = x.bytes[1] | (x.bytes[2] << 8);
+        return (t >= entry && t <= end + 2) ? `JMP@${t - entry}` : `JMP ${hx(t)}`;
+      }
+      return x.bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
+    }).join(' ') };
+  };
+  const targets = (img) => {
+    const out = new Set();
+    for (let a = img.lo; a < img.hi - 2; a++) {
+      if (img.mem[a] !== 0x20) continue;
+      const t = img.mem[a + 1] | (img.mem[a + 2] << 8);
+      if (t >= img.lo && t < img.hi) out.add(t);
+    }
+    return [...out].sort((x, y) => x - y);
+  };
+
+  const bsImg = image(BS), sdImg = image(SD);
+  const main = new Map();
+  for (const t of targets(sdImg)) {
+    const s = shape(sdImg, t);
+    if (s && s.count >= 4) main.set(s.key, t);
+  }
+  const relocated = [], own = [];
+  for (const t of targets(bsImg)) {
+    const s = shape(bsImg, t);
+    if (!s || s.count < 4) continue;
+    const hit = main.get(s.key);
+    if (hit !== undefined) relocated.push({ from: t, to: hit, n: s.count });
+    else own.push({ from: t, n: s.count });
+  }
+  const sum = (a) => a.reduce((n, x) => n + x.n, 0);
+  console.log(`  ${relocated.length} relocated (${sum(relocated)} instructions),`
+    + ` ${own.length} the finale's own (${sum(own)} instructions)`);
+  for (const r of relocated.sort((a, b) => b.n - a.n)) {
+    console.log(`    ${hx(r.from)} -> ${hx(r.to)}  ${r.n}`);
+  }
+
+  check('a third of the finale\'s routines are main-mission routines moved',
+    relocated.length === 14 && sum(relocated) === 208,
+    `${relocated.length} of ${relocated.length + own.length}, ${sum(relocated)} instructions`
+      + ' - identical but for the addresses their own branches name');
+
+  // Every one of them is a routine the port has already written and already holds against
+  // the machine, so they are not work: they are a lookup.
+  const PORTED = { 0x1A1E: 'kill.js', 0x1AE8: 'dispatch.js', 0x1C3D: 'entities.js',
+    0x1B2B: 'kill.js', 0x1B60: 'weapon.js', 0x1EFA: 'entities.js', 0x1A8B: 'kill.js',
+    0x1AC7: 'kill.js', 0x1C89: 'damage.js', 0x1C8B: 'damage.js', 0x1C1E: 'controls.js',
+    0x1C32: 'controls.js', 0x1ABE: 'kill.js', 0x1FA9: 'damage.js' };
+  const missing = relocated.filter((r) => !PORTED[r.to]);
+  check('and every one of them is already in the port, named by its main-mission address',
+    missing.length === 0,
+    missing.length ? missing.map((r) => hx(r.to)).join(', ')
+      : [...new Set(Object.values(PORTED))].sort().join(', '));
+
+  // The control: the finale's biggest routine is not one of them.
+  const biggest = own.sort((a, b) => b.n - a.n)[0];
+  check('control: the finale\'s own largest routine matches nothing in the main mission',
+    biggest && biggest.n > 300,
+    `${hx(biggest.from)} is ${biggest.n} instructions and has no twin - half of the`
+      + ` ${sum(own)} that still have to be written`);
 }
 
 // ---------------------------------------------------------------- the machine ------------

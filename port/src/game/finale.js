@@ -60,12 +60,18 @@ export const DEBRIS1 = 0x093E;
 export const FRAME_TOP = 0x09A7;
 
 /**
- * The two subroutines the fifteenth stage calls, which are not ported.
+ * The two subroutines the fifteenth stage calls - **and both are already written.**
  *
- * Named rather than dropped, the same way `damage.js` names its sounds, so the chain through
- * this block is complete and the gap is visible.
+ * `$1131` is `kill.js`'s `$1A1E` relocated and `$12AB` is its `$1ABE`, identical but for the
+ * addresses their own branches name. Fourteen of the finale's thirty-three routines turn out
+ * to be main-mission routines moved, and every one of them is a module the port already holds
+ * against the machine; `probe_basestar.mjs` derives that mapping and checks it. These were
+ * listed here as gaps before anyone looked.
  */
 export const STAGE_CALLS = [0x1131, 0x12AB];
+
+/** Where each of those lives in the main mission, and so in the port. */
+export const STAGE_CALLS_ARE = { 0x1131: 0x1A1E, 0x12AB: 0x1ABE };
 
 /** What the block did, and why it stopped. */
 export const DONE = { running: null, destroyed: 'destroyed', won: 'won' };
@@ -268,7 +274,12 @@ export const ONE_SHOTS = [
   { flag: 0x0945, call: 0x177C },   // $108B
 ];
 
-/** More that is not ported: the debris drawer and the two bursts the staged win plays. */
+/**
+ * The debris drawer, the renderer and the two bursts the staged win plays.
+ *
+ * `$14FB` and `$15C5` are the finale's own and are not ported. `$6000` is A2-3D2, which the
+ * port has had since phase 1.
+ */
 export const DEBRIS_CALLS = { draw: 0x14FB, render: 0x6000, stagedWin: 0x15C5 };
 
 /**
@@ -344,11 +355,20 @@ export const SECOND_GATE = 0x817F;
 /** $0907 - the byte `$0F7E` rotates instead of loading. */
 export const ROTATED = 0x0907;
 
-/** What each block calls when the kill lands. None is ported. */
+/**
+ * What each block calls when the kill lands.
+ *
+ * The third of each three is already written: `$1278` is `kill.js`'s `$1A8B` relocated and
+ * `$12B4` is its `$1AC7` - the routine that aims the debris along the shot's heading. The
+ * first two of each, `$119E`/`$120B` and `$1755`/`$175B`, are the finale's own and are not.
+ */
 export const AWARD_CALLS = [
   { debris: 0x093F, calls: [0x119E, 0x1755, 0x1278] },   // $0F5B, $0F5E, $0F61
   { debris: 0x0940, calls: [0x120B, 0x175B, 0x12B4] },   // $0FA3, $0FA6, $0FA9
 ];
+
+/** The ones above that are main-mission routines moved, by where they came from. */
+export const AWARD_CALLS_ARE = { 0x1278: 0x1A8B, 0x12B4: 0x1AC7 };
 
 /**
  * `$0F7E ROL $0907` - rotate left through carry, as the 6502 does it.

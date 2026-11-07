@@ -2463,9 +2463,38 @@ above it, which is data-dependent, and `math.js` does not model MATH's flags bec
 else has needed them. `hitTest` takes the carry as an input and the harness supplies the
 machine's.
 
-What is still unported: `$1131` and `$12AB` at the fifteenth stage, `$171D`, `$1613`, `$1632`,
-`$15F5`, `$14FB` (the debris drawer), `$1761`, `$177C`, `$119E`, `$1278`, `$120B` and `$12B4`,
-and the mission's firing code. They are named in `finale.js` rather than dropped.
+### A third of the finale is already written
+
+Three routines turning up identical-but-relocated was either a coincidence or a pattern, and
+the difference decides whether the finale is 1,369 instructions to write or far fewer. So
+every routine either binary is JSRed to was reduced to a **shape**: its instructions to the
+first `RTS`, with a branch or `JMP` landing inside the routine written as an offset instead of
+an address, and everything else - absolute operands, calls out - kept exactly. Same shape
+means same code at a different address.
+
+**14 of the finale's 33 routines are main-mission routines moved**, 208 instructions:
+
+| finale | main | | finale | main | | finale | main |
+|---|---|---|---|---|---|---|---|
+| `$1131` | `$1A1E` | | `$134D` | `$1B60` | | `$1478` | `$1C8B` |
+| `$12D5` | `$1AE8` | | `$16EC` | `$1EFA` | | `$140B` | `$1C1E` |
+| `$142A` | `$1C3D` | | `$1278` | `$1A8B` | | `$141F` | `$1C32` |
+| `$1318` | `$1B2B` | | `$12B4` | `$1AC7` | | `$12AB` | `$1ABE` |
+| | | | `$1476` | `$1C89` | | `$1797` | `$1FA9` |
+
+And **every one of them is a routine the port already holds against the machine** -
+`controls.js`, `damage.js`, `dispatch.js`, `entities.js`, `kill.js`, `weapon.js`. They are not
+work; they are a lookup. Four of them had been written down in `finale.js` as gaps before
+anyone checked.
+
+That leaves **19 routines and 694 instructions** that are the finale's own, and `$0D2A` is 346
+of them - half the remaining job in one routine. `probe_basestar.mjs` derives the mapping
+rather than storing it, so a module moving or a routine changing makes the check fail.
+
+What is still unported and genuinely the finale's: `$0D2A`, `$1544`, `$119E`, `$120B`,
+`$1382`, `$13C2`, `$15C5`, `$14FB` (the debris drawer), `$17A0`, `$15AC`, `$1591`, `$15F5`,
+`$1613`, `$1632`, `$171D`, `$1755`, `$175B`, `$1761` and `$177C`. They are named in
+`finale.js` rather than dropped.
 
 ### The route is not walkable, and that is a separate bug
 
