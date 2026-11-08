@@ -36,7 +36,7 @@ export class Presentation {
    * @param {Uint8Array|ArrayBuffer} image the .dsk
    * @param {object} [opts] `rnd`, `calls` for CALL handlers the shell supplies
    */
-  constructor(image, { rnd = Math.random, calls = {} } = {}) {
+  constructor(image, { rnd = Math.random, calls = {}, corruptInterface = false } = {}) {
     this.disk = openDisk(image);
     this.mem = new Uint8Array(0x10000);
     /**
@@ -52,6 +52,7 @@ export class Presentation {
     });
     this.host = new Host(this.mem, this.disk, {
       rnd,
+      corruptInterface,
       calls: {
         0x6000: () => { this.engine.reset(); this.engine.run(); return null; },
         ...calls,

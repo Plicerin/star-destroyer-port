@@ -216,7 +216,16 @@ export const CHAIN = {
   HYPERDRIVE0: { to: 'SD', orphan: true },
   'SD RET': { to: null, orphan: true },
   'CLEAR SCORES': { to: null, orphan: true },
-  INITIALS: { to: null },
+  /**
+   * Where a *game* ends - and where the disk starts the next one.
+   *
+   * Both ways through reach line 6000: line 130 when the score did not make the table, and
+   * line 380 after the three letters are entered. 6000 is `FOR J = 1 TO 15000: NEXT:
+   * PRINT CHR$(4);"RUN START"` - a pause and then the boot program, so the machine never
+   * stops. This said `to: null` until a second game was walked, which made the chain look
+   * like it had an end.
+   */
+  INITIALS: { to: 'START', from: 'INITIALS 130 / 380 / 6000' },
   /**
    * The attract mode, and the only place the game says what it is about. Its loop draws the
    * narration out of the shape table and leaves on its own at line 210 - or at line 144 the

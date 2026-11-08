@@ -293,6 +293,7 @@ async function bootDisk() {
       $('s-missiles').textContent = flying ? gauge(s.missiles) : '—';
       $('s-hits').textContent = flying ? `${s.hits} of ${s.fatal}` : '—';
       $('l-passes').textContent = s.finale ? 'flights · FINALE' : 'flights';
+      $('pause').textContent = s.paused ? 'Resume' : 'Pause';
       $('over').textContent = s.error ? s.error
         : (s.waiting === 'key' ? 'press a key' : '');
       const gaps = s.unimplemented || [];
@@ -302,7 +303,8 @@ async function bootDisk() {
         : '';
     };
     boot.start();
-    $('pause').disabled = true;
+    $('pause').disabled = false;
+    $('pause').textContent = 'Pause';
     $('boot').textContent = 'Reboot';
   } catch (e) {
     $('over').textContent = String(e.message || e);
@@ -315,9 +317,12 @@ async function bootDisk() {
 $('boot').addEventListener('click', bootDisk);
 $('start').addEventListener('click', fly);
 $('pause').addEventListener('click', () => {
-  shell.paused = !shell.paused;
-  shell.audio.resume();
-  show(shell.status());
+  const d = active();
+  d.paused = !d.paused;
+  d.audio.resume();
+  // `Boot` repaints and reports from its own loop; only the shell needs the nudge.
+  if (d === shell) show(shell.status());
+  else $('pause').textContent = d.paused ? 'Resume' : 'Pause';
 });
 $('mute').addEventListener('change', (e) => active().audio.setMuted(e.target.checked));
 $('tint').addEventListener('change', (e) => {

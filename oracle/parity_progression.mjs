@@ -195,6 +195,10 @@ console.log('\n=== complete games, played in the port ===');
         starbases++;
         scores.push(starbaseScore(mem).score);
       }
+      // A game ends at INITIALS. The disk does not stop there - line 6000 is `RUN START` and
+      // the next game begins - so the walk has to stop itself rather than wait for a chain
+      // that has no end. `probe_chainwalk.mjs` is what holds the loop closing.
+      if (program === 'INITIALS') break;
       const to = next(program, mem, { zeroPage: mem[0], key: true });
       if (to === null) break;
       program = to;

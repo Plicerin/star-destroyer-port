@@ -12,11 +12,17 @@
 import { Display } from './display.js';
 import { paintText, clear as clearText, encode, COLS, ROWS, rowOffset } from './text.js';
 import { bload } from '../game/dos.js';
+import { IFACE } from '../game/chain.js';
 import { Unsupported } from '../game/applesoft.js';
 import { parseTable, drawShape } from './shapes.js';
 
 /** $C000 is the keyboard latch and $C010 clears its strobe. */
 export const KEYBOARD = 0xC000, STROBE = 0xC010;
+
+/** $1FF3-$1FFF, the thirteen the BASIC and the binary share, in address order. */
+const IFACE_BYTES = [IFACE.lastFlight, IFACE.bonus, IFACE.flights, IFACE.difficulty,
+  IFACE.finale, IFACE.target, ...IFACE.waves, ...IFACE.kills, IFACE.baseStar]
+  .sort((a, b) => a - b);
 
 /** Applesoft's HCOLOR, as masks. The same five colours A2-3D2 has, named Applesoft's way. */
 const HCOLORS = [
@@ -36,7 +42,9 @@ export class Host {
    * @param {object} disk an openDisk() result
    * @param {object} [opts] `rnd`, and `call` for a map of address to handler
    */
-  constructor(mem, disk, { rnd = Math.random, calls = {} } = {}) {
+  constructor(mem, disk, { rnd = Math.random, calls = {}, corruptInterface = false } = {}) {
+    /** True skips the interface repair above, which only a harness has a use for. */
+    this.corruptInterface = corruptInterface;
     this.mem = mem;
     this.disk = disk;
     this.display = new Display();
@@ -326,7 +334,23 @@ export class Host {
       if (at !== null && at < 0) at += 0x10000;
       const f = this.loadFile(name);
       if (!f) return null;
+      // **The interface repair, on the chain's side.** `STAR DESTROYER.OBJ0` ends at `$1FF0`
+      // and DOS reads a file's last sector whole, so BRUNning it writes 250 bytes of that
+      // sector's slack over `$1FF3`-`$1FFF` - the thirteen bytes the BASIC and the binary talk
+      // through, which the BASIC has just finished poking. `platform/boot.js` has repaired
+      // this since the flight shell was written; the chain, which runs the real DOS commands
+      // through this host, did not - so a game played through the chain read a target of 217
+      // flights and a flight counter already at 32, and could never be finished.
+      //
+      // Measured: both games of a two-game walk had their first flight numbered 33, which is
+      // the slack's 32 plus `$09A0 INC $1FF5`.
+      //
+      // The load itself stays exact - `dos.js` still overshoots and `parity_overshoot.mjs`
+      // still holds it - and only those thirteen bytes are put back. On a dump whose slack is
+      // zeros this is a no-op. `corruptInterface` gets the disk's own behaviour back.
+      const keep = this.corruptInterface ? null : IFACE_BYTES.map((a) => this.mem[a]);
       bload(this.mem, f, { at });
+      if (keep) IFACE_BYTES.forEach((a, i) => { this.mem[a] = keep[i]; });
       if (verb === 'BRUN') return { run: f.addr, name };
       return null;
     }

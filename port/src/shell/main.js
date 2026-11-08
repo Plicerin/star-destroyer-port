@@ -150,6 +150,8 @@ export class Shell {
 
   start() {
     if (this.raf !== null) return;
+    // Re-attach, so a stopped shell can be started again rather than being quietly deaf.
+    this.input.attach();
     this.audio.resume();
     this.last = null;
     const tick = (now) => {
@@ -178,6 +180,12 @@ export class Shell {
   stop() {
     if (this.raf !== null) cancelAnimationFrame(this.raf);
     this.raf = null;
+    // Both of these were missing, and `stop` is exactly what the page calls before it builds
+    // another driver. Every flight left its keyboard listeners on the window and its
+    // AudioContext open: measured at three live keydown handlers and six contexts after three
+    // boot-and-fly cycles, with the contexts at the browser's cap.
+    this.input.detach();
+    this.audio.close();
   }
 
   /** The loop's own way out, for a shell that wants to show why it ended. */

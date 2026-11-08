@@ -62,6 +62,24 @@ export class Audio {
   }
 
   /**
+   * Let the context go.
+   *
+   * The page builds a fresh driver for every game - `Shell` for a flight, `Boot` for the whole
+   * disk - and each owns one of these, so without this every boot and every "fly again" left
+   * an AudioContext open and running. Browsers cap them at a handful: measured in the page,
+   * three boot-and-fly cycles opened six, which is the limit Chrome enforces. `resume` builds
+   * a new one on demand, so a closed Audio is usable again rather than dead.
+   */
+  close() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    this.ctx = null;
+    this.gain = null;
+    // Closing one that is already closing is not an error anybody can act on.
+    Promise.resolve(ctx.close()).catch(() => {});
+  }
+
+  /**
    * Play one routine, by its address.
    *
    * The state is advanced **whether or not there is an audio context**, so muting the shell

@@ -32,7 +32,8 @@ export class Boot {
    * @param {Uint8Array} image the .dsk
    * @param {object} [opts] `fps` for the flight, `tint`, `rnd`
    */
-  constructor(canvas, image, { fps = DISK_FPS, tint = 'colour', rnd = Math.random } = {}) {
+  constructor(canvas, image, { fps = DISK_FPS, tint = 'colour', rnd = Math.random,
+    corruptInterface = false } = {}) {
     canvas.width = HGR_W;
     canvas.height = HGR_H;
     this.canvas = canvas;
@@ -41,7 +42,7 @@ export class Boot {
     this.fps = fps;
     this.tint = tint;
 
-    this.show = new Presentation(image, { rnd, calls: {
+    this.show = new Presentation(image, { rnd, corruptInterface, calls: {
       /**
        * `CALL 768` - PLAYER.MODULE. The three programs that play music BLOAD a tune at
        * $6000 and point $1E/$1F at it, so the tune is read from the image rather than
@@ -71,11 +72,14 @@ export class Boot {
     this.flights = 0;
     /** True while the mission running is the finale rather than an ordinary flight. */
     this.finale = false;
+    /** P, and the page's button. The chain's deadlines move with it; see `tick`. */
+    this.paused = false;
   }
 
   start() {
     this.show.load('START');
     this.state = 'chain';
+    this.input.attach();
     this.audio.resume();
     if (this.raf === null) this.raf = requestAnimationFrame((t) => this.tick(t));
     return this;
@@ -85,6 +89,8 @@ export class Boot {
     if (this.raf !== null) cancelAnimationFrame(this.raf);
     this.raf = null;
     this.input.detach();
+    // This one detached its input but left its AudioContext open, so a reboot leaked one.
+    this.audio.close();
   }
 
   /** Whatever the soft switches say is on screen. */
@@ -106,6 +112,20 @@ export class Boot {
     // The player's keys go to the latch whether anything is looking or not, which is what
     // the hardware does - and is why holding a key through the title works.
     const held = this.input.read();
+
+    // P pauses, here as well as in `Shell` - this driver had no pause at all, so the page
+    // disabled the button whenever the disk was booted, which is most of the time.
+    if (this.input.takePause()) this.paused = !this.paused;
+    if (this.paused) {
+      // The chain's waits are deadlines against `now`, so they have to move with it or a
+      // pause would eat a picture screen's hold and a tune would be cut short on resume.
+      if (this.holdUntil) this.holdUntil += dt;
+      if (this.musicUntil) this.musicUntil += dt;
+      this.draw();
+      if (this.onStatus) this.onStatus(this.status());
+      return;
+    }
+
     if (this.input.down('fire')) this.show.host.pressKey(' ');
     for (const [code, ch] of DIGITS) {
       if (this.input.held.has(code)) this.show.host.pressKey(ch);
@@ -233,6 +253,7 @@ export class Boot {
       state: this.state,
       flights: this.flights,
       finale: this.finale,
+      paused: this.paused,
       error: this.error ?? null,
       fps: this.fps,
     };
