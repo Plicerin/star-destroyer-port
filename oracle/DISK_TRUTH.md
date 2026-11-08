@@ -2766,6 +2766,53 @@ would be stored as bytes a search could match.
 
 ---
 
+### The game can be played from its boot program to its high scores
+
+`probe_chainwalk.mjs` runs the disk's own twenty Applesoft programs through `presentation.js`,
+runs a mission when one is `BRUN`ed, and checks the route. Both endings are reachable:
+
+> won:  START -> LOGO1 -> SELECT -> SD -> SD START -> SD PART2 -> HYPERDRIVE 3 -> STARBASE ->
+>       HYPERDRIVE 4 -> SD START2 -> SD PART3 -> WIN -> INITIALS
+>
+> lost: START -> LOGO1 -> SELECT -> SD -> SD START -> SD PART2 -> MONOLITH -> INITIALS
+
+**`STARBASE` finishes in the port.** Open question 17 is that it never finishes its docking
+scene in the machine - A2-3D2 sits around `$664A` for six emulated minutes against the
+thirty-five renders the program asks for. The port's own A2-3D2 completes it. That does not
+settle question 17, because the two renderers are not the same code and the port's might be
+wrong in a way that happens to terminate, but it does mean the chain is walkable here.
+
+**The wiring that was missing was one line.** `presentation.js` already reported which binary a
+`BRUN` named, and `boot.js` built a `Game` for both of them - so the final mission ran the main
+mission's code over the finale's data. It picks `Finale` for `BASE STAR.OBJ0` now, and the
+check's control is that the wrong class gives a different answer: a `Game` left the last
+mission `waveClear` where a `Finale` left it `destroyed`.
+
+**Two bugs in `setup` had to be fixed before any of this could work**, and both were in code no
+harness drove. `Game.setup` is `$0957`-`$09A2`, and nothing in the suite ran it:
+
+- **`$09A0 INC $1FF5` was missing.** `$1FF5` is the flight counter and **no Applesoft program
+  writes it** - the binary is what counts flights, and `SD PART2` line 175 compares it with the
+  target `SELECT` rolled. Without it a game can never reach its last flight and so can never
+  reach the base star. It was invisible twice over: no check drove `setup`, and `$1FF5` sat
+  outside the window `parity_loop.mjs` compared, which was `$1FF9`-`$1FFE` and so left out the
+  counter, the difficulty, the target, the bonus and `$1FFF` itself. The window is the whole
+  interface now.
+- **The two respawns were given a set carry.** `$0957` is `CLC`, but `JSR $6000` runs the whole
+  renderer twice before `$0985`, so the flag there is A2-3D2's leftover rather than that `CLC`.
+  Measured at both call sites from six mission states: clear every time. With `true` each
+  spawn's X high byte came out one too far away. `respawn`'s own note said "both real callers
+  leave it set", which was true of the debris caller and not of these.
+
+`parity_loop.mjs` now drives `setup` against the machine - both pages, both spawns, the publish
+and `$1FF5` - with a control that removing the increment parts the two.
+
+**What a player cannot do yet** is survive five to fifteen real flights to get there: the walk
+hands itself each wave, because clearing one is a player's job. And the screens between the
+flights are the chain's own programs running, so what is missing there is named rather than
+silent - the two title pictures (a deliberate missing asset), `CALL $8EF` (the author's own
+`CLS` binary, which clears the hi-res page between hyperdrive screens) and three ROM routines.
+
 ## Open questions
 
 Things this pass did **not** establish. None of them should be guessed at later and quietly

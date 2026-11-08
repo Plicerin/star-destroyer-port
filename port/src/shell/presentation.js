@@ -19,8 +19,14 @@ export const TXTTAB = 0x801;
 /** The program the boot starts with. DOS's HELLO on this disk. */
 export const FIRST = 'START';
 
+/** `SD PART2` BRUNs this one: an ordinary flight, which `loop.js`'s `Game` runs. */
+export const FLIGHT_BINARY = 'STAR DESTROYER.OBJ0';
+
+/** `SD PART3` BRUNs this one: the final mission, which `finale.js`'s `Finale` runs. */
+export const FINALE_BINARY = 'BASE STAR.OBJ0';
+
 /** The binaries that are the game rather than setup for it. */
-export const MISSIONS = new Set(['STAR DESTROYER.OBJ0', 'BASE STAR.OBJ0']);
+export const MISSIONS = new Set([FLIGHT_BINARY, FINALE_BINARY]);
 
 /** What the driver is waiting for, when it is waiting. */
 export const WAITING = { nothing: null, key: 'key', flight: 'flight', ended: 'ended' };

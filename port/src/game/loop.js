@@ -80,6 +80,9 @@ export { QUIT, QUIT_VALUE };
 /** $1FF9-$1FFB - how many of each class the wave still has to send. */
 export const WAVES = [0x1FF9, 0x1FFA, 0x1FFB];
 
+/** $1FF5 - flights flown, which `$09A0` increments and no BASIC program writes. */
+export const FLIGHTS = 0x1FF5;
+
 /** $1FFC-$1FFE - the per-class counters the awards bump. $1FFE doubles as the wave-clear mark. */
 export const SCORES = [0x1FFC, 0x1FFD, 0x1FFE];
 
@@ -194,9 +197,22 @@ export class Game {
     this.mem[DRAW_PAGE] = 0;
     this.render();
     this.mem[PAGE] = 0;
-    respawn(this.mem, this.math, CLASSES[0], true, CLASSES);   // $0985 JSR $1E98
-    respawn(this.mem, this.math, CLASSES[1], true, CLASSES);   // $0988 JSR $1EC9
+    // $0985, $0988 - with the carry CLEAR, which is not what it is anywhere else. `$0957` is
+    // `CLC`, but `JSR $6000` runs the whole renderer twice before these two, so the flag here
+    // is A2-3D2's leftover rather than that `CLC`. Measured at both call sites from six
+    // different mission states: clear every time. It was `true` here, which put each spawn's
+    // X high byte one too far out - invisible, because nothing drove `setup`.
+    respawn(this.mem, this.math, CLASSES[0], false, CLASSES);   // $0985 JSR $1E98
+    respawn(this.mem, this.math, CLASSES[1], false, CLASSES);   // $0988 JSR $1EC9
     publishShip(this.mem, this.math);
+
+    // $09A0 INC $1FF5 - the last instruction of the block, and **the binary is what counts
+    // flights**: no Applesoft program touches this byte. `SD PART2` line 175 compares it with
+    // the target `SELECT` rolled, so without it a game can never reach its last flight and
+    // never reach the base star. It was missing here until the chain needed it, and nothing
+    // caught that because no harness drove `setup` at all and `$1FF5` sat outside the window
+    // `parity_loop.mjs` compared.
+    this.mem[FLIGHTS] = (this.mem[FLIGHTS] + 1) & 0xff;
   }
 
   /**

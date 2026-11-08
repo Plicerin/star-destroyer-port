@@ -8,11 +8,13 @@
 // The clock has two speeds because the game does. A presentation screen is Applesoft and runs
 // as fast as Applesoft did, which for these programs is "faster than anyone notices"; a flight
 // is 389 ms a pass. So the chain is stepped until it needs something, and a flight is paced.
-import { Presentation, WAITING } from './presentation.js';
+import { Presentation, WAITING, FINALE_BINARY } from './presentation.js';
 import { YIELD } from '../game/applesoft.js';
 
 const YIELD_CALL = YIELD.call;
 import { Game } from '../game/loop.js';
+import { Finale } from '../game/finale.js';
+import { KEYBOARD } from '../platform/host.js';
 import { paint, HGR_W, HGR_H } from '../platform/hgr.js';
 import { Input } from '../platform/input.js';
 import { Audio } from '../platform/audio.js';
@@ -65,6 +67,8 @@ export class Boot {
     this.state = 'idle';
     this.onStatus = null;
     this.flights = 0;
+    /** True while the mission running is the finale rather than an ordinary flight. */
+    this.finale = false;
   }
 
   start() {
@@ -134,7 +138,7 @@ export class Boot {
       return;
     }
     if (r.waiting === WAITING.flight) {
-      this.beginFlight();
+      this.beginFlight(r.flight);
       return;
     }
     if (r.waiting === WAITING.key) {
@@ -157,10 +161,31 @@ export class Boot {
     if (r.waiting === WAITING.ended) this.state = 'stopped';
   }
 
-  beginFlight() {
-    this.game = new Game(this.show.mem);
-    this.game.setup();
-    this.flights++;
+  /**
+   * A `BRUN` of a mission binary, which is either of the two the game has.
+   *
+   * `SD PART2` BRUNs `STAR DESTROYER.OBJ0` and `SD PART3` BRUNs `BASE STAR.OBJ0`, and they are
+   * **different programs**: `loop.js`'s `Game` and `finale.js`'s `Finale`. This used to make a
+   * `Game` for both, which meant the last mission of a finished game ran the wrong binary's
+   * code over the finale's data - one enemy region's worth of state driven as three.
+   *
+   * The two entry blocks differ as well: `Game.setup` spawns two enemies and counts the flight
+   * at `$09A0`, and `Finale.enter` sets the hit range, clears the stage counter and publishes
+   * one axis. Each is held against the machine by its own parity check.
+   *
+   * @param {string} which the binary's name, as the BRUN gave it
+   */
+  beginFlight(which) {
+    if (which === FINALE_BINARY) {
+      this.game = new Finale(this.show.mem);
+      this.game.enter();
+      this.finale = true;
+    } else {
+      this.game = new Game(this.show.mem);
+      this.game.setup();
+      this.finale = false;
+      this.flights++;
+    }
     this.accumulator = 0;
     this.state = 'flight';
   }
@@ -170,7 +195,9 @@ export class Boot {
     const period = 1000 / this.fps;
     if (this.accumulator < period) return;
     this.accumulator = Math.min(this.accumulator - period, period);
-    const r = this.game.pass(input);
+    // $1107 reads $C000 to decide whether to hold the frame, so the latch goes in with the
+    // paddles. `Game.pass` ignores it; the main mission's pause is in the BASIC above it.
+    const r = this.game.pass({ ...input, latch: this.show.mem[KEYBOARD] });
     this.audio.enqueue(r.sounds);
     if (!r.done) return;
     this.game = null;
@@ -185,6 +212,7 @@ export class Boot {
       ...s,
       state: this.state,
       flights: this.flights,
+      finale: this.finale,
       error: this.error ?? null,
       fps: this.fps,
     };

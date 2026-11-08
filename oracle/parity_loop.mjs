@@ -19,6 +19,7 @@ import { openDisk, DISK } from './dsk.mjs';
 import { openOracle } from './a2.mjs';
 import { toFlight, arm } from './exercise.mjs';
 import { Game, publishShip, selectPages, waveClear, PAGE, QUIT, QUIT_VALUE, XI, ZI,
+  FLIGHTS,
   DISPLAY_PAGE, CLEAR_PAGE, DRAW_PAGE, WAVES, SCORES } from '../port/src/game/loop.js';
 import { CLASSES } from '../port/src/game/dispatch.js';
 
@@ -32,7 +33,10 @@ const hx = (v, n = 4) => '$' + v.toString(16).toUpperCase().padStart(n, '0');
 /** The loop's top, its two exits, and the data windows that say whether a pass agreed. */
 const TOP = 0x09A3;
 const EXITS = [0x18DC, 0x1928];
-const WINDOWS = [[0x0900, 0x0960], [0x80FB, 0x82E6], [0x9800, 0x98F3], [0x1FF9, 0x1FFF]];
+// $1FF3-$1FFF, the whole interface, not $1FF9-$1FFE: the old window left out the flight
+// counter, the difficulty, the target and the bonus, and its upper bound excluded $1FFF. The
+// missing `INC $1FF5` in `setup` lived in that hole.
+const WINDOWS = [[0x0900, 0x0960], [0x80FB, 0x82E6], [0x9800, 0x98F3], [0x1FF3, 0x2000]];
 
 const d = openDisk(DISK);
 const fileOf = (n) => d.read(d.files.find((x) => x.name === n));
@@ -302,6 +306,80 @@ console.log('\n=== the ship\'s publish, the page select, and the wave test ===')
 function field2(i) {
   const RECORD = 13;
   return (i < 12 ? 0x8123 + i * RECORD : 0x8247 + (i - 12) * RECORD) + 1;
+}
+
+// --- the setup block, which nothing drove until the chain needed it ---------------------------
+// `$0957`-`$09A2` runs once before the loop: prime both hi-res pages, clear the page toggle,
+// spawn a class-1 and a class-2 enemy, publish the ship, and **increment `$1FF5`**.
+//
+// No harness drove `setup` at all before this one, and `$1FF5` sat outside the window the
+// checks above compared, so the missing increment was invisible twice over. It matters because
+// `$1FF5` is the flight counter and **no Applesoft program writes it** - `SD PART2` line 175
+// compares it with the target `SELECT` rolled, so a port that does not increment it can never
+// reach its last flight and can never reach the base star.
+console.log('\n=== the setup block ===');
+{
+  await a2.ev(`(() => {
+    const cpu = window.M.cpu, rd = window.M.rd, wr = window.M.wr;
+    window.M.setupRun = (windows) => {
+      const before = cpu.getState();
+      const out0 = {};
+      for (const [lo, hi] of windows) { for (let a = lo; a < hi; a++) out0[a] = rd(a); }
+      out0[0] = rd(0);
+      const page0 = window.M.range(0x2000, 0x6000);
+      const st = cpu.getState();
+      st.pc = 0x0957; cpu.setState(st);
+      let renders = 0, out = false;
+      cpu.stepCyclesDebug(20000000, () => {
+        const pc = cpu.getPC();
+        if (pc === 0x6000) renders++;
+        if (pc === 0x09A3) { out = true; return true; }     // the frame begins here
+      });
+      const after = {};
+      for (const [lo, hi] of windows) { for (let a = lo; a < hi; a++) after[a] = rd(a); }
+      after[0] = rd(0);
+      const page = window.M.range(0x2000, 0x6000);
+      // Put it all back: this is the live mission and the checks above run on from here.
+      for (const [a, v] of Object.entries(out0)) wr(Number(a), v);
+      cpu.setState(before);
+      return { was: { out: out0, page: page0 }, out: after, page, renders, out_: out };
+    };
+    return 'ok';
+  })()`);
+  const r = await a2.ev('JSON.stringify(window.M.setupRun('
+    + JSON.stringify(WINDOWS) + '))').then(JSON.parse);
+
+  const game = sync(r.was);
+  let renders = 0;
+  const realRender = game.render.bind(game);
+  game.render = () => { renders += 1; realRender(); };
+  game.setup();
+
+  const d = diff({ out: r.out, page: r.page }, game, { page: true, was: r.was });
+  check('the setup block agrees: both pages, the two spawns, the publish and $1FF5',
+    r.out_ && d.length === 0 && renders === r.renders && renders === 2,
+    d.slice(0, 2).join('; ')
+      || `${renders} renders, and it leaves the machine on $09A3 - the frame's first`
+        + ' instruction');
+
+  check('and it is the BINARY that counts flights: $1FF5 went up on both sides',
+    r.out[FLIGHTS] === ((r.was.out[FLIGHTS] + 1) & 0xff)
+      && game.mem[FLIGHTS] === r.out[FLIGHTS],
+    `${r.was.out[FLIGHTS]} -> ${r.out[FLIGHTS]} in the machine and ${game.mem[FLIGHTS]} in the`
+      + ' port - $09A0 INC $1FF5, which no BASIC program in the chain touches');
+
+  // The control: a setup that leaves the counter alone has to disagree, or the increment is
+  // not being tested - it was absent for weeks with every check green.
+  {
+    const g2 = sync(r.was);
+    g2.render = () => {};
+    g2.setup();
+    g2.mem[FLIGHTS] = (g2.mem[FLIGHTS] - 1) & 0xff;        // undo it
+    check('control: without the increment the port and the machine part company',
+      g2.mem[FLIGHTS] !== r.out[FLIGHTS],
+      `${g2.mem[FLIGHTS]} against the machine's ${r.out[FLIGHTS]} - which is the state this`
+        + ' port was in, and why a game could never reach its last flight');
+  }
 }
 
 // --- one pass, from wherever the machine happens to be -----------------------------------------

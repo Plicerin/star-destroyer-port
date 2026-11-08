@@ -206,8 +206,11 @@ export function shotHit(mem, math, shot, c) {
  * $1E98 / $1EC9 / $1EFA - put a fresh enemy of this class into the world, if the wave has one
  * left.
  *
- * @param {boolean} carry the carry the caller left, which the uncarried `ADC` picks up. Both
- *   real callers leave it set; `false` is what the immediate operand alone would give.
+ * @param {boolean} carry the carry the caller left, which the uncarried `ADC` picks up. The
+ *   debris caller at `$1D09` leaves it SET, because its own `CPX`/`CPY` comparisons set it on
+ *   the way in. `setup`'s two calls at `$0985` and `$0988` leave it CLEAR - measured at both,
+ *   from six mission states - because the renderer runs between them and `$0957`'s `CLC`. So
+ *   it is an argument and not a constant, and both values are in play.
  * @param {object[]} classes the class table, so class 2 can cascade into class 3
  * @returns {{spawned: false} | {spawned: true, into: object}}
  */
