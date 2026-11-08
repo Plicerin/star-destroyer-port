@@ -179,6 +179,22 @@ const fpsNote = () => {
       + 'game state as well as a frame, so this speeds the game up rather than smoothing it';
 };
 
+/**
+ * Set a node's text only when it differs.
+ *
+ * The two status handlers run once a frame, so every one of these was a DOM write sixty times
+ * a second for a string that changes a few times a minute - and `note` was an `innerHTML`,
+ * which tears the nodes down and parses them again each time.
+ */
+const put = (id, text) => {
+  const el = $(id);
+  if (el.textContent !== text) el.textContent = text;
+};
+const putHTML = (id, html) => {
+  const el = $(id);
+  if (el.innerHTML !== html) el.innerHTML = html;
+};
+
 const show = (s) => {
   // The three gauges are the far end of a bar in the display list, not a percentage: a hit
   // shrinks one by STEP and EMPTY is where it bottoms out. Showing both the operand and the
@@ -274,13 +290,12 @@ async function bootDisk() {
     boot.onStatus = (s) => {
       // The flight panel's labels do not describe a presentation screen, so say what these
       // actually are rather than leaving "kills: hires page 1 full" on the screen.
-      $('l-waves').textContent = 'program';
-      $('l-kills').textContent = 'display';
-      $('l-passes').textContent = 'flights';
-      $('s-waves').textContent = s.program ?? '—';
-      $('s-kills').textContent = s.display ?? '—';
-      $('s-passes').textContent = s.flights;
-      $('s-sounds').textContent = s.state;
+      put('l-waves', 'program');
+      put('l-kills', 'display');
+      put('s-waves', s.program ?? '—');
+      put('s-kills', s.display ?? '—');
+      put('s-passes', String(s.flights));
+      put('s-sounds', s.state);
 
       // The four SHIP rows, which this handler used to leave at their em-dashes for the whole
       // of a flight - the screen drew the three bars and the panel beside it said nothing.
@@ -288,19 +303,18 @@ async function bootDisk() {
       const gauge = (v) => (v === 0 ? 'empty'
         : `${v} · ${Math.max(0, Math.floor((v - s.empty) / s.step))} left`);
       const flying = s.state === 'flight';
-      $('s-shields').textContent = flying ? gauge(s.shields) : '—';
-      $('s-warp').textContent = flying ? gauge(s.warp) : '—';
-      $('s-missiles').textContent = flying ? gauge(s.missiles) : '—';
-      $('s-hits').textContent = flying ? `${s.hits} of ${s.fatal}` : '—';
-      $('l-passes').textContent = s.finale ? 'flights · FINALE' : 'flights';
-      $('pause').textContent = s.paused ? 'Resume' : 'Pause';
-      $('over').textContent = s.error ? s.error
-        : (s.waiting === 'key' ? 'press a key' : '');
+      put('s-shields', flying ? gauge(s.shields) : '—');
+      put('s-warp', flying ? gauge(s.warp) : '—');
+      put('s-missiles', flying ? gauge(s.missiles) : '—');
+      put('s-hits', flying ? `${s.hits} of ${s.fatal}` : '—');
+      put('l-passes', s.finale ? 'flights · FINALE' : 'flights');
+      put('pause', s.paused ? 'Resume' : 'Pause');
+      put('over', s.error ? s.error : (s.waiting === 'key' ? 'press a key' : ''));
       const gaps = s.unimplemented || [];
-      $('note').innerHTML = gaps.length
+      putHTML('note', gaps.length
         ? '<b>Not ported yet, and reached:</b> '
           + gaps.map((g) => `${g.what} (${g.n}×)`).join('; ')
-        : '';
+        : '');
     };
     boot.start();
     $('pause').disabled = false;
