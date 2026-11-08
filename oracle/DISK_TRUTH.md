@@ -2813,6 +2813,54 @@ flights are the chain's own programs running, so what is missing there is named 
 silent - the two title pictures (a deliberate missing asset), `CALL $8EF` (the author's own
 `CLS` binary, which clears the hi-res page between hyperdrive screens) and three ROM routines.
 
+### The chain was loading over its own interface, so a real game could not be finished
+
+`platform/boot.js` has repaired the thirteen interface bytes since the flight shell was
+written. **The chain never did.** It runs the disk's real DOS commands through `host.js`, and
+`BRUN STAR DESTROYER.OBJ0` writes 250 bytes of the file's last sector over `$1FF3`-`$1FFF` -
+the bytes `SELECT` and `SD PART2` have just poked. Measured over a two-game walk: both games'
+first flight was numbered **33**, which is the slack's 32 plus `$09A0 INC $1FF5`, and `$1FF8`
+read **217 flights to survive**.
+
+So every statement in this file about the chain being walkable was true only because the walks
+pushed the flight counter to the target by hand. Played honestly, the game asked for 217
+flights and could not be finished. The repair is now at the `bload` in `host.js`, the same
+thirteen bytes and the same `corruptInterface` switch, and `probe_chainwalk.mjs` runs the walk
+both ways: repaired the first flight is 1, as found it is 33. The live page rolls a target of
+five and waves of 3/5/6.
+
+### INITIALS goes back to START, and the model said it went nowhere
+
+Both paths through `INITIALS` reach line 6000 - line 130 when the score missed the table, line
+380 after the initials are entered - and 6000 is `FOR J = 1 TO 15000: NEXT: PRINT CHR$(4);"RUN
+START"`. So a game ending starts the next one and the disk never stops.
+
+`chain.js` had `INITIALS: { to: null }`, and `parity_progression.mjs` *asserted* that its walks
+ended there. The model agreed with itself and with nothing else, which is the failure mode this
+file exists to prevent: two places encoding the same wrong belief look like confirmation. The
+walk stops itself at `INITIALS` now, because that is where a *game* ends rather than where the
+disk does, and `probe_chainwalk.mjs` holds the loop closing.
+
+### What the shell did not survive
+
+Three things, all found by using the page rather than reading it:
+
+- **Reboot leaked.** `Audio` had no `close()` and `Shell.stop()` never detached input, where
+  `Boot.stop()` did. Three boot-and-fly cycles opened six `AudioContext`s - the cap Chrome
+  enforces - and left every `Shell`'s keyboard listeners on the window, so a keypress was
+  handled once per flight ever started. Four cycles now leave one open, and a stopped driver is
+  measurably deaf while the running one hears.
+- **`Boot` had no pause**, so the page disabled the button whenever the disk was booted. It has
+  one now, on the button and on `P`, and the chain's deadlines move with it so a pause does not
+  eat a picture screen's hold or cut a tune short on resume.
+- **The controls were bound to one driver.** Mute, tint and frames/sec all set properties on
+  `shell` while `Boot` was the one running, and `fly()` never stopped `boot`, so both loops
+  painted the same canvas with both Audios live.
+
+**None of this is reachable by the oracle.** It covers `port/src/game` and `port/src/a23d2`;
+nothing covers `port/index.html` or `port/src/shell`. `probe_chainwalk.mjs` is the first check
+that touches the shell at all, and it can only reach the parts that need no canvas.
+
 ## Open questions
 
 Things this pass did **not** establish. None of them should be guessed at later and quietly
