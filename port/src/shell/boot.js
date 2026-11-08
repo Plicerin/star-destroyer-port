@@ -12,8 +12,10 @@ import { Presentation, WAITING, FINALE_BINARY } from './presentation.js';
 import { YIELD } from '../game/applesoft.js';
 
 const YIELD_CALL = YIELD.call;
-import { Game } from '../game/loop.js';
-import { Finale } from '../game/finale.js';
+import { Game, WAVES } from '../game/loop.js';
+import { Finale, FATAL as FINALE_FATAL } from '../game/finale.js';
+import { SHLD, WARP, MSL, HITS, EMPTY, FATAL, STEP } from '../game/damage.js';
+import { IFACE } from '../game/chain.js';
 import { KEYBOARD } from '../platform/host.js';
 import { paint, HGR_W, HGR_H } from '../platform/hgr.js';
 import { Input } from '../platform/input.js';
@@ -208,8 +210,26 @@ export class Boot {
 
   status() {
     const s = this.show.status();
+    const m = this.show.mem;
+    // The gauges come from the image, the way `Shell.status` reads them - `Presentation` does
+    // not report them, because it does not know a flight from a title screen, so driving the
+    // chain left the whole SHIP panel showing em-dashes while a flight was on. The screen drew
+    // the bars the whole time; it was only the readout beside it that was blind.
+    const gauge = (a) => (m[a] === EMPTY ? 0 : m[a]);
     return {
       ...s,
+      shields: gauge(SHLD),
+      warp: gauge(WARP),
+      missiles: gauge(MSL),
+      hits: m[HITS],
+      // The finale dies at two hits where an ordinary flight takes four, so the readout's
+      // "n of m" has to follow which mission is running.
+      fatal: this.finale ? FINALE_FATAL : FATAL,
+      empty: EMPTY,
+      step: STEP,
+      waves: WAVES.map((a) => m[a]),
+      kills: IFACE.kills.map((a) => m[a]),
+      sounds: this.audio.log.slice(-4),
       state: this.state,
       flights: this.flights,
       finale: this.finale,

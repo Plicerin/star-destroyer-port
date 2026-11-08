@@ -214,12 +214,29 @@ async function loadImage() {
   return image;
 }
 
+/**
+ * The driver the controls should talk to.
+ *
+ * There are two and only one runs at a time: `Shell` flies a single mission, `Boot` runs the
+ * whole disk and hands off to a mission when the chain BRUNs one. **Each owns its own Audio,
+ * its own tint and its own frame rate**, and the controls below were all bound to `shell` - so
+ * once the disk was booted, the mute checkbox, the display tint and the frames/sec menu were
+ * setting properties on an object that was not running. Mute doing nothing is how it was
+ * noticed; the other two were just as dead.
+ */
+let booted = false;
+const active = () => (booted && boot ? boot : shell);
+
 async function fly() {
   $('start').disabled = true;
   $('start').textContent = 'Loading…';
   try {
     const img = await loadImage();
     shell.stop();
+    // And the other driver, which this did not do: both loops went on painting the same
+    // canvas, and both Audios went on playing.
+    if (boot) { boot.stop(); boot = null; }
+    booted = false;
     shell = new Shell(canvas, {
       fps: Number($('fps').value),
       tint: $('tint').value,
@@ -252,6 +269,8 @@ async function bootDisk() {
       fps: Number($('fps').value),
       tint: $('tint').value,
     });
+    booted = true;
+    boot.audio.setMuted($('mute').checked);
     boot.onStatus = (s) => {
       // The flight panel's labels do not describe a presentation screen, so say what these
       // actually are rather than leaving "kills: hires page 1 full" on the screen.
@@ -262,6 +281,18 @@ async function bootDisk() {
       $('s-kills').textContent = s.display ?? '—';
       $('s-passes').textContent = s.flights;
       $('s-sounds').textContent = s.state;
+
+      // The four SHIP rows, which this handler used to leave at their em-dashes for the whole
+      // of a flight - the screen drew the three bars and the panel beside it said nothing.
+      // `fatal` follows the mission: the finale dies at two hits where a flight takes four.
+      const gauge = (v) => (v === 0 ? 'empty'
+        : `${v} · ${Math.max(0, Math.floor((v - s.empty) / s.step))} left`);
+      const flying = s.state === 'flight';
+      $('s-shields').textContent = flying ? gauge(s.shields) : '—';
+      $('s-warp').textContent = flying ? gauge(s.warp) : '—';
+      $('s-missiles').textContent = flying ? gauge(s.missiles) : '—';
+      $('s-hits').textContent = flying ? `${s.hits} of ${s.fatal}` : '—';
+      $('l-passes').textContent = s.finale ? 'flights · FINALE' : 'flights';
       $('over').textContent = s.error ? s.error
         : (s.waiting === 'key' ? 'press a key' : '');
       const gaps = s.unimplemented || [];
@@ -288,10 +319,14 @@ $('pause').addEventListener('click', () => {
   shell.audio.resume();
   show(shell.status());
 });
-$('mute').addEventListener('change', (e) => shell.audio.setMuted(e.target.checked));
-$('tint').addEventListener('change', (e) => { shell.tint = e.target.value; shell.draw(); });
+$('mute').addEventListener('change', (e) => active().audio.setMuted(e.target.checked));
+$('tint').addEventListener('change', (e) => {
+  const d = active();
+  d.tint = e.target.value;
+  d.draw();
+});
 $('fps').addEventListener('change', (e) => {
-  shell.fps = Number(e.target.value);
+  active().fps = Number(e.target.value);
   fpsNote();
 });
 fpsNote();
