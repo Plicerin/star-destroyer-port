@@ -56,7 +56,8 @@ import { Engine } from '../a23d2/engine.js';
 import { steer, turnDirection, panStars, H1, OBJ12_HEADING } from './controls.js';
 import { GEOM, rangeToTarget, bearing, rangeFromArgs, dir } from './geometry.js';
 import { hold, move, missile } from './entities.js';
-import { SHOTS as PLAYER_SHOTS, placeDebris, aimDebris, respawn } from './kill.js';
+import { SHOTS as PLAYER_SHOTS, placeDebris, switchOffShot, aimDebris, respawn }
+  from './kill.js';
 import { fire as pullTrigger, moveShot } from './weapon.js';
 import { shrink } from './damage.js';
 
@@ -448,11 +449,24 @@ export const ROTATED_INDICES = [
 ];
 
 /**
- * What each block calls when the kill lands.
+ * What each block calls when the kill lands - and **all six are `kill.js`'s**.
  *
- * The third of each three is already written: `$1278` is `kill.js`'s `$1A8B` relocated and
- * `$12B4` is its `$1AC7` - the routine that aims the debris along the shot's heading. The
- * first two of each, `$119E`/`$120B` and `$1755`/`$175B`, are the finale's own and are not.
+ * This file had the first two of each three down as the finale's own, and `$1755`/`$175B` as
+ * sounds, on no better evidence than their sitting in the sound region. They are not:
+ *
+ *     $119E / $120B   `placeDebris`, with the SHOT's scope twin as the source rather than the
+ *                     enemy - 36 of each routine's 37 instructions are the main mission's
+ *     $1755 / $175B   `switchOffShot`, byte for byte the main mission's $1F67 and $1F6D:
+ *                     `LDA #$00 / STA $8172 / RTS`, three instructions
+ *     $1278 / $12B4   `aimDebris`, which is $1A8B and $1AC7
+ *
+ * So the finale's award is `kill.js`'s `shotHit` tail without `switchOffEnemy` - which makes
+ * sense, because the thing the shot hit is the base star and the base star does not die here.
+ *
+ * `switchOffShot` is why the relocation census missed these two: it is three instructions and
+ * the matcher needs four, a guard against coincidence that excluded a real match. Found by
+ * tracing which instruction took the player's shot off the screen - `$1757` - after the
+ * whole-frame check disagreed about it for two passes.
  */
 export const AWARD_CALLS = [
   { debris: 0x093F, calls: [0x119E, 0x1755, 0x1278] },   // $0F5B, $0F5E, $0F61
@@ -481,23 +495,22 @@ export function rotate(value, carry = 0) {
  * @param {Uint8Array} mem
  * @param {number} which 0 for the first block, 1 for the second
  */
-export function award(mem, which, { placeDebris, aimDebris, SHOTS } = {}) {
+export function award(mem, which, { placeDebris, switchOffShot, aimDebris, SHOTS } = {}) {
   const { debris, calls } = AWARD_CALLS[which];
   mem[PROGRESS] = (mem[PROGRESS] + 1) & 0xff;          // $0F53 / $0F9B INC $1FF7
   mem[debris] = DEBRIS_ON_KILL;                        // $0F56 / $0F9E LDA #$04
 
-  // $0F5B / $0FA3 - `$119E` and `$120B` are `kill.js`'s `placeDebris` with the shot's scope
-  // twin as the source instead of the enemy, so the debris appears where the shot landed.
-  // $0F61 / $0FA9 - `$1278` and `$12B4` are `$1A8B` and `$1AC7`, this shot's `aimDebris`.
+  // $0F5B, $0F5E, $0F61 - the three, in the order the block calls them. The middle one takes
+  // the player's shot off the screen, which is the whole of what it does.
   //
-  // Both are optional only so the award can still be measured on its own, as the first
+  // They are optional only so the award can still be measured on its own, as the first
   // version of it was: without them it reports the calls instead of making them.
-  if (placeDebris && aimDebris && SHOTS) {
-    placeDebris(mem, SHOTS[which].twin);
-    aimDebris(mem, SHOTS[which]);
+  if (placeDebris && switchOffShot && aimDebris && SHOTS) {
+    placeDebris(mem, SHOTS[which].twin);               // $119E / $120B
+    switchOffShot(mem, SHOTS[which]);                  // $1755 / $175B
+    aimDebris(mem, SHOTS[which]);                      // $1278 / $12B4
   }
-  // The middle call of the three is the sound; the other two are done above.
-  return { calls: [...calls], debris, sound: calls[1] };
+  return { calls: [...calls], debris };
 }
 
 // ---------------------------------------------------------------------------------------
@@ -958,18 +971,17 @@ export class Finale {
       // $0E48 - a cooling base star jumps past the hold test, so it always moves.
       if (coolDown(mem, c) || !hold(math)) move(mem, math, c);    // $0E66
 
-      // $0F1C, $0F64 - the player's two shots, each gated on its own count. The award is the
-      // finale's own: it scores, loads a debris counter, places the debris where the SHOT is
-      // and aims it. It does not switch the shot's own record off the way the main mission's
-      // `shotHit` does - only the twin, inside `aimDebris` - so the shot expires by count.
+      // $0F1C, $0F64 - the player's two shots, each gated on its own count. The award scores,
+      // loads a debris counter, and then runs `kill.js`'s three: the debris placed where the
+      // SHOT is rather than where the enemy is, the shot switched off, and the debris aimed.
       for (const [which, shot] of PLAYER_SHOTS.entries()) {
         if (mem[field(shot.object, 'count')] === 0) continue;
         const r = hitTest(mem, math, which, {
           rangeFromArgs, GEOM, dir, rotatedIndices: this.rotatedIndices,
         });
         if (!r.hit) continue;
-        const a = award(mem, which, { placeDebris, aimDebris, SHOTS: PLAYER_SHOTS });
-        this.sounds.push(a.sound);                               // $0F5E / $0FA6
+        award(mem, which,
+          { placeDebris, switchOffShot, aimDebris, SHOTS: PLAYER_SHOTS });
       }
     }
 

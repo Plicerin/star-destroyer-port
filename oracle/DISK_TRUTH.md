@@ -3057,20 +3057,19 @@ promoted to fact.
     poked to make the flight exit - and nothing distinguishes them yet. It is why the finale
     is reached through `SD START2`'s setup rather than by walking the chain.
 
-18. **What switches the player's shot off inside the finale's frame.** `parity_finale.mjs`
-    runs `Finale` against the machine pass for pass, with both damaged instructions repaired
-    on the machine so the two sides are running the same code. Six of eight passes agree over
-    every byte of the display list, the state, zero page `$00` and all 243 bytes of MATH's
-    table. The two with the trigger down differ on **object 6's count and nothing else**: the
-    machine reaches `$0B0C` and launches, exactly as the port does, then ends the frame with
-    that count back at zero where the port leaves it running.
+18. ~~What switches the player's shot off inside the finale's frame.~~ **Answered: `$1755`,
+    which this file had down as a sound.** It is `LDA #$00 / STA $8172 / RTS` - three
+    instructions, byte for byte the main mission's `$1F67`, which is `kill.js`'s
+    `switchOffShot`. So the finale's award is `shotHit`'s tail: `placeDebris` from the shot's
+    own scope twin, `switchOffShot`, `aimDebris`. Without `switchOffEnemy`, which fits - what
+    the shot hit is the base star, and the base star does not die there.
 
-    So something in the frame takes the shot off and the port does not do it. `$0F53`'s award
-    is the suspect - the main mission's `shotHit` calls `switchOffShot` ( `$1F67` ) at that
-    point and the finale's three calls are `$119E`, `$1755` and `$1278`, none of which is
-    obviously it. `$1755` has been read as a sound only because it sits in the sound region.
+    It was called a sound on no better evidence than its sitting in the sound region, which
+    is exactly how `$1F2B` was skipped and the ship could not be destroyed. And the relocation
+    census could not have caught it: the matcher needs four instructions and this is three, a
+    guard against coincidence that excluded a real match. Found by tracing which instruction
+    wrote the byte - `$1757` - the same way the missing respawn at `$16F6` was found.
 
-    The check encodes this rather than skipping it: it fails if a pass without the trigger
-    disagrees at all, if a pass with it disagrees anywhere other than that one byte, or if the
-    number of either changes. So `Finale` is **not yet held frame for frame**, and the gap is
-    one byte wide and reproducible.
+    **`Finale` is now held frame for frame**: eight passes from eight mission states agree
+    over every byte of the display list, the binary's state, zero page `$00` and all 243 bytes
+    of MATH's table.

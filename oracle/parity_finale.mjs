@@ -30,8 +30,8 @@ import { endOfFrame, pauses, DONE, HITS, FATAL, PROGRESS, STAGE, BASE_STAR, OBJ3
 import { shrink } from '../port/src/game/damage.js';
 import { Flight } from '../port/src/game/flight.js';
 import { MISSILE_ENTRY } from '../port/src/game/weapon.js';
-import { placeDebris, aimDebris, SHOTS, DEBRIS as DEBRIS_OBJECTS, DEBRIS_UNUSED }
-  from '../port/src/game/kill.js';
+import { placeDebris, switchOffShot, aimDebris, SHOTS, DEBRIS as DEBRIS_OBJECTS,
+  DEBRIS_UNUSED } from '../port/src/game/kill.js';
 import { Math24 } from '../port/src/game/math.js';
 import { field } from '../port/src/game/objects.js';
 import { VARS } from '../port/src/game/tables.js';
@@ -456,7 +456,7 @@ try {
         const r = await run(addr, stop, pokes);
         const mem = new Uint8Array(0x10000);
         for (const [a, v] of Object.entries(r.seeded)) mem[a] = v;
-        const got = award(mem, which, { placeDebris, aimDebris, SHOTS });
+        const got = award(mem, which, { placeDebris, switchOffShot, aimDebris, SHOTS });
         const watched = [PROGRESS, 0x093F, 0x0940];
         for (let a = 0x80FB; a < 0x82E6; a++) watched.push(a);
         for (const a of watched) {
@@ -1352,30 +1352,25 @@ try {
       exits.add(machine.exit);
       if (f.flight.gate !== 0) warped++;
       const d = diff(machine, f, was);
-      if (d.length) bad.push({ i, d, launched: machine.marks.includes(0x0B0C) });
+      if (d.length) bad.push({ i, d });
     }
 
-    // The six passes where the trigger stays up agree over every byte. The two where it goes
-    // down disagree on **object 6's count and nothing else**: the machine reaches `$0B0C` and
-    // launches, exactly as the port does, and then ends the frame with that count back at zero
-    // where the port leaves it running. So something inside the frame switches the player's
-    // shot off that this port does not, and `$0F53`'s award is the suspect - the main mission's
-    // `shotHit` calls `switchOffShot` at that point and the finale's three calls do not
-    // obviously include it. **Open question 18.**
+    // Every pass, every byte: the display list, the binary's state, zero page $00 and all
+    // 243 bytes of MATH's table, from eight different mission states.
     //
-    // It is encoded rather than skipped: this fails if a pass without the trigger disagrees at
-    // all, if a pass with it disagrees anywhere other than that one byte, or if the count of
-    // either changes.
-    const clean = bad.filter((b) => !b.d.every((x) => x.startsWith(hx(0x8172))));
-    const only8172 = bad.filter((b) => b.d.length === 1 && b.d[0].startsWith(hx(0x8172)));
-    check('every pass agrees over every byte, but for the player shot on the two that fire',
-      clean.length === 0 && only8172.length === 2 && passes === SCRIPT.length
-        && only8172.every((b) => b.launched),
-      clean.length ? `pass ${clean[0].i}: ${clean[0].d.join(' | ')}`
+    // Two of these used to differ at `$8172`, object 6's count, on the passes where the
+    // trigger fires - the machine took the player's shot off the screen and the port left it
+    // running. That was open question 18, and the answer was that `$1755` is not a sound. It
+    // sits in the sound region, which is the only reason this file ever called it one; it is
+    // `LDA #$00 / STA $8172 / RTS`, byte for byte the main mission's `$1F67`, which is
+    // `kill.js`'s `switchOffShot`. The relocation census missed it because it is three
+    // instructions and the matcher requires four.
+    check("every pass agrees over every byte of the list, the state and MATH's table",
+      bad.length === 0 && passes === SCRIPT.length,
+      bad.length ? `pass ${bad[0].i}: ${bad[0].d.join(' | ')}`
         : `${passes} passes from eight different mission states, ${warped} under warp, exits`
-          + ` ${[...exits].map((x) => hx(x)).join(' ')} - ${passes - only8172.length} agree to`
-          + ` the byte and ${only8172.length} differ only at ${hx(0x8172)}, object 6's count,`
-          + ' which is open question 18');
+          + ` ${[...exits].map((x) => hx(x)).join(' ')} - and the two that fire the trigger`
+          + ' agree too, which they did not until $1755 was read properly');
 
     // The control. Both numbers have to change what the frame does, or they are decoration -
     // and both can be shown without a machine pass, which keeps the control independent of
