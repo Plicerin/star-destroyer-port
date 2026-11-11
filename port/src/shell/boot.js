@@ -55,8 +55,21 @@ export class Boot {
       0x0300: (host) => {
         const at = host.mem[0x1E] | (host.mem[0x1F] << 8);
         if (!at) { host.note('CALL $300', 'no tune pointer at $1E/$1F'); return null; }
-        const wave = playTune(host.mem.subarray(at, at + 4096));
-        const seconds = this.audio.waveform(wave, { name: 'tune' });
+        // **Sound must never stop the game.** This throwing used to take the whole chain
+        // down: `chainStep` catches what `run` throws and goes to 'stopped', so a tune that
+        // could not be built left the player on a dead screen with the disk half booted.
+        // Found by a harness whose fake AudioContext was missing one method, which is as
+        // plausible a failure as a context closed mid-tune or a browser that will not play.
+        //
+        // The chain is held for the tune's length either way, because the original holds
+        // whether or not anybody is listening.
+        let seconds = 0;
+        try {
+          const wave = playTune(host.mem.subarray(at, at + 4096));
+          seconds = this.audio.waveform(wave, { name: 'tune' });
+        } catch (e) {
+          host.note('CALL $300', `the tune could not be played: ${e.message}`);
+        }
         return { async: true, seconds };
       },
     } });
@@ -250,6 +263,8 @@ export class Boot {
       waves: WAVES.map((a) => m[a]),
       kills: IFACE.kills.map((a) => m[a]),
       sounds: this.audio.log.slice(-4),
+      /** Set once if the speaker refused; the game carries on without it. */
+      silent: this.audio.broken ?? null,
       state: this.state,
       flights: this.flights,
       finale: this.finale,

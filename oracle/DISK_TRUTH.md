@@ -2857,9 +2857,26 @@ Three things, all found by using the page rather than reading it:
   `shell` while `Boot` was the one running, and `fly()` never stopped `boot`, so both loops
   painted the same canvas with both Audios live.
 
-**None of this is reachable by the oracle.** It covers `port/src/game` and `port/src/a23d2`;
-nothing covers `port/index.html` or `port/src/shell`. `probe_chainwalk.mjs` is the first check
-that touches the shell at all, and it can only reach the parts that need no canvas.
+**`probe_shell.mjs` covers the shell now**, and none of it needed an emulator - only a fake
+canvas, a window that counts its own listeners, a clock that ticks when it is told to, and an
+`AudioContext` that can be closed. Twelve checks: the chain walks, pause freezes and resumes on
+the flag and on `P`, a running driver holds one listener set and one context and `stop()` gives
+both back, six reboots leave one of each and the six stopped drivers stay silent, the ship's
+gauges are populated in flight with `fatal` following the mission, and each binary gets its own
+class.
+
+**It found a bug by being built.** Its fake `AudioContext` was missing `copyToChannel`, and the
+chain went to `stopped` on the difficulty screen with the disk half booted: `chainStep` treats
+anything a program throws as fatal, so a closed context or a browser refusing to start one
+would have killed the game. `flightStep` was worse - it calls `enqueue` with no guard at all,
+so the same failure in flight threw straight out of the animation frame. **Sound is the one
+part of this port that cannot be allowed to stop the game.** There is one place that talks to
+the speaker now, it cannot throw, it records the reason once rather than once a frame, and the
+page says the sound stopped and that the game carries on.
+
+**What is still uncovered is `port/index.html`** - the page's own wiring, where mute, tint and
+frames/sec are bound to a driver and where two of the bugs above actually lived. That needs a
+DOM stub.
 
 ## Open questions
 

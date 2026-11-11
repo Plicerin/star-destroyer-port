@@ -33,6 +33,8 @@ export class Audio {
     /** The shift register and Y, carried from sound to sound. See above. */
     this.state = null;
     this.muted = false;
+    /** Set the first time the speaker refuses, so the page can say the sound has gone. */
+    this.broken = null;
     /** What has been played, newest last, for the shell to show. */
     this.log = [];
   }
@@ -95,13 +97,7 @@ export class Audio {
     if (this.log.length > 12) this.log.shift();
     if (!this.ctx || this.muted || !result.toggles.length) return sound.name;
 
-    const samples = render(result, { sampleRate: this.ctx.sampleRate, cpuHz: this.cpuHz });
-    const buffer = this.ctx.createBuffer(1, samples.length, this.ctx.sampleRate);
-    buffer.copyToChannel(samples, 0);
-    const src = this.ctx.createBufferSource();
-    src.buffer = buffer;
-    src.connect(this.gain);
-    src.start();
+    this.emit(render(result, { sampleRate: this.ctx.sampleRate, cpuHz: this.cpuHz }));
     return sound.name;
   }
 
@@ -130,15 +126,43 @@ export class Audio {
     this.log.push(name);
     if (this.log.length > 12) this.log.shift();
     if (!this.ctx || this.muted || !wave.toggles.length) return seconds;
-    const samples = render(wave, { sampleRate: this.ctx.sampleRate, cpuHz: this.cpuHz });
-    const buffer = this.ctx.createBuffer(1, samples.length, this.ctx.sampleRate);
-    buffer.copyToChannel(samples, 0);
-    const src = this.ctx.createBufferSource();
-    src.buffer = buffer;
-    src.connect(this.gain);
-    src.start();
-    this.playing = src;
+    this.playing = this.emit(render(wave, { sampleRate: this.ctx.sampleRate,
+      cpuHz: this.cpuHz }));
     return seconds;
+  }
+
+  /**
+   * Hand a rendered waveform to the speaker, and **never throw doing it**.
+   *
+   * Sound is the one part of this port that cannot be allowed to stop the game. The chain runs
+   * the tune through a `CALL` handler, and `chainStep` treats anything that throws out of a
+   * program as fatal - so a context that has been closed, a browser that will not start one,
+   * or a buffer method that is not there left the player on a dead screen with the disk half
+   * booted. Worse, `flightStep` calls `enqueue` with no guard at all, so the same failure in
+   * flight threw straight out of the animation frame.
+   *
+   * Found by a harness whose fake AudioContext was missing `copyToChannel` - which is as
+   * plausible a failure as any of the real ones.
+   *
+   * @returns {object|null} the source that is playing, or null if nothing is
+   */
+  emit(samples) {
+    try {
+      const buffer = this.ctx.createBuffer(1, samples.length, this.ctx.sampleRate);
+      buffer.copyToChannel(samples, 0);
+      const src = this.ctx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(this.gain);
+      src.start();
+      return src;
+    } catch (e) {
+      // Once, and then quietly: a speaker that fails once will fail every frame.
+      if (!this.broken) {
+        this.broken = e.message;
+        this.log.push(`silent: ${e.message}`);
+      }
+      return null;
+    }
   }
 
   /** Cut whatever is playing short, which is what a keypress does to a tune. */

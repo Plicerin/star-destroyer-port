@@ -309,7 +309,9 @@ async function bootDisk() {
       put('s-hits', flying ? `${s.hits} of ${s.fatal}` : '—');
       put('l-passes', s.finale ? 'flights · FINALE' : 'flights');
       put('pause', s.paused ? 'Resume' : 'Pause');
-      put('over', s.error ? s.error : (s.waiting === 'key' ? 'press a key' : ''));
+      put('over', s.error ? s.error
+        : s.silent ? `the sound stopped: ${s.silent} — the game carries on`
+        : (s.waiting === 'key' ? 'press a key' : ''));
       const gaps = s.unimplemented || [];
       putHTML('note', gaps.length
         ? '<b>Not ported yet, and reached:</b> '
