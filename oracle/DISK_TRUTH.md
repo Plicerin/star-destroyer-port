@@ -2874,9 +2874,23 @@ part of this port that cannot be allowed to stop the game.** There is one place 
 the speaker now, it cannot throw, it records the reason once rather than once a frame, and the
 page says the sound stopped and that the game carries on.
 
-**What is still uncovered is `port/index.html`** - the page's own wiring, where mute, tint and
-frames/sec are bound to a driver and where two of the bugs above actually lived. That needs a
-DOM stub.
+**And `probe_page.mjs` covers the page's wiring**, which is where two of the bugs above
+actually lived. Getting there meant admitting that `index.html`'s two hundred lines of module
+script were not markup: they are logic, and they are now `port/src/shell/page.js` with the page
+reduced to a loader. `wire` takes its two driver classes **as arguments**, so the harness gives
+it stubs that record what was done to them - the subject is the wiring, with no emulator and no
+disk anywhere near it.
+
+Fourteen checks: with the disk booted mute, tint and frames/sec all reach the boot and none of
+them touches the idle shell; flying after a boot stops the boot and the controls follow back; a
+driver is built with the settings already on the page, mute included; the pause button is live
+under the chain and its label tracks both ways; the gauges are blank on a title screen and
+filled in flight with `fatal` following the mission; a disk that will not load says so and
+leaves the button usable. The control is the binding the page used to have, which sets the idle
+driver - the checkbox moves and the sound does not.
+
+So the front end has two harnesses now where it had none, and every bug reported from the page
+is something the suite would catch.
 
 ## Open questions
 
