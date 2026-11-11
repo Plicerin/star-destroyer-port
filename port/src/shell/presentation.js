@@ -34,9 +34,11 @@ export const WAITING = { nothing: null, key: 'key', flight: 'flight', ended: 'en
 export class Presentation {
   /**
    * @param {Uint8Array|ArrayBuffer} image the .dsk
-   * @param {object} [opts] `rnd`, `calls` for CALL handlers the shell supplies
+   * @param {object} [opts] `rnd`, `calls` for CALL handlers the shell supplies, `store`
+   *   for where a written file is kept - see `platform/saves.js`
    */
-  constructor(image, { rnd = Math.random, calls = {}, corruptInterface = false } = {}) {
+  constructor(image, { rnd = Math.random, calls = {}, corruptInterface = false,
+    store = null } = {}) {
     this.disk = openDisk(image);
     this.mem = new Uint8Array(0x10000);
     /**
@@ -53,6 +55,7 @@ export class Presentation {
     this.host = new Host(this.mem, this.disk, {
       rnd,
       corruptInterface,
+      store,
       calls: {
         0x6000: () => { this.engine.reset(); this.engine.run(); return null; },
         ...calls,

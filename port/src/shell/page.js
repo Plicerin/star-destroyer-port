@@ -20,11 +20,13 @@
  *
  * @param {Document} doc something with `getElementById`
  * @param {object} deps `Shell` and `Boot`, the two driver classes; `HELP`, `FPS_CHOICES` and
- *   `DISK_FPS` for the captions; `fetchImage` to get the .dsk; `log` for the console
+ *   `DISK_FPS` for the captions; `fetchImage` to get the .dsk; `saves` for where the high
+ *   scores are kept, which the page owns because the Clear button outlives any one driver;
+ *   `log` for the console
  * @returns {object} the drivers and the handlers, for the console and for a harness
  */
 export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage,
-  log = console } = {}) {
+  saves = null, log = console } = {}) {
   const $ = (id) => doc.getElementById(id);
   const canvas = $('screen');
   let shell = new Shell(canvas);
@@ -62,6 +64,22 @@ export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage
     if (el.innerHTML !== html) el.innerHTML = html;
   };
 
+  /**
+   * Something to tell the player, for a few seconds.
+   *
+   * Both status handlers write `over` on every frame, so a line put there by a button is gone
+   * before anybody reads it - which is what happened to Clear's own confirmation. This is the
+   * line they fall back to while it is still fresh.
+   */
+  let notice = null;
+  let noticeUntil = 0;
+  const say = (text, ms = 5000) => {
+    notice = text;
+    noticeUntil = Date.now() + ms;
+    put('over', text);
+  };
+  const fresh = () => (notice && Date.now() < noticeUntil ? notice : null);
+
   /** The three gauges are a bar's far end, not a percentage: a hit shrinks one by STEP. */
   const gauge = (v, s) => (v === 0 ? 'empty'
     : `${v} · ${Math.max(0, Math.floor((v - s.empty) / s.step))} left`);
@@ -77,7 +95,7 @@ export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage
     put('s-sounds', s.sounds.length ? s.sounds.join(', ') : '—');
     put('pause', s.paused ? 'Resume' : 'Pause');
     const why = shell.reason();
-    put('over', why || (s.paused ? 'paused' : ''));
+    put('over', why || fresh() || (s.paused ? 'paused' : ''));
   };
 
   /** The flight the BASIC set up, in the BASIC's own terms. */
@@ -109,7 +127,10 @@ export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage
     put('pause', s.paused ? 'Resume' : 'Pause');
     put('over', s.error ? s.error
       : s.silent ? `the sound stopped: ${s.silent} — the game carries on`
-      : (s.waiting === 'key' ? 'press a key' : ''));
+      // A table that cannot be kept is worth saying out loud, because the game gives no sign
+      // of it: the Hall of Heroes comes up looking right and forgets you on reload.
+      : s.forgetful ? `the high scores are not being kept: ${s.forgetful}`
+      : fresh() || (s.waiting === 'key' ? 'press a key' : ''));
     const gaps = s.unimplemented || [];
     putHTML('note', gaps.length
       ? '<b>Not ported yet, and reached:</b> '
@@ -168,6 +189,7 @@ export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage
       boot = new Boot(canvas, img, {
         fps: Number($('fps').value),
         tint: $('tint').value,
+        saves,
       });
       booted = true;
       boot.audio.setMuted($('mute').checked);
@@ -195,6 +217,21 @@ export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage
     else $('pause').textContent = d.paused ? 'Resume' : 'Pause';
   });
   $('mute').addEventListener('change', (e) => active().audio.setMuted(e.target.checked));
+  /**
+   * `CLEAR SCORES`, which is a program on the disk that nothing on the disk runs.
+   *
+   * The running driver gets it when there is one, because it has this session's copy of the
+   * file open as well as the store; with no disk booted the store is the only copy there is.
+   */
+  $('clear-scores').addEventListener('click', () => {
+    if (!saves) { say('there is nowhere to keep high scores in this browser'); return; }
+    const d = booted && boot ? boot : null;
+    if (d) d.clearScores();
+    else saves.clearScores();
+    say(saves.broken
+      ? `the high scores are not being kept: ${saves.broken}`
+      : 'the hall of heroes is seven rows of AAA again, the way CLEAR SCORES leaves it');
+  });
   $('tint').addEventListener('change', (e) => {
     const d = active();
     d.tint = e.target.value;
@@ -215,5 +252,6 @@ export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage
     bootDisk,
     show,
     showChain,
+    saves,
   };
 }

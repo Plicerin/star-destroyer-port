@@ -102,19 +102,29 @@ class StubBoot extends StubDriver {
   constructor(canvas, image, opts) {
     super(canvas, opts);
     this.image = image;
+    this.saves = opts?.saves ?? null;
+    this.cleared = 0;
     StubBoot.made.push(this);
   }
+
+  clearScores() { this.cleared += 1; return true; }
 }
 StubBoot.made = [];
 
 const { wire } = await import('../port/src/shell/page.js');
+
+/** A store that only counts, because what is being checked is who gets asked. */
+const makeSaves = () => ({ cleared: 0, broken: null,
+  clearScores() { this.cleared += 1; return true; } });
 
 /** A freshly wired page, with the stubs and nothing real. */
 function page() {
   StubShell.made.length = 0;
   StubBoot.made.length = 0;
   const doc = makeDocument();
+  const saves = makeSaves();
   const sd = wire(doc, {
+    saves,
     Shell: StubShell,
     Boot: StubBoot,
     HELP: [['P', 'pause']],
@@ -123,7 +133,7 @@ function page() {
     fetchImage: async () => new Uint8Array([1, 2, 3]),
     log: { log() {}, error() {} },
   });
-  return { doc, sd, $: (id) => doc.getElementById(id) };
+  return { doc, sd, saves, $: (id) => doc.getElementById(id) };
 }
 
 console.log('=== the page\'s wiring ===');
@@ -239,6 +249,13 @@ console.log('=== the page\'s wiring ===');
     $('over').textContent.includes('no speaker')
       && $('over').textContent.includes('carries on'),
     `"${$('over').textContent}"`);
+
+  // And likewise a table that cannot be kept, because the game gives no sign of it: the Hall
+  // of Heroes comes up looking right and forgets you on reload.
+  sd.showChain({ ...chain, forgetful: 'this browser refused its storage' });
+  check('and it says when a high score will not be kept, which nothing else would show',
+    $('over').textContent.includes('refused its storage'),
+    `"${$('over').textContent}"`);
 }
 
 // ---------------------------------------------------------------- a load that fails ---------
@@ -278,8 +295,41 @@ console.log('=== the page\'s wiring ===');
     'which is exactly the report - the checkbox moved, and the sound did not');
 }
 
-console.log('');
-const failed = results.filter((r) => !r.ok);
+// ---------------------------------------------------------------- the high scores ----------
+// The disk writes its table back to itself and this port will not write to the image, so the
+// page keeps it in the browser - and then it needs the author's own `CLEAR SCORES`, or the
+// first three letters typed into the table are there for good. Who gets asked depends on
+// whether a disk is running: the driver has this session's copy of the file open as well as
+// the store, and clearing one without the other reads back what was just cleared.
+{
+  const { sd, saves, $ } = page();
+  $('clear-scores').fire('click');
+  check('with no disk booted, Clear scores goes straight to the store',
+    saves.cleared === 1 && $('over').textContent.includes('AAA'),
+    `the store was cleared ${saves.cleared} time and the page says "${$('over').textContent}"`);
+
+  await sd.bootDisk();
+  const boot = StubBoot.made[0];
+  $('clear-scores').fire('click');
+  check('and once it is booted the running driver gets it, which has the file open too',
+    boot.cleared === 1 && saves.cleared === 1,
+    `the driver was cleared ${boot.cleared} time and the store not again - the driver does`
+      + ' the store itself, and drops its own copy of the file with it');
+
+  check('the driver is built with the store, or it would have nowhere to keep a score',
+    boot.saves === saves, 'the page owns it and hands it over');
+
+  // Both status handlers write `over` on every frame, and the chain's runs about sixty times
+  // a second, so a line put there by a button is gone before anybody reads it. Found on the
+  // page rather than here: the confirmation was written and then immediately wiped.
+  sd.showChain({ program: 'LOGO1', display: 'text', flights: 0, state: 'chain',
+    empty: 0xC7, step: 4, shields: 0, warp: 0, missiles: 0, hits: 0, fatal: 4 });
+  check('and what it says survives the next status frame, which owns that line',
+    $('over').textContent.includes('AAA'),
+    `after a frame of the chain the page still says "${$('over').textContent}"`);
+}
+
+console.log('');const failed = results.filter((r) => !r.ok);
 console.log(failed.length ? `${failed.length} of ${results.length} checks FAILED`
   : `all ${results.length} checks passed`);
 process.exit(failed.length);

@@ -11,8 +11,8 @@
 // file supplies. It is a `probe_` rather than a `parity_` because the subject is the port's own
 // shell: there is nothing on the machine to compare a pause button against.
 //
-// What it cannot reach is `port/index.html` - the page's own wiring, which is where mute, tint
-// and frames/sec are bound to a driver. That still has no test.
+// The layer above it - which control reaches which driver - moved out of `index.html` into
+// `port/src/shell/page.js` and has its own harness in `probe_page.mjs`.
 import { readFileSync } from 'node:fs';
 
 // ---------------------------------------------------------------- the browser, in miniature -
@@ -99,6 +99,7 @@ globalThis.cancelAnimationFrame = (id) => { pending = pending.filter(([i]) => i 
 
 // The modules read `window` when they are constructed, so they come in after the stub.
 const { Boot } = await import('../port/src/shell/boot.js');
+const { Saves, SCORES, CLEARED } = await import('../port/src/platform/saves.js');
 const { FINALE_BINARY } = await import('../port/src/shell/presentation.js');
 
 const results = [];
@@ -296,8 +297,44 @@ console.log('=== the shell, driven without a browser ===');
   b.stop();
 }
 
-console.log('');
-const failed = results.filter((r) => !r.ok);
+// ---------------------------------------------------------------- the high scores ---------
+// `INITIALS.DAT` is the only file the game writes, and the port will not write to the disk
+// image - so the records come out of the host and have to stop somewhere that outlives the
+// tab. `probe_initials.mjs` holds the file itself; this holds the wiring, which is the half
+// that was missing: a table kept in a `Map` on an object the page threw away on reload.
+{
+  const items = new Map();
+  const storage = {
+    getItem: (k) => (items.has(k) ? items.get(k) : null),
+    setItem: (k, v) => items.set(k, String(v)),
+    removeItem: (k) => items.delete(k),
+  };
+  const saves = new Saves(storage);
+  saves.write(SCORES, ['ZZZ', '19100', ...CLEARED.slice(2)]);
+
+  const b = boot({ saves });
+  b.show.host.openFile(SCORES);
+  check("a Boot opens the high scores the browser kept rather than the disk's own table",
+    b.show.host.file.records[0] === 'ZZZ' && b.show.host.file.records[1] === '19100',
+    `the top row came back as ${b.show.host.file.records.slice(0, 2).join(' ')} - through`
+      + ' the store, the Presentation and the host, which is three joins that were not made');
+
+  // And back out again. The author shipped `CLEAR SCORES` beside the game and nothing on the
+  // disk runs it, so once a table persists the port has to offer it - and it has to reach the
+  // host's own copy of the file as well as the store, or the next OPEN reads back what was
+  // just cleared.
+  b.clearScores();
+  const stored = saves.read(SCORES);
+  b.show.host.openFile(SCORES);
+  check("and CLEAR SCORES reaches the stored table and this session's copy of it",
+    stored.slice(0, 14).join(',') === CLEARED.join(',')
+      && b.show.host.file.records[0] === 'AAA',
+    `the store reads ${stored.slice(0, 2).join(' ')} and a fresh OPEN gives`
+      + ` ${b.show.host.file.records.slice(0, 2).join(' ')}`);
+  b.stop();
+}
+
+console.log('');const failed = results.filter((r) => !r.ok);
 console.log(failed.length ? `${failed.length} of ${results.length} checks FAILED`
   : `all ${results.length} checks passed`);
 process.exit(failed.length);

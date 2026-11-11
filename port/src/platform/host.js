@@ -40,9 +40,11 @@ export class Host {
   /**
    * @param {Uint8Array} mem the 64K image
    * @param {object} disk an openDisk() result
-   * @param {object} [opts] `rnd`, and `call` for a map of address to handler
+   * @param {object} [opts] `rnd`, `calls` for a map of address to handler, and `store` for
+   *   where a file the game writes is kept - see `saves.js`
    */
-  constructor(mem, disk, { rnd = Math.random, calls = {}, corruptInterface = false } = {}) {
+  constructor(mem, disk, { rnd = Math.random, calls = {}, corruptInterface = false,
+    store = null } = {}) {
     /** True skips the interface repair above, which only a harness has a use for. */
     this.corruptInterface = corruptInterface;
     this.mem = mem;
@@ -64,13 +66,20 @@ export class Host {
       * The open text file, and the contents of any file the game has written.
       *
       * `INITIALS` is the only program that opens one, and it reads ten records from
-      * `INITIALS.DAT` and writes seven back. **Writes stay here**: the port does not modify
-      * the disk image, because the image is the thing every measurement in this repository
-      * is made against and a port that edits its own evidence is not one. A shell that wants
-      * high scores to persist can take `files` and keep it wherever it likes.
+      * `INITIALS.DAT` and writes seven back. **Writes never reach the disk image**: the image
+      * is the thing every measurement in this repository is made against, and a port that
+      * edits its own evidence is not one. They go here, and from here to `store` if the shell
+      * supplied one - which is what makes a high score outlive the tab.
       */
     this.file = null;
     this.files = new Map();
+    /**
+      * Where a written file is kept between sessions, or null to keep it nowhere.
+      *
+      * `read(name)` gives back the records or null, `write(name, records)` keeps them.
+      * `platform/saves.js` is the one the page uses; a harness passes its own.
+      */
+    this.store = store;
     /** Everything printed that was not a DOS command, newest last. */
     this.log = [];
   }
@@ -120,9 +129,7 @@ export class Host {
     // A PRINT while a file is open for writing goes to the file, not the screen - which is
     // how INITIALS saves the high-score table.
     if (this.file && this.file.mode === 'write') {
-      this.file.out.push(text);
-      this.files.set(this.file.name, [...(this.files.get(this.file.name) ?? []),
-        ...text.split(String.fromCharCode(10))].filter((x) => x !== ''));
+      this.writeToFile(text, newline);
       return;
     }
     if (text) this.log.push(text);
@@ -265,29 +272,87 @@ export class Host {
    * Open a DOS text file.
    *
    * A text file is carriage-return delimited, and a `READ` followed by `INPUT` takes one
-   * field per INPUT. If the game has written the file already this session, that is what it
-   * reads back; otherwise it comes off the disk.
+   * record per INPUT. `OPEN` puts the position at the first record and both reading and
+   * writing walk forward from there; `WRITE` is issued once per record by `INITIALS` and does
+   * not move it back, which is why seven of those loops leave seven records and not one.
+   *
+   * Where the records come from, in order: what the game has written this session, then the
+   * store the shell gave us, then the disk.
    */
   openFile(name) {
-    if (this.files.has(name)) {
-      this.file = { name, fields: [...this.files.get(name)], pos: 0, mode: null, out: [] };
-      return;
+    let records = this.files.get(name) ?? null;
+    if (!records && this.store) {
+      try {
+        records = this.store.read(name);
+      } catch (e) {
+        this.note(name, `could not be read back: ${e.message}`);
+      }
     }
-    let fields = [];
+    if (!records) {
+      try {
+        const f = this.disk.file(name);
+        records = Array.from(f.data, (b) => String.fromCharCode(b & 0x7F))
+          .join('').split(String.fromCharCode(13));
+      } catch (e) {
+        records = [];
+        this.note(name, 'not on the disk, so it opens empty');
+      }
+    }
+    this.files.set(name, records);
+    this.file = { name, records, pos: 0, mode: null, partial: null };
+  }
+
+  /**
+   * A PRINT into the file DOS has open for writing.
+   *
+   * DOS writes the characters at the file's own position and a carriage return ends a record,
+   * so **a write overwrites in place and does not truncate**. Both halves of that matter here:
+   * `INITIALS` saves seven records over a file that holds more, the rest of it stays where it
+   * is, and the next game's save lands on top of this one rather than behind it.
+   *
+   * This used to append each record to the end of whatever was there. One game looked right,
+   * because there was nothing there yet. A second game wrote its table behind the first one's,
+   * so the screen that came up after it showed the older of the two and the newer score was
+   * never seen again.
+   */
+  writeToFile(text, newline) {
+    const f = this.file;
+    const chunks = (text + (newline ? '\n' : '')).split(/[\r\n]/);
+    for (let i = 0; i < chunks.length - 1; i++) {
+      f.records[f.pos] = (f.partial ?? '') + chunks[i];
+      f.partial = null;
+      f.pos += 1;
+    }
+    const tail = chunks[chunks.length - 1];
+    if (tail) f.partial = (f.partial ?? '') + tail;
+    this.files.set(f.name, f.records);
+  }
+
+  /**
+   * CLOSE, which is where a written file is handed to the store.
+   *
+   * A record the game never terminated is still on the disk without its carriage return, so a
+   * pending partial is written out rather than dropped.
+   */
+  closeFile() {
+    const f = this.file;
+    this.file = null;
+    if (!f || f.mode !== 'write') return;
+    if (f.partial) { f.records[f.pos] = f.partial; f.partial = null; }
+    this.files.set(f.name, f.records);
+    if (!this.store) return;
     try {
-      const f = this.disk.file(name);
-      fields = Array.from(f.data, (b) => String.fromCharCode(b & 0x7F))
-        .join('').split(String.fromCharCode(13));
+      this.store.write(f.name, f.records);
     } catch (e) {
-      this.note(name, 'not on the disk, so it opens empty');
+      // Keeping a high score is not worth stopping a game for. Same rule as the speaker.
+      this.note(f.name, `could not be saved: ${e.message}`);
     }
-    this.file = { name, fields, pos: 0, mode: null, out: [] };
   }
 
   /** INPUT: from the open file if one is being read, otherwise from whoever is watching. */
   input() {
     if (this.file && this.file.mode === 'read') {
-      const v = this.file.fields[this.file.pos++];
+      const v = this.file.records[this.file.pos++];
       return v === undefined ? '' : v;
     }
     return this.pendingInput ?? '';
@@ -355,7 +420,7 @@ export class Host {
       return null;
     }
     if (verb === 'OPEN') { this.openFile(name); return null; }
-    if (verb === 'CLOSE') { this.file = null; return null; }
+    if (verb === 'CLOSE') { this.closeFile(); return null; }
     if (verb === 'READ') {
       if (this.file) this.file.mode = 'read';
       return null;

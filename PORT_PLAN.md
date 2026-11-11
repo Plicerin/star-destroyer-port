@@ -528,10 +528,12 @@ comparing state and screens at checkpoints — the pattern `probe_play.mjs` alre
 
 ## Phase 6 — the rest of the disk
 
-Sound (`PLAYER.MODULE` at `$0300`, tunes BLOADed to `$6000`), high scores
-(`INITIALS.DAT`, written back to the disk), and the `DEMO` path, which has never been
-walked. All three are open questions in DISK_TRUTH; establish them with probes before
-porting them.
+Sound (`PLAYER.MODULE` at `$0300`, tunes BLOADed to `$6000`) ✅, high scores
+(`INITIALS.DAT`) ✅, and the `DEMO` path, which has never been walked. Sound is ported and
+held by `parity_music.mjs` and `parity_sound.mjs`; the high scores are ported, kept in the
+browser rather than written back to the image, and held by `probe_initials.mjs`. What is
+left of this phase is `DEMO`'s animation - its narration is read, and it is the game's whole
+story - and whether it returns to `LOGO1` or loops.
 
 ## Phase 6.5 — the shell  ✅ done
 

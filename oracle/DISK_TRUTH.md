@@ -2859,7 +2859,7 @@ Three things, all found by using the page rather than reading it:
 
 **`probe_shell.mjs` covers the shell now**, and none of it needed an emulator - only a fake
 canvas, a window that counts its own listeners, a clock that ticks when it is told to, and an
-`AudioContext` that can be closed. Twelve checks: the chain walks, pause freezes and resumes on
+`AudioContext` that can be closed. Fourteen checks: the chain walks, pause freezes and resumes on
 the flag and on `P`, a running driver holds one listener set and one context and `stop()` gives
 both back, six reboots leave one of each and the six stopped drivers stay silent, the ship's
 gauges are populated in flight with `fatal` following the mission, and each binary gets its own
@@ -2881,7 +2881,7 @@ reduced to a loader. `wire` takes its two driver classes **as arguments**, so th
 it stubs that record what was done to them - the subject is the wiring, with no emulator and no
 disk anywhere near it.
 
-Fourteen checks: with the disk booted mute, tint and frames/sec all reach the boot and none of
+Nineteen checks: with the disk booted mute, tint and frames/sec all reach the boot and none of
 them touches the idle shell; flying after a boot stops the boot and the controls follow back; a
 driver is built with the settings already on the page, mute included; the pause button is live
 under the chain and its label tracks both ways; the gauges are blank on a title screen and
@@ -2891,6 +2891,65 @@ driver - the checkbox moves and the sound does not.
 
 So the front end has two harnesses now where it had none, and every bug reported from the page
 is something the suite would catch.
+
+### The high scores were written and then thrown away
+
+`INITIALS.DAT` is the only writable file on this disk, and the only thing in it is the table
+the Hall of Heroes draws. The port ran the whole of that path and then stopped one step short
+of the end of it: the records came out of `INITIALS`, through DOS, into a `Map` on the host -
+and the page threw the host away on reload. Every game was played against the table the author
+left behind.
+
+**What the file holds**, read rather than assumed. It is a TEXT file of two sectors, 256 bytes,
+and its first fourteen records are a cleared table: seven `AAA` and seven `0`, which is exactly
+what `CLEAR SCORES` writes. Behind those fourteen is a longer table that was never cleared
+away, because **DOS does not truncate a text file** - a shorter save overwrites the front of a
+longer one and leaves the rest where it is. Behind the cleared table sit `MI>` and `GMR` next
+to 75,000 and three `AAA` next to 500,000 - games somebody played, under the table the game
+shows. `MI>` is line 310 at work: anything the player did not type as A-Z comes back as
+`CHR$(62)`, so that is two initials and a RETURN.
+
+**What a score is** is lines 2010-2017, and nothing else computes it: 300 a fighter, 600 a
+cruiser, 800 a base, 500 for each flight survived, and 10,000 more if `$1FFF` says the base
+star died. The ten thousand is the whole difference between winning and surviving.
+
+**A DOS write goes at the file's own position and overwrites in place.** The port appended
+instead - each record on the end of whatever was there - and one game cannot tell the
+difference, because the file it wrote was empty and the end of it and the front of it were the
+same place. The second game in a session wrote its table *behind* the first one's, so the
+screen that came up afterwards showed the older of the two and the newer score was never seen
+again. `OPEN` puts the position at the first record, a terminated `PRINT` is a record, `WRITE`
+does not move the position back - which is why seven of those loops leave seven records and
+not one - and `CLOSE` is where the file is handed on.
+
+**Where it is handed to** is `port/src/platform/saves.js`, and what it stores is **the file,
+not a data structure**: the records joined by carriage returns, which is what the sectors hold.
+A stored table can be read beside the disk's own bytes. The disk image itself is never written
+to, because the image is what every measurement in this repository is made against.
+
+Nothing in that path is allowed to throw. `localStorage` is absent in some private windows,
+throws on read where site data is blocked and throws on write where the origin is full, and a
+high score is not worth a stopped game - the same rule the speaker is held to, for the same
+reason. The reason is recorded once and the page says the scores are not being kept.
+
+**`CLEAR SCORES` comes back with it.** The author shipped a two-line utility beside the game
+and nothing on the disk runs it, so on a machine it was something you typed. Once a table
+persists there has to be a way back to an empty one, or the first three letters anybody types
+are there for good. The button writes the same fourteen records line 20 writes, over the front
+of the file, leaving what is behind them alone.
+
+**`probe_initials.mjs` holds all of it**, twelve checks with no emulator and no browser: the
+disk's own file; the score lines 2010-2017 add up and the base star's ten thousand only when
+`$1FFF` says so; three games in one session leaving a table of the three of them, best first,
+with the records past it untouched; a score set in one session on the table in the next, two
+images and one store; a store that throws on every call not stopping the game and saying why;
+and `CLEAR SCORES`. Two of those are controls and **the first one is run rather than
+described** - the old rule is put back into the host and the same two games are played through
+it, which puts the author's table back at the front and both games' scores off the end.
+
+**And using it found one more.** Both status handlers write the page's message line on every
+frame, so the confirmation the Clear button wrote was gone before anyone could read it. A
+button's line now outlives the next status frame, which `probe_page.mjs` holds.
 
 ## Open questions
 
@@ -3035,8 +3094,9 @@ promoted to fact.
    them, seeded once and never resynchronised. Recorded rather than quietly deleted, because
    the shape of the mistake is worth keeping: a harness that compares against something it
    supplied itself will tell you whatever you put there.
-10. **`INITIALS.DAT`** — the game writes high scores back to the disk. Nothing has been
-   measured about when or in what format.
+10. ~~**`INITIALS.DAT`**~~ — answered, above, and it was not only a question of format: the
+   port wrote the records and then dropped them, and wrote them to the end of the file rather
+   than at its position. Both are fixed and held by `probe_initials.mjs`.
 11. ~~**The `DEMO` path**, never walked.~~ Partly answered, above, and it mattered more than
     its place in this list suggested: `DEMO`'s `DATA` statements hold **the game's entire
     fiction**, drawn from the shape table rather than printed, which is why no search of the

@@ -126,6 +126,7 @@
     </select>
   </label>
   <label><input type="checkbox" id="mute"> mute</label>
+  <button id="clear-scores" title="CLEAR SCORES, the utility on the disk">Clear scores</button>
 </div>
 
 <div class="help" id="help"></div>
@@ -160,6 +161,7 @@
 import { wire } from './src/shell/page.js';
 import { Shell, HELP, FPS_CHOICES, DISK_FPS } from './src/shell/main.js';
 import { Boot } from './src/shell/boot.js';
+import { browserSaves } from './src/platform/saves.js';
 
 window.__sd = wire(document, {
   Shell,
@@ -167,6 +169,9 @@ window.__sd = wire(document, {
   HELP,
   FPS_CHOICES,
   DISK_FPS,
+  // The high-score file, kept in this browser. The page owns it rather than a driver,
+  // because Clear has to work before the disk is booted as well as after.
+  saves: browserSaves(),
   fetchImage: async () => {
     const r = await fetch('../disk/STAR_DESTROYER.dsk');
     if (!r.ok) throw new Error(`could not fetch the disk image: ${r.status} ${r.statusText}`);

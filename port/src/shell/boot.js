@@ -20,6 +20,7 @@ import { KEYBOARD } from '../platform/host.js';
 import { paint, HGR_W, HGR_H } from '../platform/hgr.js';
 import { Input } from '../platform/input.js';
 import { Audio } from '../platform/audio.js';
+import { browserSaves, SCORES } from '../platform/saves.js';
 import { FRAME_MS, DISK_FPS } from './main.js';
 import { play as playTune } from '../game/music.js';
 
@@ -30,10 +31,12 @@ export class Boot {
   /**
    * @param {HTMLCanvasElement} canvas
    * @param {Uint8Array} image the .dsk
-   * @param {object} [opts] `fps` for the flight, `tint`, `rnd`
+   * @param {object} [opts] `fps` for the flight, `tint`, `rnd`, and `saves` for where the
+   *   high scores are kept - the browser's own storage unless something else is passed,
+   *   and `null` for a game that forgets them when the tab closes
    */
   constructor(canvas, image, { fps = DISK_FPS, tint = 'colour', rnd = Math.random,
-    corruptInterface = false } = {}) {
+    corruptInterface = false, saves = undefined } = {}) {
     canvas.width = HGR_W;
     canvas.height = HGR_H;
     this.canvas = canvas;
@@ -42,37 +45,47 @@ export class Boot {
     this.fps = fps;
     this.tint = tint;
 
-    this.show = new Presentation(image, { rnd, corruptInterface, calls: {
-      /**
-       * `CALL 768` - PLAYER.MODULE. The three programs that play music BLOAD a tune at
-       * $6000 and point $1E/$1F at it, so the tune is read from the image rather than
-       * being passed in.
-       *
-       * The original blocks until the tune ends or a key is pressed, so this does too:
-       * it returns how long the tune takes and the chain holds there. That is why the
-       * key test at $0371 exists, and why the difficulty screen is bearable.
-       */
-      0x0300: (host) => {
-        const at = host.mem[0x1E] | (host.mem[0x1F] << 8);
-        if (!at) { host.note('CALL $300', 'no tune pointer at $1E/$1F'); return null; }
-        // **Sound must never stop the game.** This throwing used to take the whole chain
-        // down: `chainStep` catches what `run` throws and goes to 'stopped', so a tune that
-        // could not be built left the player on a dead screen with the disk half booted.
-        // Found by a harness whose fake AudioContext was missing one method, which is as
-        // plausible a failure as a context closed mid-tune or a browser that will not play.
-        //
-        // The chain is held for the tune's length either way, because the original holds
-        // whether or not anybody is listening.
-        let seconds = 0;
-        try {
-          const wave = playTune(host.mem.subarray(at, at + 4096));
-          seconds = this.audio.waveform(wave, { name: 'tune' });
-        } catch (e) {
-          host.note('CALL $300', `the tune could not be played: ${e.message}`);
-        }
-        return { async: true, seconds };
+    /**
+     * Where `INITIALS.DAT` is kept between games. See `platform/saves.js`.
+     *
+     * The disk writes its high scores back to itself and this port will not write to the
+     * image, so without this the table came up as the author left it on every reload: a
+     * player could type their initials into it and never see them again.
+     */
+    this.saves = saves === undefined ? browserSaves() : saves;
+    this.show = new Presentation(image, { rnd, corruptInterface, store: this.saves,
+      calls: {
+        /**
+         * `CALL 768` - PLAYER.MODULE. The three programs that play music BLOAD a tune at
+         * $6000 and point $1E/$1F at it, so the tune is read from the image rather than
+         * being passed in.
+         *
+         * The original blocks until the tune ends or a key is pressed, so this does too:
+         * it returns how long the tune takes and the chain holds there. That is why the
+         * key test at $0371 exists, and why the difficulty screen is bearable.
+         */
+        0x0300: (host) => {
+          const at = host.mem[0x1E] | (host.mem[0x1F] << 8);
+          if (!at) { host.note('CALL $300', 'no tune pointer at $1E/$1F'); return null; }
+          // **Sound must never stop the game.** This throwing used to take the whole chain
+          // down: `chainStep` catches what `run` throws and goes to 'stopped', so a tune that
+          // could not be built left the player on a dead screen with the disk half booted.
+          // Found by a harness whose fake AudioContext was missing one method, which is as
+          // plausible a failure as a context closed mid-tune or a browser that will not play.
+          //
+          // The chain is held for the tune's length either way, because the original holds
+          // whether or not anybody is listening.
+          let seconds = 0;
+          try {
+            const wave = playTune(host.mem.subarray(at, at + 4096));
+            seconds = this.audio.waveform(wave, { name: 'tune' });
+          } catch (e) {
+            host.note('CALL $300', `the tune could not be played: ${e.message}`);
+          }
+          return { async: true, seconds };
+        },
       },
-    } });
+    });
     this.input = new Input(window).attach();
     this.audio = new Audio();
     this.game = null;
@@ -265,6 +278,8 @@ export class Boot {
       sounds: this.audio.log.slice(-4),
       /** Set once if the speaker refused; the game carries on without it. */
       silent: this.audio.broken ?? null,
+      /** Likewise if the high scores cannot be kept - a table is not worth a stopped game. */
+      forgetful: this.saves?.broken ?? null,
       state: this.state,
       flights: this.flights,
       finale: this.finale,
@@ -272,6 +287,22 @@ export class Boot {
       error: this.error ?? null,
       fps: this.fps,
     };
+  }
+
+  /**
+   * `CLEAR SCORES`, the utility the author shipped beside the game.
+   *
+   * The chain never runs it - it is not in any program's `RUN` - so on the disk it was
+   * something you typed. A port that keeps high scores has to offer it, or the first three
+   * letters anybody types into the table are there for good.
+   */
+  clearScores() {
+    if (!this.saves) return false;
+    const ok = this.saves.clearScores();
+    // The host holds this session's copy of the file in its own map and prefers it to the
+    // store, so without this the next `OPEN` reads back the table that was just cleared.
+    this.show.host.files.delete(SCORES);
+    return ok;
   }
 }
 
