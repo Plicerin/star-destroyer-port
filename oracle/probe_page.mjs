@@ -39,10 +39,20 @@ function makeElement(id) {
 
 function makeDocument() {
   const els = new Map();
+  const listeners = new Map();
   return {
     getElementById(id) {
       if (!els.has(id)) els.set(id, makeElement(id));
       return els.get(id);
+    },
+    // The page listens on the document itself for one thing: any gesture at all, which is how
+    // a speaker that autoboot had no gesture to start gets woken.
+    addEventListener(type, fn) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(fn);
+    },
+    fire(type, event = {}) {
+      for (const fn of listeners.get(type) ?? []) fn({ type, ...event });
     },
   };
 }
@@ -118,12 +128,13 @@ const makeSaves = () => ({ cleared: 0, broken: null,
   clearScores() { this.cleared += 1; return true; } });
 
 /** A freshly wired page, with the stubs and nothing real. */
-function page() {
+function page(opts = {}) {
   StubShell.made.length = 0;
   StubBoot.made.length = 0;
   const doc = makeDocument();
   const saves = makeSaves();
   const sd = wire(doc, {
+    ...opts,
     saves,
     Shell: StubShell,
     Boot: StubBoot,
@@ -244,6 +255,20 @@ console.log('=== the page\'s wiring ===');
     $('l-passes').textContent === 'flights · FINALE' && $('s-hits').textContent === '1 of 2',
     `"${$('l-passes').textContent}" and hits "${$('s-hits').textContent}"`);
 
+  const reached = [{ what: 'CALL $8EF: not implemented', n: 1 }];
+  sd.showChain({ ...chain, unimplemented: reached });
+  const workbench = $('note').innerHTML;
+
+  // The same frame on a page built for a player, where a list of the port's own loose ends
+  // belongs about as much as a compiler warning does.
+  const quiet = page({ gaps: false });
+  await quiet.sd.bootDisk();
+  quiet.sd.showChain({ ...chain, unimplemented: reached });
+  check('the workbench says what the chain reached and the port has not got to; a player\'s'
+    + ' page does not',
+    workbench.includes('CALL $8EF') && quiet.$('note').innerHTML === '',
+    `"${workbench}" against an empty line`);
+
   sd.showChain({ ...chain, silent: 'no speaker' });
   check('and it says when the sound has gone rather than going quiet about it',
     $('over').textContent.includes('no speaker')
@@ -329,7 +354,54 @@ console.log('=== the page\'s wiring ===');
     `after a frame of the chain the page still says "${$('over').textContent}"`);
 }
 
-console.log('');const failed = results.filter((r) => !r.ok);
+// ---------------------------------------------------------------- the disk goes in by itself
+// The owner's report: "why does it not load into the game? i see a blank screen until pressing
+// the boot button". Nothing was wrong - the shell is a harness and waits to be told which of
+// the two drivers to run - but a black rectangle that does nothing is a broken page to anyone
+// who did not write it. A page someone arrives at boots; the dev shell still chooses.
+{
+  const { sd } = page({ autoboot: true });
+  await sd.booting;
+  check('a page wired to autoboot has the disk running before anything is clicked',
+    StubBoot.made.length === 1 && StubBoot.made[0].started === true && sd.boot !== null,
+    `${StubBoot.made.length} boot, started ${StubBoot.made[0]?.started}, with no click`);
+
+  // The control, because every other check in this file clicks something first.
+  const quiet = page();
+  await quiet.sd.booting;
+  check('control: without it nothing starts, which is what the dev shell wants',
+    StubBoot.made.length === 0 && quiet.sd.boot === null && quiet.sd.booting === null,
+    `${StubBoot.made.length} boots made, and the page is waiting to be told which driver`);
+}
+
+// ---------------------------------------------------------------- waking the speaker --------
+// Autoboot has no gesture behind it, so `Boot.start`'s own `resume()` builds the context and
+// is refused - and the game plays silently for as long as the player only looks. The document
+// listens for the whole session rather than once, because a later boot or flight builds a
+// fresh Audio with exactly the same problem.
+{
+  const { doc, sd } = page({ autoboot: true });
+  await sd.booting;
+  const boot = StubBoot.made[0];
+  const atBoot = boot.audio.resumed;
+  doc.fire('pointerdown');
+  doc.fire('keydown');
+  check('a click or a keypress anywhere on the page wakes the running driver\'s speaker',
+    boot.audio.resumed === atBoot + 2,
+    `${boot.audio.resumed - atBoot} resumes, one for each gesture - which is the only kind a`
+      + ' browser lets through, and the only kind autoboot does not have');
+
+  await sd.fly();
+  const flying = StubShell.made[StubShell.made.length - 1];
+  const before = flying.audio.resumed;
+  doc.fire('pointerdown');
+  check('and it follows the driver, because a new one brings a new speaker with it',
+    flying.audio.resumed === before + 1 && boot.audio.resumed === atBoot + 2,
+    `the flight resumed ${flying.audio.resumed - before} more and the stopped boot none`);
+}
+
+console.log('');
+const failed = results.filter((r) => !r.ok);
 console.log(failed.length ? `${failed.length} of ${results.length} checks FAILED`
   : `all ${results.length} checks passed`);
 process.exit(failed.length);

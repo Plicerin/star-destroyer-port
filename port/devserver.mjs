@@ -29,7 +29,10 @@ const TYPES = {
 };
 
 http.createServer((req, res) => {
-  const url = decodeURIComponent((req.url ?? '/').split('?')[0]);
+  let url = decodeURIComponent((req.url ?? '/').split('?')[0]);
+  // A directory is its index, the way every static host serves one. Without this the page at
+  // the root of the repository could only be opened by its full filename.
+  if (url.endsWith('/')) url += 'index.html';
   const file = path.join(ROOT, url);
   // Nothing outside the repository, whatever the URL says.
   if (!file.startsWith(ROOT)) { res.writeHead(403); res.end('no'); return; }

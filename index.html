@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Star Destroyer</title>
+    <meta name="description" content="Mitchell Robbins's 1983 Apple II starship game, rebuilt in the browser and measured against the original floppy by an oracle of 59 suites." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        color-scheme: dark;
+        /* The Apple II hi-res palette, which is the whole colour vocabulary this game had. */
+        --a2-green: #14f53c;
+        --a2-orange: #ff6a3c;
+        --a2-violet: #ff44fd;
+        --a2-blue: #14cffd;
+        --a2-white: #ffffff;
+
+        --bg: #07060a;
+        --bg-2: #0d0a10;
+        --panel: #15111a;
+        --line: #2a2133;
+        --line-2: #3b2f47;
+        --ink: #ece4f2;
+        --ink-2: #a89bb4;
+        --ink-3: #74677f;
+        --maxw: 1100px;
+        --radius: 14px;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(1000px 560px at 50% -10%, rgba(255, 106, 60, 0.13), transparent 70%),
+          linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+        background-attachment: fixed;
+        color: var(--ink);
+        font-family: 'IBM Plex Sans', system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--a2-orange); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      code, kbd, .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; }
+      code {
+        background: #120d17; border: 1px solid var(--line);
+        border-radius: 5px; padding: 1px 6px; font-size: 0.88em; color: var(--a2-green);
+      }
+      kbd {
+        display: inline-block; min-width: 1.7em; padding: 1px 7px; text-align: center;
+        border: 1px solid var(--line-2); border-bottom-width: 3px; border-radius: 6px;
+        background: #1d1724; color: var(--ink); font-size: 0.82em; line-height: 1.5;
+        font-family: 'IBM Plex Mono', monospace;
+      }
+      h2 {
+        font-size: clamp(1.4rem, 3.4vw, 2rem); line-height: 1.2; margin: 0 0 6px;
+        letter-spacing: -0.01em;
+      }
+      h3 { font-size: 1.02rem; margin: 0 0 8px; letter-spacing: 0.01em; }
+      p { margin: 0 0 14px; }
+      .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 18px; }
+      .lead { color: var(--ink-2); }
+      .lead b, .lead strong { color: var(--ink); font-weight: 600; }
+
+      /* ---------- top bar ---------- */
+      .top {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 14px; padding: 16px 0; font-size: 13px;
+      }
+      .brand {
+        display: flex; align-items: center; gap: 10px;
+        font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+        letter-spacing: 0.1em; color: var(--ink);
+      }
+      .brand .pip {
+        width: 10px; height: 10px; border-radius: 2px; background: var(--a2-orange);
+        box-shadow: 0 0 10px rgba(255, 106, 60, 0.85);
+      }
+      .top nav { display: flex; gap: 18px; flex-wrap: wrap; }
+      .top nav a { color: var(--ink-2); }
+      .top nav a:hover { color: var(--ink); text-decoration: none; }
+
+      /* ---------- hero ---------- */
+      .hero { padding: 26px 0 22px; text-align: center; }
+      .stripes {
+        display: grid; grid-auto-flow: column; gap: 5px;
+        margin: 0 auto 22px; max-width: 420px;
+      }
+      .stripes span { height: 6px; border-radius: 3px; }
+      .hero h1 {
+        margin: 0 0 14px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-weight: 700;
+        font-size: clamp(1.9rem, 7.2vw, 3.5rem);
+        letter-spacing: 0.1em;
+        line-height: 1.05;
+        color: var(--a2-white);
+        text-shadow: 0 0 28px rgba(255, 106, 60, 0.45);
+      }
+      .hero .sub {
+        max-width: 680px; margin: 0 auto 10px; color: var(--ink-2);
+        font-size: clamp(1rem, 2.3vw, 1.12rem);
+      }
+      .hero .sub b { color: var(--ink); font-weight: 600; }
+      .byline {
+        font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+        letter-spacing: 0.14em; color: var(--ink-3); margin-bottom: 20px;
+      }
+      .cta { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+      .btn {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 10px 18px; border-radius: 10px;
+        border: 1px solid var(--line-2); background: var(--panel);
+        color: var(--ink); font-weight: 600; font-size: 0.94rem; cursor: pointer;
+        font-family: inherit;
+      }
+      .btn:hover { border-color: var(--a2-orange); text-decoration: none; }
+      .btn.primary {
+        background: linear-gradient(180deg, #5a2a16, #381809);
+        border-color: #a8542f; color: #ffeee6;
+      }
+
+      /* ---------- the game ---------- */
+      #container { padding: 6px 0 4px; }
+      .stage {
+        display: grid; gap: 14px;
+        grid-template-columns: minmax(0, 1fr) 266px;
+        align-items: start;
+      }
+      .bezel {
+        position: relative;
+        border: 1px solid var(--line-2);
+        border-radius: 18px;
+        padding: 14px;
+        background: linear-gradient(180deg, #19131f, #0a070d);
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      }
+      #viewport {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 35 / 24;     /* 280 x 192, the hi-res screen */
+        border-radius: 10px;
+        overflow: hidden;
+        background: #000;
+        isolation: isolate;
+        line-height: 0;
+      }
+      /* A hi-res pixel is a hard-edged pixel, so the canvas is not smoothed. The scanline is
+         the only thing here that the machine did not do, and it is one twentieth of black. */
+      #viewport::after {
+        content: '';
+        position: absolute; inset: 0; pointer-events: none; z-index: 3;
+        background-image: repeating-linear-gradient(
+          to bottom, transparent 0 1px, rgba(0, 0, 0, 0.055) 1px, rgba(0, 0, 0, 0.055) 2px);
+        mix-blend-mode: multiply;
+      }
+      #screen {
+        display: block; width: 100%; height: 100%;
+        background: #000; image-rendering: pixelated; touch-action: none;
+      }
+      .tray {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 12px; flex-wrap: wrap; margin-top: 12px;
+        font-size: 13px; color: var(--ink-2);
+      }
+      .tray .keys { font-family: 'IBM Plex Mono', monospace; }
+      .tray .keys kbd { margin-right: 2px; }
+      .tray .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+      .tray button {
+        background: var(--panel); color: var(--ink);
+        border: 1px solid var(--line-2); border-radius: 8px;
+        padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer;
+      }
+      .tray button:hover:not(:disabled) { border-color: var(--a2-orange); }
+      .tray button:disabled { opacity: 0.4; cursor: default; }
+      .over {
+        margin-top: 10px; min-height: 1.5em; text-align: center;
+        color: var(--a2-orange); font-size: 13.5px;
+        font-family: 'IBM Plex Mono', monospace;
+      }
+      .note {
+        margin-top: 4px; color: var(--ink-2); font-size: 13px;
+        border-left: 2px solid var(--line-2); padding-left: 12px;
+      }
+      .note:empty { display: none; }
+      .note b { color: var(--a2-orange); font-weight: 600; }
+
+      /* ---------- the instruments ---------- */
+      .hud { display: grid; gap: 10px; }
+      .gauge {
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: 12px; padding: 11px 13px;
+      }
+      .gauge h4 {
+        margin: 0 0 7px; font-family: 'IBM Plex Mono', monospace;
+        font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase;
+        color: var(--a2-orange); font-weight: 600;
+      }
+      .kv {
+        display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+        font-size: 13px; padding: 3px 0;
+      }
+      .kv span:first-child { color: var(--ink-3); }
+      .kv span:last-child {
+        font-family: 'IBM Plex Mono', monospace; color: var(--ink); text-align: right;
+      }
+      .gauge label {
+        display: block; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+        color: var(--ink-3); margin: 8px 0 4px; font-family: 'IBM Plex Mono', monospace;
+      }
+      .gauge label:first-of-type { margin-top: 0; }
+      .gauge select, .gauge button {
+        width: 100%; font: inherit; font-size: 13px;
+        color: var(--ink); background: #110d16;
+        border: 1px solid var(--line-2); border-radius: 8px;
+        padding: 6px 9px; cursor: pointer;
+      }
+      .gauge select:hover, .gauge button:hover:not(:disabled) { border-color: var(--a2-orange); }
+      .gauge button:disabled { opacity: 0.4; cursor: default; }
+      .gauge .check {
+        display: flex; align-items: center; gap: 8px; margin-top: 9px;
+        font-size: 13px; color: var(--ink-2); text-transform: none; letter-spacing: 0;
+        font-family: inherit; cursor: pointer;
+      }
+      .gauge .check input { accent-color: var(--a2-orange); cursor: pointer; }
+      .caption { color: var(--ink-3); font-size: 11.5px; line-height: 1.45; margin-top: 7px; }
+
+      /* ---------- sections ---------- */
+      section { padding: 44px 0 6px; }
+      .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); }
+      .grid + p { margin-top: 22px; }
+      .card {
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: var(--radius); padding: 18px;
+      }
+      .card p:last-child { margin-bottom: 0; }
+      .card .tag {
+        font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+        letter-spacing: 0.16em; color: var(--a2-green); margin-bottom: 8px;
+      }
+      ul.keys { list-style: none; margin: 0; padding: 0; font-size: 0.92rem; }
+      ul.keys li {
+        display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+        padding: 7px 0; border-bottom: 1px dashed var(--line);
+      }
+      ul.keys li:last-child { border-bottom: 0; }
+      ul.keys span:first-child { color: var(--ink-2); }
+      .stat { display: flex; align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+      .stat:last-child { border-bottom: 0; }
+      .stat .n {
+        font-family: 'IBM Plex Mono', monospace; font-weight: 700;
+        font-size: 1.5rem; color: var(--a2-green); min-width: 3.6em;
+      }
+      .stat .t { color: var(--ink-2); font-size: 0.9rem; }
+      .pull {
+        border-left: 3px solid var(--a2-orange);
+        padding: 2px 0 2px 16px; margin: 18px 0;
+        color: var(--ink); font-size: 1.02rem;
+      }
+      figure.listing {
+        margin: 16px 0; background: #0a0710; border: 1px solid var(--line);
+        border-radius: 10px; overflow: hidden;
+      }
+      figure.listing pre {
+        margin: 0; padding: 14px 16px; overflow-x: auto;
+        font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;
+        line-height: 1.65; color: var(--a2-green);
+      }
+      figure.listing figcaption {
+        padding: 8px 16px; border-top: 1px solid var(--line);
+        font-size: 12px; color: var(--ink-3);
+      }
+
+      /* ---------- footer ---------- */
+      footer { margin-top: 54px; border-top: 1px solid var(--line); padding: 22px 0 46px; }
+      footer .row {
+        display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+        font-size: 12.5px; color: var(--ink-3);
+      }
+      details.dev { margin-top: 16px; font-size: 12.5px; color: var(--ink-3); }
+      details.dev summary { cursor: pointer; color: var(--ink-2); }
+
+      @media (max-width: 880px) {
+        .stage { grid-template-columns: minmax(0, 1fr); }
+        .hud { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+      }
+      @media (max-width: 720px) {
+        .top { flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px 0 10px; }
+        .top nav { gap: 14px 18px; }
+      }
+      @media (max-width: 560px) {
+        .bezel { padding: 9px; border-radius: 14px; }
+        section { padding: 34px 0 4px; }
+        .hero { padding: 16px 0 18px; }
+        ul.keys li { flex-wrap: wrap; gap: 4px 12px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="top">
+        <div class="brand"><span class="pip"></span> STAR DESTROYER</div>
+        <nav>
+          <a href="#play">Play</a>
+          <a href="#controls">Controls</a>
+          <a href="#shape">A game</a>
+          <a href="#history">1983</a>
+          <a href="#beowulf">The Beowulf</a>
+          <a href="#oracle">How it was ported</a>
+          <a href="#findings">What the disk said</a>
+          <a href="https://plicerin.github.io/">All games</a>
+        </nav>
+      </div>
+
+      <header class="hero">
+        <div class="stripes" aria-hidden="true">
+          <span style="background: var(--a2-orange)"></span>
+          <span style="background: var(--a2-violet)"></span>
+          <span style="background: var(--a2-white)"></span>
+          <span style="background: var(--a2-blue)"></span>
+          <span style="background: var(--a2-green)"></span>
+        </div>
+        <h1>STAR DESTROYER</h1>
+        <p class="sub">
+          A 1983 Apple&nbsp;II starship game, rebuilt in the browser and
+          <b>measured against the original floppy</b>. One wireframe cockpit, a wave of
+          attackers to clear, and a starbase between you and the next one.
+        </p>
+        <p class="byline">HARVEST TIME SOFTWARE COMPANY &nbsp;&middot;&nbsp; &copy; 1983 MITCHELL ROBBINS</p>
+        <div class="cta">
+          <a class="btn primary" href="#play">Play it</a>
+          <a class="btn" href="#beowulf">The story nobody could find</a>
+        </div>
+      </header>
+
+      <main>
+        <!-- The game. Every id below is one `port/src/shell/page.js` drives. -->
+        <div id="container">
+          <div class="stage">
+            <div id="play" class="bezel">
+              <div id="viewport">
+                <canvas id="screen" width="280" height="192"></canvas>
+              </div>
+              <div class="tray">
+                <div class="keys" id="help"></div>
+                <div class="buttons">
+                  <button id="pause" type="button" disabled>Pause</button>
+                  <button id="boot" type="button">Reboot</button>
+                  <button id="fullscreen" type="button">Fullscreen</button>
+                </div>
+              </div>
+            </div>
+
+            <aside class="hud">
+              <div class="gauge">
+                <h4>ship</h4>
+                <div class="kv"><span>shields</span><span id="s-shields">&mdash;</span></div>
+                <div class="kv"><span>warp</span><span id="s-warp">&mdash;</span></div>
+                <div class="kv"><span>missiles</span><span id="s-missiles">&mdash;</span></div>
+                <div class="kv"><span>hits taken</span><span id="s-hits">&mdash;</span></div>
+              </div>
+              <div class="gauge">
+                <h4>mission</h4>
+                <div class="kv"><span id="l-waves">left to send</span><span id="s-waves">&mdash;</span></div>
+                <div class="kv"><span id="l-kills">kills</span><span id="s-kills">&mdash;</span></div>
+                <div class="kv"><span id="l-passes">passes</span><span id="s-passes">&mdash;</span></div>
+              </div>
+              <div class="gauge">
+                <h4>speaker</h4>
+                <div class="kv"><span>last</span><span id="s-sounds">&mdash;</span></div>
+                <!-- Checked, because this page puts the disk in by itself and a page that
+                     starts without being asked should not start making noise either. -->
+                <label class="check"><input type="checkbox" id="mute" checked> mute</label>
+                <p class="caption">
+                  The speaker is off until you ask for it. There is no sound chip in here
+                  &mdash; every one of the seven noises is the processor flipping the cone.
+                </p>
+              </div>
+              <div class="gauge">
+                <h4>the machine</h4>
+                <label for="fps">frames a second</label>
+                <select id="fps"></select>
+                <label for="tint">display</label>
+                <select id="tint">
+                  <option value="colour">colour</option>
+                  <option value="green">green screen</option>
+                  <option value="amber">amber screen</option>
+                  <option value="white">white screen</option>
+                </select>
+                <p class="caption" id="fps-note"></p>
+              </div>
+              <div class="gauge">
+                <h4>shortcuts</h4>
+                <label for="difficulty">difficulty, for the shortcut below</label>
+                <select id="difficulty">
+                  <option value="1">1 &mdash; HARD, 5 to 7 flights</option>
+                  <option value="2">2 &mdash; HARDER, 8 to 10</option>
+                  <option value="3">3 &mdash; HARDEST, 10 to 15</option>
+                </select>
+                <p class="caption">
+                  The disk asks you this itself, on the screen after the title. This is for
+                  the shortcut.
+                </p>
+                <button id="start" type="button">Skip to a flight</button>
+                <button id="clear-scores" type="button" title="CLEAR SCORES, the utility on the disk">Clear the high scores</button>
+                <p class="caption">
+                  Your scores are kept in this browser. Clearing them runs the author's own
+                  <code>CLEAR SCORES</code>, which nothing on the disk ever did.
+                </p>
+              </div>
+            </aside>
+          </div>
+
+          <div class="over" id="over"></div>
+          <div class="note" id="note"></div>
+        </div>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="controls">
+          <h2>Three units of heading a frame</h2>
+          <p class="lead">
+            The ship turns at a fixed rate and there is nothing in between: the original reads
+            <b>paddle&nbsp;0</b> once a frame through the monitor ROM, and anything from
+            <b>100 to 154</b> is dead centre. Outside that, the heading moves <b>three units</b>
+            and no more, whether you have nudged the dial or thrown it hard over. A full circle
+            is 256 units, so a half turn is forty-three frames &mdash; about seventeen seconds.
+          </p>
+          <div class="grid">
+            <div class="card">
+              <div class="tag">FLYING</div>
+              <ul class="keys">
+                <li><span>Turn</span><span><kbd>&larr;</kbd> <kbd>&rarr;</kbd></span></li>
+                <li><span>Warp</span><span><kbd>&uarr;</kbd> <kbd>Shift</kbd></span></li>
+                <li><span>Fire</span><span><kbd>Space</kbd></span></li>
+                <li><span>Pause</span><span><kbd>P</kbd></span></li>
+              </ul>
+              <p class="lead" style="margin: 12px 0 0; font-size: 0.86rem">
+                That is the whole of it. The binary reads the paddle, button&nbsp;0 and the
+                keyboard, and nothing else.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">THE KEYBOARD IS A PAUSE</div>
+              <p class="lead" style="margin-bottom: 0">
+                Press any key during a flight on the original and the game stops dead until you
+                press another one. That is not a feature written for it &mdash; it is six
+                instructions that read the keyboard, clear the strobe and spin. Measured: with
+                the paddle held hard over the heading advances nine units, press a key and it
+                advances none.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">A WARNING ABOUT PACE</div>
+              <p class="lead">
+                This game is <b>slow</b>. One pass of the loop &mdash; read the paddle, move
+                everything, draw the whole scene, flip the page &mdash; is about
+                <b>397,000 cycles</b>, four tenths of a second, and <b>eighty per cent of it is
+                the renderer</b>.
+              </p>
+              <p class="lead" style="margin-bottom: 0">
+                So the game runs at <b>2.57 frames a second</b> and that is not emulation
+                overhead. The frames-a-second control is there if you would rather not play at
+                1983 speed &mdash; but a pass is a whole tick of the game as well as a picture,
+                so raising it speeds the game up rather than smoothing it.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="shape">
+          <h2>A game is five to fifteen flights</h2>
+          <p class="lead">
+            Everything outside the flight loop is Applesoft &mdash; <b>twenty programs</b> on the
+            floppy, each one <code>RUN</code>ning the next &mdash; and everything those programs
+            and the machine code say to each other goes through <b>thirteen bytes</b> at
+            <code>$1FF3</code>&ndash;<code>$1FFF</code>, just above where the binary ends. That is
+            the entire interface. No file, no buffer, no second channel: thirteen bytes carry the
+            wave counters, the kills, the flight count and whether the last mission was won.
+          </p>
+          <div class="grid">
+            <div class="card">
+              <div class="tag">THE LOOP OF IT</div>
+              <p class="lead" style="margin-bottom: 0">
+                Clear a wave to the last enemy, hyperdrive out, dock at the starbase, bank the
+                bonus, hyperdrive back, and do it again. Survive as many flights as the
+                difficulty rolled for you and the last jump puts you somewhere else entirely.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">HOW LONG</div>
+              <p class="lead" style="margin-bottom: 0">
+                The target is rolled, not fixed: <b>5 to 7</b> flights on HARD, <b>8 to 10</b> on
+                HARDER, <b>10 to 15</b> on HARDEST. The test that ends the run is
+                <code>&gt;=</code>, so flying exactly as many as asked for finishes it &mdash; a
+                strict <code>&gt;</code> would have given every difficulty one flight too many.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">SCORING</div>
+              <p class="lead" style="margin-bottom: 0">
+                300 a fighter, 600 a cruiser, 800 a base, and 10,000 for finishing it. The
+                starbase bonus is the interesting one: each visit adds the flights so far, capped
+                at five, to a running total that <i>every later visit multiplies again</i>. A won
+                game on HARDEST comes out near 180,000, and about two thirds of that is the bonus
+                rather than the shooting.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="history">
+          <h2>Where it came from</h2>
+          <p class="lead">
+            <b>Star Destroyer</b> is an Apple&nbsp;II game published in 1983 by <b>Harvest Time
+            Software Company</b> and written by <b>Mitchell Robbins</b> &mdash; the author of
+            <a href="https://plicerin.github.io/space-vikings-port/">Space Vikings</a> a year
+            earlier. The difference between the two is what is underneath them. Space Vikings
+            drew its world with hand-rolled Applesoft; this one is built on subLOGIC's
+            <b>A2&#8209;3D2</b> graphics package, the commercial 3-D library that came out of the
+            flight simulators.
+          </p>
+          <p class="lead">
+            And A2-3D2 is not a drawing routine. It is an <b>interpreter</b>: the scene is a
+            program, in a thirty-opcode instruction set, sitting in a file called
+            <code>SV DATA</code>. Each frame the game pokes new numbers into that program's
+            operands &mdash; an angle here, a coordinate there &mdash; and calls the engine,
+            which runs the scene from the top and clips, projects and plots whatever it
+            finds. The game does not know what a line is.
+          </p>
+          <p class="pull">
+            One call renders the whole world in about 316,000 cycles &mdash; roughly 95,000
+            6502 instructions, eighteen and a half video frames, three tenths of a second. The
+            engine is synchronised to nothing at all. It runs until it is done.
+          </p>
+          <p class="lead">
+            The rest of the disk is of its time in the nicest way. There are twenty Applesoft
+            programs and <b>four that nothing ever runs</b>: two look like earlier versions left
+            where they fell, one is the high-score reset the author presumably typed by hand, and
+            the fourth is not a screen at all &mdash; it is the <b>author's own build tool</b>,
+            which generates one of the machine-code overlays out of its own <code>DATA</code>
+            statements and <code>BSAVE</code>s it. One of the four binaries on this disk has its
+            source sitting right next to it.
+          </p>
+        </section>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="beowulf">
+          <h2>The ship is called the Beowulf</h2>
+          <p class="lead">
+            For most of this project the game appeared to have no fiction in it at all. Nothing
+            names the player's ship or the enemy; searching the floppy for a name finds nothing,
+            and the notes said so. <b>That was wrong, and the reason it was wrong is the better
+            finding.</b>
+          </p>
+          <p class="lead">
+            Every word this game puts on screen is <b>drawn</b> &mdash; one shape table, and the
+            programs hold their text as <i>lists of shape numbers</i> in <code>DATA</code>
+            statements. There is no text on the disk to search for. The cipher turned out to be
+            forced rather than guessed: one program converts a digit to a shape number twice by
+            different routes, and the two agree, which pins the table to ASCII <code>/</code>
+            through <code>Z</code> with <code>@</code> left out &mdash; 43 shapes, exactly the
+            count the table declares. Decoded, it reads back the program's own name and the words
+            <code>FINAL SCORE</code>, neither of which the derivation had any say in.
+          </p>
+          <figure class="listing">
+<pre>450   STAR DESTROYER
+500   YOU ARE THE COMMANDER OF THE
+510   STARSHIP BEOWULF
+520   DESTROY THE ALIEN ARMADA
+525   BEFORE THEY DESTROY YOU</pre>
+            <figcaption>
+              <code>DEMO</code>, the attract mode, with its <code>DATA</code> statements decoded.
+              This is the only statement of what the game is about that exists anywhere &mdash;
+              no manual survives.
+            </figcaption>
+          </figure>
+          <p class="lead">
+            The game's entire written vocabulary is those five lines plus <code>STARBASE</code>,
+            <code>DOCKING COMPLETE</code>, <code>SCORE</code>, <code>LEVEL</code> and
+            <code>FINAL SCORE</code>. It uses <b>22 of the 26 letters</b>: there is no J, no Q,
+            no X and no Z anywhere in the game.
+          </p>
+          <p class="lead" style="margin-bottom: 0">
+            The lesson got written down with the finding. <b>&ldquo;A search of the disk finds
+            nothing&rdquo; is not a fact about the game.</b> It is a fact about the search.
+          </p>
+        </section>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="oracle">
+          <h2>How it was ported</h2>
+          <p class="lead">
+            Not by reading the listings and reimplementing them. The listings tell you what the
+            author wrote; they do not tell you what the machine <i>does</i> &mdash; and on this
+            disk the difference turned out to matter on nearly every page.
+          </p>
+          <p class="lead">
+            So the port is built against an <b>oracle</b>: the real game, running on an
+            Apple&nbsp;II emulator inside a headless browser, driven by a script that can press
+            keys, read memory and screenshot the hi-res page. Everything goes through two stages.
+          </p>
+          <div class="grid">
+            <div class="card">
+              <div class="tag">STAGE ONE &mdash; ASK</div>
+              <h3>A probe asks the machine</h3>
+              <p class="lead" style="margin-bottom: 0">
+                Boot the disk, play to the thing in question, and record what actually happened
+                &mdash; the bytes, the screen, the cycle counts. There are <b>38</b> of these.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">STAGE TWO &mdash; COMPARE</div>
+              <h3>A harness holds the port to it</h3>
+              <p class="lead" style="margin-bottom: 0">
+                Drive the port the same way and compare &mdash; pixel for pixel where it is a
+                picture, value for value where it is a number, cycle for cycle where it is a
+                sound. There are <b>21</b> of these, and all 59 have to pass.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">THE RULE</div>
+              <h3>A check that cannot fail is worse than none</h3>
+              <p class="lead" style="margin-bottom: 0">
+                Because it gets counted. Every harness here was made to fail on purpose before it
+                was believed, and three of them were wrong the first time. The ways they were
+                wrong are written down rather than quietly fixed.
+              </p>
+            </div>
+          </div>
+          <p class="lead">
+            Where the port and the floppy disagree, <b>the floppy is right</b> &mdash; including
+            when it is obviously a bug. Several of the ones below are bugs, and the port keeps
+            every one of them.
+          </p>
+        </section>
+
+        <!-- ---------------------------------------------------------------- -->
+        <section id="findings">
+          <h2>What the disk actually said</h2>
+          <p class="lead">
+            A sample of things that are true of the original, that nobody would have guessed from
+            the listings, and that the port now does too.
+          </p>
+          <div class="grid">
+            <div class="card">
+              <div class="tag">SHOOTING</div>
+              <h3>Half your shots are free</h3>
+              <p class="lead" style="margin-bottom: 0">
+                There are two shot slots and they alternate. Only the <b>first</b> one takes a
+                missile off the bar; the path that fires the second never touches it. And the
+                one it does take is a single unit because the code jumps <i>one byte into</i> the
+                routine that normally subtracts four &mdash; the same four instructions that
+                knock four off your shield take one off the missiles, and the entry point is the
+                whole difference.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">THE LAST ENEMY</div>
+              <h3>The base star shoots you in the back</h3>
+              <p class="lead" style="margin-bottom: 0">
+                It is the only thing in either mission that fires at the ship at all, and it
+                tests <b>four</b> candidate headings where everything else tests two. Two of the
+                four are the reciprocal bearing &mdash; so it will shoot at you dead astern as
+                readily as dead ahead, while still pointing the other way. Its missile also
+                <b>rolls as it flies</b>. Nothing else in the game does.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">THE SPEAKER</div>
+              <h3>Six of the seven sounds have no sound</h3>
+              <p class="lead" style="margin-bottom: 0">
+                There is no sound chip &mdash; a sound is a list of cycle numbers and the pitch
+                is how long the processor waits between flipping the cone. Six of the seven
+                routines get their waveform from a shift register that <b>nothing ever
+                initialises</b>, so what a sound is depends on where the last sound left it: the
+                same routine measured 108 toggles from one starting state and 158 from another.
+                A recording would be one performance, not the sound, so the port runs the
+                generator instead.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">THE SEVENTH</div>
+              <h3>The warp buzz is however deep the stack is</h3>
+              <p class="lead" style="margin-bottom: 0">
+                The one sound with a plain waveform opens by calling a ROM routine that returns
+                with the <b>stack pointer in X</b> &mdash; and X is the delay counter. So the
+                first gap of the buzz is however deep the stack happened to be when you engaged
+                warp. Four different stack depths give first gaps of 610, 1250, 1887 and 2377
+                cycles, and then 2567 every time after.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">THE SCOREBOARD</div>
+              <h3>Every 8 is drawn as a 9</h3>
+              <p class="lead" style="margin-bottom: 0">
+                One line of the starbase program reads <code>IF A = 8 THEN A = 9</code>, applied
+                to each digit of the docking score before it is turned into a shape. A score of
+                800 reads 900. The shape table has a perfectly good 8 in it, and the routine that
+                draws the level number uses it without any such guard, so it is a slip rather
+                than a workaround. The port keeps it.
+              </p>
+            </div>
+            <div class="card">
+              <div class="tag">THE FINALE</div>
+              <h3>The last mission is the same code, moved</h3>
+              <p class="lead" style="margin-bottom: 0">
+                The final mission looked like a second game: 1,369 instructions in a binary of
+                its own. <b>1,070 of them are the main mission's</b>, assembled at a different
+                address &mdash; the frame loop four bytes down, the dispatch and the kills
+                $0813 up, the sound $080E. Asking the question per routine found almost none of
+                it. Asking it per instruction found nearly all.
+              </p>
+            </div>
+          </div>
+          <div class="grid" style="margin-top: 16px">
+            <div class="card">
+              <div class="stat"><span class="n">59</span><span class="t">suites, all green</span></div>
+              <div class="stat"><span class="n">20</span><span class="t">Applesoft programs on the floppy</span></div>
+              <div class="stat"><span class="n">13</span><span class="t">bytes of interface between all of them</span></div>
+              <div class="stat"><span class="n">30</span><span class="t">opcodes in the renderer's instruction set</span></div>
+            </div>
+            <div class="card">
+              <div class="stat"><span class="n">2.57</span><span class="t">frames a second, measured</span></div>
+              <div class="stat"><span class="n">397k</span><span class="t">cycles a frame, 80% of it the renderer</span></div>
+              <div class="stat"><span class="n">&plusmn;3</span><span class="t">units of heading a frame, at any paddle deflection</span></div>
+              <div class="stat"><span class="n">43</span><span class="t">shapes, which are the game's entire alphabet</span></div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <div class="row">
+          <div>
+            Star Destroyer is &copy; 1983 Mitchell Robbins, published by Harvest Time Software
+            Company. This is an unofficial preservation project, not affiliated with the author
+            or any publisher.
+          </div>
+          <div><a href="https://plicerin.github.io/">All games</a></div>
+        </div>
+        <details class="dev">
+          <summary>Notes for the curious</summary>
+          <p style="margin-top: 10px">
+            The findings document is <code>oracle/DISK_TRUTH.md</code> and is the only trusted
+            account of what the disk does; <code>node oracle/run_all.mjs</code> runs every suite.
+            The port is an <i>interpreter</i> of the disk rather than a transliteration of it:
+            the twenty Applesoft programs are run as they are, by the same chain the machine
+            follows, and the four machine-code overlays are transliterated 6502. The one thing
+            kept outside the disk is your high-score table, which lives in this browser, because
+            nothing here writes to the floppy image.
+          </p>
+        </details>
+      </footer>
+    </div>
+
+    <script type="module">
+      // The loader, and nothing else. The wiring is in `port/src/shell/page.js`, where a
+      // harness can reach it - `oracle/probe_page.mjs` wires the same function to a stub
+      // document and a pair of recording drivers.
+      import { wire } from './port/src/shell/page.js';
+      import { Shell, HELP, FPS_CHOICES, DISK_FPS } from './port/src/shell/main.js';
+      import { Boot } from './port/src/shell/boot.js';
+      import { browserSaves } from './port/src/platform/saves.js';
+
+      window.__sd = wire(document, {
+        Shell,
+        Boot,
+        HELP,
+        FPS_CHOICES,
+        DISK_FPS,
+        // The high-score file, kept in this browser. The page owns it rather than a driver,
+        // because Clear has to work before the disk is booted as well as after.
+        saves: browserSaves(),
+        // This is a page, not a workbench: the disk goes in on arrival, and the port's own
+        // loose ends stay off the screen. `port/index.html` is the workbench and shows them.
+        autoboot: true,
+        gaps: false,
+        fetchImage: async () => {
+          const r = await fetch('./disk/STAR_DESTROYER.dsk');
+          if (!r.ok) throw new Error(`could not fetch the disk image: ${r.status} ${r.statusText}`);
+          return new Uint8Array(await r.arrayBuffer());
+        },
+      });
+
+      document.getElementById('fullscreen').addEventListener('click', () => {
+        const v = document.getElementById('viewport');
+        if (document.fullscreenElement) document.exitFullscreen();
+        else v.requestFullscreen?.();
+      });
+    </script>
+  </body>
+</html>

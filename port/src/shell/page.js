@@ -22,11 +22,13 @@
  * @param {object} deps `Shell` and `Boot`, the two driver classes; `HELP`, `FPS_CHOICES` and
  *   `DISK_FPS` for the captions; `fetchImage` to get the .dsk; `saves` for where the high
  *   scores are kept, which the page owns because the Clear button outlives any one driver;
- *   `log` for the console
+ *   `autoboot` to put the disk in the drive without being asked; `gaps` to list what the
+ *   chain reached and the port has not got to, which is a workbench's business rather than a
+ *   player's; `log` for the console
  * @returns {object} the drivers and the handlers, for the console and for a harness
  */
 export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage,
-  saves = null, log = console } = {}) {
+  saves = null, autoboot = false, gaps = true, log = console } = {}) {
   const $ = (id) => doc.getElementById(id);
   const canvas = $('screen');
   let shell = new Shell(canvas);
@@ -131,10 +133,10 @@ export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage
       // of it: the Hall of Heroes comes up looking right and forgets you on reload.
       : s.forgetful ? `the high scores are not being kept: ${s.forgetful}`
       : fresh() || (s.waiting === 'key' ? 'press a key' : ''));
-    const gaps = s.unimplemented || [];
-    putHTML('note', gaps.length
+    const reached = (gaps && s.unimplemented) || [];
+    putHTML('note', reached.length
       ? '<b>Not ported yet, and reached:</b> '
-        + gaps.map((g) => `${g.what} (${g.n}×)`).join('; ')
+        + reached.map((g) => `${g.what} (${g.n}×)`).join('; ')
       : '');
   };
 
@@ -243,6 +245,30 @@ export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage
   });
   fpsNote();
 
+  /**
+   * Any gesture at all wakes the speaker.
+   *
+   * `Boot.start` asks its Audio to resume, which is enough when a click on **Boot the disk**
+   * is what called it - the browser is inside a gesture and lets the context run. Autoboot
+   * has no gesture, so the context is built suspended and stays there, silently, for as long
+   * as the player only looks. This listens for the whole session rather than once, because
+   * every boot and every `fly()` builds a fresh Audio that has the same problem.
+   */
+  if (doc.addEventListener) {
+    const wake = () => active().audio.resume();
+    doc.addEventListener('pointerdown', wake);
+    doc.addEventListener('keydown', wake);
+  }
+
+  /**
+   * Put the disk in the drive.
+   *
+   * A page whose screen is black until a button is pressed reads as a page that does not
+   * work - which is what the owner saw. The dev shell leaves this off, because there the
+   * point is choosing which of the two drivers runs; a page someone arrives at boots.
+   */
+  const booting = autoboot ? bootDisk() : null;
+
   // For poking at it from the console, and for the harness.
   return {
     get shell() { return shell; },
@@ -250,6 +276,7 @@ export function wire(doc, { Shell, Boot, HELP, FPS_CHOICES, DISK_FPS, fetchImage
     active,
     fly,
     bootDisk,
+    booting,
     show,
     showChain,
     saves,
