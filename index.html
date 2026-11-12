@@ -549,10 +549,13 @@
             <b>Star Destroyer</b> is an Apple&nbsp;II game published in 1983 by <b>Harvest Time
             Software Company</b> and written by <b>Mitchell Robbins</b> &mdash; the author of
             <a href="https://plicerin.github.io/space-vikings-port/">Space Vikings</a> a year
-            earlier. The difference between the two is what is underneath them. Space Vikings
-            drew its world with hand-rolled Applesoft; this one is built on subLOGIC's
-            <b>A2&#8209;3D2</b> graphics package, the commercial 3-D library that came out of the
-            flight simulators.
+            earlier &mdash; and the two games run on the same engine, one version apart. The
+            earlier disk carries <code>LO-HI A2-3D1</code>; this one carries
+            <b>A2&#8209;3D2</b>, subLOGIC's enhancement of it. Both load at <code>$6000</code>,
+            both put the renderer first in a jump table with the cosine and sine behind it, and
+            a third of the newer one is <i>literally the older one's code</i>, moved: 2,846
+            bytes in 67 runs, the longest of them the 269-byte signed multiply. Compared at
+            fixed addresses the two look 2% alike, which is how that went unnoticed.
           </p>
           <p class="lead">
             And A2-3D2 is not a drawing routine. It is an <b>interpreter</b>: the scene is a

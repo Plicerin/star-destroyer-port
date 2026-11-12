@@ -109,9 +109,42 @@ says it in its own words:
 - **© 1983 BY MITCHELL ROBBINS**
 - **A2-3D2 COPYRIGHT 1981 SUB LOGIC**
 
-So: the same author as *Space Vikings*, one year later, self-published rather than through
-subLOGIC, and built on subLOGIC's **A2-3D2** 3-D graphics package rather than on hand-rolled
-`HPLOT`. The year is **1983**, from the screen, not 1982.
+So: **the same author as *Space Vikings*, one year later**, self-published rather than through
+subLOGIC, and built on subLOGIC's **A2-3D2** 3-D graphics package. The year is **1983**, from
+the screen, not 1982.
+
+### And Space Vikings was built on A2-3D1, which this is the enhancement of
+
+Recorded here because this file said the opposite - that the earlier game drew its world with
+hand-rolled `HPLOT`, and that the engine is what changed between the two. It is wrong, and the
+evidence is a file name in the other game's catalogue: **`LO-HI A2-3D1`, 4,864 bytes, BLOADed
+to `$6000`** - the same address this disk's `A2-3D2` loads at, and 64% of all CPU time in that
+game by its own project's trace.
+
+The two modules have the same shape. A `JMP` table at the top with the render entry first and
+the cosine and sine at `$6006` and `$6009`; a zero-page save area at the head of the file,
+which is why both disassemble as stray Applesoft tokens there; Cohen-Sutherland clipping; and
+one Q15 fixed-point convention throughout.
+
+Measured over the two files, and **this is a note rather than a probe**, because the other
+game's disk is not in this repository:
+
+| | |
+| --- | --- |
+| equal at the same address | **91 of 4,864 bytes, 1.9%** |
+| shared runs of 16 bytes or more, under any offset | **67 runs, 2,846 bytes - 33.7% of A2-3D2** |
+| the longest | **269 bytes**, A2-3D1 `$635B` to A2-3D2 `$6490`, which is the signed multiply |
+| the next two | 179 bytes at `+$233`, then 130 bytes covering A2-3D1's cosine table |
+
+So a third of A2-3D2 is A2-3D1's own code at six or more different offsets, and compared at
+fixed addresses it looks like 2%. **That is the finale's lesson again** - the unit is the
+instruction under an offset, never the byte at an address - and it is worth noticing that it
+holds across two games a year apart as well as across two binaries on one disk.
+
+What this does **not** establish is anything about `SV DATA`, the scene program's file name.
+`SV` is unexplained: Space Vikings' own models are `PLANET # n` and `SHIP # n`, nothing on
+either disk is named that way, and whether it stands for the earlier game or for something in
+subLOGIC's own distribution is not answerable from these two images.
 
 ---
 
