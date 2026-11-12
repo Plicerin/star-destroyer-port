@@ -142,6 +142,12 @@
       #viewport {
         position: relative;
         width: 100%;
+        /* Keep the screen AND the row of controls under it on the first screenful. Without
+           this, a 1024x768 window showed the hero and the top of the canvas, and the mute
+           box - the first control anyone reaches for - was 150px below the fold. The height
+           left over after the masthead becomes a width, which the aspect ratio then honours. */
+        max-width: max(300px, calc((100svh - 452px) * 35 / 24));
+        margin: 0 auto;
         aspect-ratio: 35 / 24;     /* 280 x 192, the hi-res screen */
         border-radius: 10px;
         overflow: hidden;
@@ -177,6 +183,17 @@
       }
       .tray button:hover:not(:disabled) { border-color: var(--a2-orange); }
       .tray button:disabled { opacity: 0.4; cursor: default; }
+      /* The speaker belongs with the other controls. It was in the instrument column, which
+         on a 768-high screen put the one control a visitor reaches for first below the fold. */
+      .tray .toggle {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: var(--panel); color: var(--ink-2);
+        border: 1px solid var(--line-2); border-radius: 8px;
+        padding: 7px 12px; font-size: 13px; cursor: pointer; user-select: none;
+      }
+      .tray .toggle:hover { border-color: var(--a2-orange); color: var(--ink); }
+      .tray .toggle input { accent-color: var(--a2-orange); cursor: pointer; margin: 0; }
+      .tray .toggle:has(input:checked) { color: var(--ink); border-color: #5a3a2a; }
       .over {
         margin-top: 10px; min-height: 1.5em; text-align: center;
         color: var(--a2-orange); font-size: 13.5px;
@@ -284,6 +301,15 @@
       details.dev { margin-top: 16px; font-size: 12.5px; color: var(--ink-3); }
       details.dev summary { cursor: pointer; color: var(--ink-2); }
 
+      /* A laptop screen is short before it is narrow. The masthead was taking 383px of a 768px
+         window, which is half the page spent on a title nobody came for. */
+      @media (max-height: 850px) {
+        .hero { padding: 14px 0 16px; }
+        .stripes { margin-bottom: 14px; }
+        .hero h1 { font-size: clamp(1.7rem, 5.6vw, 2.7rem); margin-bottom: 10px; }
+        .hero .sub { margin-bottom: 6px; }
+        .byline { margin-bottom: 14px; }
+      }
       @media (max-width: 880px) {
         .stage { grid-template-columns: minmax(0, 1fr); }
         .hud { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
@@ -348,6 +374,11 @@
               <div class="tray">
                 <div class="keys" id="help"></div>
                 <div class="buttons">
+                  <!-- Checked, because this page puts the disk in by itself and a page that
+                       starts without being asked should not start making noise either. -->
+                  <label class="toggle" title="The speaker is off until you ask for it">
+                    <input type="checkbox" id="mute" checked> mute
+                  </label>
                   <button id="pause" type="button" disabled>Pause</button>
                   <button id="boot" type="button">Reboot</button>
                   <button id="fullscreen" type="button">Fullscreen</button>
@@ -372,12 +403,10 @@
               <div class="gauge">
                 <h4>speaker</h4>
                 <div class="kv"><span>last</span><span id="s-sounds">&mdash;</span></div>
-                <!-- Checked, because this page puts the disk in by itself and a page that
-                     starts without being asked should not start making noise either. -->
-                <label class="check"><input type="checkbox" id="mute" checked> mute</label>
                 <p class="caption">
-                  The speaker is off until you ask for it. There is no sound chip in here
-                  &mdash; every one of the seven noises is the processor flipping the cone.
+                  Off until you ask for it, with the <b>mute</b> box under the screen. There is
+                  no sound chip in here &mdash; every one of the seven noises is the processor
+                  flipping the cone itself.
                 </p>
               </div>
               <div class="gauge">
