@@ -192,11 +192,22 @@ console.log('\n=== the port, running DEMO ===');
     return real(shape, at, xor);
   };
   pres.load('DEMO');
-  const r = pres.run({ maxSteps: 8_000_000, maxChains: 0 });
+  // The attract now stops three times, because an empty `FOR`/`NEXT` is how this language
+  // waits and the port charges the machine's price for it - `parity_demo.mjs` holds that
+  // against the measurement. Waiting is the caller's job and there is no clock here, so
+  // these carry straight on.
+  const { YIELD } = await import('../port/src/game/applesoft.js');
+  let r = pres.run({ maxSteps: 8_000_000, maxChains: 0 });
+  let held = 0;
+  while (r.yield === YIELD.wait) {
+    held += r.seconds;
+    r = pres.run({ maxSteps: 8_000_000, maxChains: 0 });
+  }
 
   const want = NARRATION.map(([, t]) => t).join('').replace(/ /g, '');
   check('every character of the narration is XDRAWn', drawn.replace(/ /g, '') === want,
-    `${drawn.replace(/ /g, '').length} characters, in the order the DATA blocks sit in`);
+    `${drawn.replace(/ /g, '').length} characters, in the order the DATA blocks sit in, with`
+      + ` ${held.toFixed(1)}s of reading time cut into them`);
   check('and DEMO leaves for SELECT of its own accord', r.next === 'SELECT',
     'the attract loop ends at HH = 66 with JU = 1 (line 153), not on a key');
   check('control: it got there without a keypress', pres.host.peek(0xC000) < 128,

@@ -3132,14 +3132,31 @@ promoted to fact.
     a minute of flight. What is still unread is
     `$0905`-`$0907`, `$0911`-`$0914`, `$0918`-`$091E`, `$0925`, `$0927`-`$092A` and
     `$0933`-`$0937`.
-16. **Whether `DEMO`'s narration stays on the screen.** The sentences are drawn - the port
-    XDRAWs all 92 characters in order, and `probe_shapetext.mjs` holds that - but `DEMO`
-    draws them *from inside* its attract loop, which page-flips (`POKE 33040, 84 + OO`) and
-    makes 96 `CALL 24576`s while they are up. In the port the page is nearly bare by the time
-    `DEMO` leaves, so the text is being overwritten by later frames. Whether the machine does
-    the same, flickers at half rate, or keeps it, is **unmeasured**: `DEMO` has still never
-    been walked in the oracle, and this is now the reason to walk it. Until it is, the port's
-    attract mode draws the right words and may well show them for the wrong length of time.
+16. ~~**Whether `DEMO`'s narration stays on the screen.**~~ **Answered**, by walking it:
+    `probe_demo.mjs`. The attract was never overwriting the text. It was being read at a
+    speed nothing on this disk runs at.
+
+    `DEMO` holds each block with `412 FOR J = 1 TO 2000: NEXT`, and an empty `FOR`/`NEXT` is
+    the only way this language has of waiting. In the port that loop was free, so all three
+    blocks were drawn and painted over inside a single frame of the page - **the port ran the
+    author's program correctly and still did not show the game.** What had to be reproduced
+    was never the instructions. It was the pause.
+
+    Walked a video frame at a time, reading Applesoft's own current line out of `$75`/`$76`:
+    the attract starts 44s after power-on - all of it `START` and `LOGO1` loading pictures off
+    the floppy - runs for **48 seconds**, stops three times for **1836, 1852 and 1836 ms**,
+    makes 110 visits to line 186's `CALL 24576`, and ends at line 210 with `RUN SELECT`. So it
+    does **not** loop and does not return to `LOGO1`, which was the other half of this
+    question.
+
+    Two numbers come out of it and the port now charges both: an empty Applesoft iteration is
+    **937 cycles**, which also prices `SELECT`'s `FOR J = 1 TO 1500` at 1.4s and `LOGO1`'s 500
+    at half a second; and a `CALL 24576` is the cadence's 316,000 cycles, which is what makes
+    `DEMO`'s animation and `STARBASE`'s 33 renders take as long as they take. Held by
+    `parity_demo.mjs`, whose control puts the old rule back and watches the story vanish.
+
+    Not measured: the attract's timing from a cold machine, because the port does not model
+    the disk at all. It reaches `DEMO` in about two seconds where the floppy takes forty-four.
 
 17. **Why `STARBASE` never finishes its docking scene in the machine.** Reached through the
     real chain it loads, starts rendering and then sits in A2-3D2 around `$664A` for six

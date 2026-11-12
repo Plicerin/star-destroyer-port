@@ -19,6 +19,14 @@ export const TXTTAB = 0x801;
 /** The program the boot starts with. DOS's HELLO on this disk. */
 export const FIRST = 'START';
 
+/**
+ * What one `CALL 24576` costs, measured: 316,000 cycles at 1.0205 MHz.
+ *
+ * Three frames within 0.8% of each other, 18.6 video frames each - about 95,000 6502
+ * instructions to render the whole scene. See *The cadence* in `oracle/DISK_TRUTH.md`.
+ */
+export const RENDER_SECONDS = 316000 / 1020500;
+
 /** `SD PART2` BRUNs this one: an ordinary flight, which `loop.js`'s `Game` runs. */
 export const FLIGHT_BINARY = 'STAR DESTROYER.OBJ0';
 
@@ -57,7 +65,21 @@ export class Presentation {
       corruptInterface,
       store,
       calls: {
-        0x6000: () => { this.engine.reset(); this.engine.run(); return null; },
+        /**
+         * `CALL 24576` - A2-3D2 renders a frame, and takes a third of a second doing it.
+         *
+         * Measured at 316,000 cycles, three frames within 0.8% of each other, which is 309ms
+         * and 18.6 video frames: the engine is synchronised to nothing and runs until it is
+         * done. In the port it is a function call and costs nothing, so a BASIC program that
+         * animates - `DEMO`'s 110 renders, `STARBASE`'s 33 - played its whole animation
+         * inside one frame of the page. The time is handed to the caller to wait out, the
+         * same way an empty `FOR`/`NEXT` is.
+         */
+        0x6000: () => {
+          this.engine.reset();
+          this.engine.run();
+          return { async: true, wait: true, seconds: RENDER_SECONDS };
+        },
         ...calls,
       },
     });

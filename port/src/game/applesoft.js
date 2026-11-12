@@ -87,7 +87,34 @@ export const YIELD = {
   call: 4,
   /** A `BRUN` of something that is not BASIC: the caller runs it and then resumes. */
   run: 5,
+  /** An empty `FOR`/`NEXT`, which is this language's only way of waiting. See below. */
+  wait: 6,
 };
+
+/** 1.0205 MHz, the machine this was written for. */
+const CPU_HZ = 1020500;
+
+/**
+ * What one iteration of an empty `FOR`/`NEXT` costs, measured.
+ *
+ * Applesoft has no wait statement, so a 1983 program pauses by counting:
+ *
+ *     412 FOR J = 1 TO 2000: NEXT :RETURN
+ *
+ * That is `DEMO`'s line 412, and it is the whole of how long you get to read each block of
+ * the attract mode's story. Interpreting the author's own code gets this wrong for free: the
+ * loop costs nothing here, so all three blocks were drawn and painted over inside a single
+ * frame and the page was nearly empty by the end. The port was running the program correctly
+ * and still not showing the game, because what had to be reproduced was never the
+ * instructions. It was the pause.
+ *
+ * `probe_demo.mjs` walks the real attract a video frame at a time, reading Applesoft's own
+ * current line number out of `$75`/`$76`, and times the three stretches at line 412: 1836,
+ * 1852 and 1836 ms for two thousand iterations each. So one iteration is this, and the
+ * author's three delay loops come out at 1.8s for `DEMO`'s 2000, 1.4s for `SELECT`'s 1500,
+ * and half a second for `LOGO1`'s 500.
+ */
+export const DELAY_CYCLES = 937;
 
 export class Applesoft {
   /**
@@ -264,7 +291,10 @@ export class Applesoft {
   doCall() {
     const addr = this.num();
     const r = this.host.call(addr < 0 ? addr + 0x10000 : addr);
-    return r && r.async ? { yield: YIELD.call, addr, ...r } : { yield: YIELD.none };
+    // `wait` separates a call that merely takes time from one that is playing something. A
+    // key cuts a tune short the way `$0371` does; nothing cuts a frame short.
+    if (!r || !r.async) return { yield: YIELD.none };
+    return { yield: r.wait ? YIELD.wait : YIELD.call, addr, ...r };
   }
 
   doGosub() {
@@ -312,9 +342,46 @@ export class Applesoft {
     let step = 1;
     this.skipSpaces();
     if (this.peekByte() === T.STEP) { this.pc.at++; step = this.num(); }
+
+    // A loop with nothing in it is a wait, and the only one this language has. Running the
+    // iterations would be free and therefore wrong, so the time is handed to the caller and
+    // the loop is skipped - leaving the variable where Applesoft leaves it, one step past
+    // the end. See DELAY_CYCLES.
+    const past = step !== 0 ? this.emptyLoop() : null;
+    if (past !== null) {
+      const n = Math.max(1, Math.floor((to - from) / step) + 1);
+      this.setVar(name, sigil, from + step * n);
+      this.pc.at = past;
+      return { yield: YIELD.wait, iterations: n, seconds: (n * DELAY_CYCLES) / CPU_HZ };
+    }
+
     this.setVar(name, sigil, from);
     this.stack.push({ kind: 'for', name, sigil, to, step, pc: { ...this.pc } });
     return { yield: YIELD.none };
+  }
+
+  /**
+   * Is the statement after this `FOR` its own `NEXT`?
+   *
+   * Only on the same line, which is where all three of this disk's delay loops are. A `NEXT`
+   * on a later line is a loop whose body is the rest of this one, and that is not a wait.
+   *
+   * @returns {number|null} where to carry on from, past the `NEXT`, or null
+   */
+  emptyLoop() {
+    const b = this.line.bytes;
+    const name = (c) => (c >= 0x41 && c <= 0x5A) || (c >= 0x61 && c <= 0x7A)
+      || (c >= 0x30 && c <= 0x39) || c === 0x24 || c === 0x25;
+    let at = this.pc.at;
+    while (b[at] === 0x20) at++;
+    if (b[at] !== 0x3A) return null;
+    at++;
+    while (b[at] === 0x20) at++;
+    if (b[at] !== T.NEXT) return null;
+    at++;
+    while (b[at] === 0x20) at++;
+    while (at < b.length && name(b[at])) at++;
+    return at;
   }
 
   doNext() {

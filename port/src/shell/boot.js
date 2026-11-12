@@ -12,6 +12,7 @@ import { Presentation, WAITING, FINALE_BINARY } from './presentation.js';
 import { YIELD } from '../game/applesoft.js';
 
 const YIELD_CALL = YIELD.call;
+const YIELD_WAIT = YIELD.wait;
 import { Game, WAVES } from '../game/loop.js';
 import { Finale, FATAL as FINALE_FATAL } from '../game/finale.js';
 import { SHLD, WARP, MSL, HITS, EMPTY, FATAL, STEP } from '../game/damage.js';
@@ -198,6 +199,13 @@ export class Boot {
       // cut it short the way $0371 does.
       this.holdUntil = now + r.seconds * 1000;
       this.musicUntil = this.holdUntil;
+      return;
+    }
+    if (r.yield === YIELD_WAIT && r.seconds) {
+      // An empty FOR/NEXT: the author counting, which is how this language waits. Held for
+      // as long as the machine counts for, and **not** cut short by a key - nothing in the
+      // loop looks at the keyboard. It is what you read the attract mode's story in.
+      this.holdUntil = now + r.seconds * 1000;
       return;
     }
     if (r.next) {
