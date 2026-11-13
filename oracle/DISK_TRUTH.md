@@ -143,8 +143,73 @@ holds across two games a year apart as well as across two binaries on one disk.
 
 What this does **not** establish is anything about `SV DATA`, the scene program's file name.
 `SV` is unexplained: Space Vikings' own models are `PLANET # n` and `SHIP # n`, nothing on
-either disk is named that way, and whether it stands for the earlier game or for something in
-subLOGIC's own distribution is not answerable from these two images.
+either disk is named that way, and the package's own data file is `TDAT`.
+
+### The package itself is archived, and it is a second witness
+
+`apple.asimov.net` has `images/productivity/graphics/misc/sublogic_a23d_a2ge1.zip` - three
+143,360-byte DOS 3.3 images, the A2-3D1 animation package, the **A2-3D2 enhancement** and the
+A2-GE1 graphics editor - and
+`documentation/programming/misc/A2-3D2 Animation Package Manual (missing pages 21-30).pdf`,
+which is **subLOGIC's own technical manual, version 1.1, 22 June 1981, by Bruce Artwick**. A
+scan, but with an OCR layer, so it is searchable. Neither is in this repository; the findings
+below are notes rather than probes.
+
+**Space Vikings shipped the package's file untouched.** Its `LO-HI A2-3D1` against the retail
+disk's `A2-3D1H`, both at `$6000`: **4,824 of 4,864 bytes equal at the same address, and all
+forty that differ lie in `$6014`-`$6064`** - inside the zero-page save buffer, which holds
+whatever was in the developer's zero page when the module was BSAVEd. The code is identical.
+The retail file is 5,120 bytes against 4,864, one sector longer.
+
+**This disk's `A2-3D2` is a different build of the same product.** Same name, same `$6000`,
+**same length to the byte - 8,443** - and the two retail copies on that disk (`A2-3D2` and
+`A2-3D2 BACKUP`) are identical to each other, so the reading is sound. Against ours:
+
+| | |
+| --- | --- |
+| equal at the same address | 549 of 8,443 |
+| shared runs of 16 bytes or more | 145 runs, 5,998 bytes - **71% of ours** |
+| `$600B`-`$61DD` | offset **0** |
+| `$6348`-`$7120` | offset **-21**, consistently |
+| `$737B` onward | **+189, +389, +427, +951**, and one region of retail appears in ours **twice** |
+
+The first twelve bytes are the four-entry jump table in both, differing only in the trig
+entries - retail jumps to `$61F7` and `$6210`, this disk to `$61F6` and `$620F`, one byte
+earlier. So: twenty-one bytes shorter through the middle, more in the tail, the same total.
+That is a **rebuild, not a patch**, and the manual's own title page says *version 1.1*, so
+revisions exist. Which of the two is later is not established, and nothing here says anyone
+other than subLOGIC made the one on this disk. Given that the same author shipped A2-3D1
+byte-for-byte a year earlier, the expectation is that he shipped this as supplied too.
+
+### The manual confirms the opcode table, including a measured constant
+
+`probe_opcodes.mjs` derived all thirty opcodes from the interpreter and from running them,
+with no documentation at all. The manual names them, and it agrees:
+
+| op | this file called it | subLOGIC calls it |
+| --- | --- | --- |
+| 0 | POINT, 3-D, 7 bytes | `PNT` - opcode, X lsb/msb, Y lsb/msb, Z lsb/msb |
+| 1 | LINE: two 3-D points | `SPNT`, start point then continue point |
+| 14 | VIEWPORT: x scale, y scale, x centre, y centre | `SCRSZ`, "bit ratio ... screen center" |
+| 18 | COLOUR, patches 26 sites | `STCOL`, and the manual calls it instruction-modifying. **0 white, 1 green, 2 purple, 3 blue, 4 orange** |
+| 19 | OBJECT, 13 bytes | `ICALL`, "independent object call", BYTES: 13 - status `00`/`ff`, x, y, z, pitch, bank, heading, definition address |
+| 20 | VECTOR: re-point the 2-D primitives at a second pair of routines | `SRES`, **set resolution**: 0 lo-res, 1 hi-res, and it "sets line traps by dynamically" patching |
+| 22 | ORIGIN for 23 and 25 | `SHRB`, **Set Hi-Res Bias** - where the 256-wide drawing field sits on the 280-wide screen |
+| 23, 25 | 2-D line and point relative to that origin | `HLIN2`, `HPNT2` |
+| 26 | SKIP: if operand 2 is zero, skip operand 1 bytes | `SKIP`, "size, skip=0=active" |
+| 27 | WAIT, **measured at about 0.2s per unit** | `PAUS`, "**time/5 seconds**" |
+| 28 | CAPTURE TO | `SET323`, sets the output array pointer; its default address is **`TDAT`** |
+| 29 | CAPTURE: 0 off, non-zero appends, 2 also stops drawing | `GN323`: 00 off, 01 on, **02 on and suppress final projection** |
+
+Opcode 27 is the one to notice. Its cost was measured in the machine at roughly a fifth of a
+second per unit, with no idea what the instruction was called; the manual says `time/5
+seconds`. Two of the readings are **improved** rather than confirmed: opcode 20 is not "a
+second pair of routines" but lo-res against hi-res, and 22 is a screen bias rather than an
+origin. Both are the same mechanism under a better name.
+
+**The rule does not change.** Where the manual and the disk disagree, the disk wins - this
+is a manual for version 1.1 and the engine on this disk is not that build. It is a second
+witness, not the arbiter.
 
 ---
 
