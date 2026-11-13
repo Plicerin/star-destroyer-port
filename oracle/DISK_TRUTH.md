@@ -179,38 +179,78 @@ revisions exist. Which of the two is later is not established, and nothing here 
 other than subLOGIC made the one on this disk. Given that the same author shipped A2-3D1
 byte-for-byte a year earlier, the expectation is that he shipped this as supplied too.
 
-### The manual confirms the opcode table, including a measured constant
+### The manual confirms the opcode table, 29 of 30
 
-`probe_opcodes.mjs` derived all thirty opcodes from the interpreter and from running them,
-with no documentation at all. The manual names them, and it agrees:
+`probe_opcodes.mjs` derived all thirty from the interpreter and from running them, with no
+documentation at all. Section 1.3 of the manual is a feature chart listing every command with
+its operand format, for A2-3D1 and A2-3D2 side by side - **including the twelve whose command
+sheets are on the pages this scan is missing**. It agrees, and it names them:
 
-| op | this file called it | subLOGIC calls it |
-| --- | --- | --- |
-| 0 | POINT, 3-D, 7 bytes | `PNT` - opcode, X lsb/msb, Y lsb/msb, Z lsb/msb |
-| 1 | LINE: two 3-D points | `SPNT`, start point then continue point |
-| 14 | VIEWPORT: x scale, y scale, x centre, y centre | `SCRSZ`, "bit ratio ... screen center" |
-| 18 | COLOUR, patches 26 sites | `STCOL`, and the manual calls it instruction-modifying. **0 white, 1 green, 2 purple, 3 blue, 4 orange** |
-| 19 | OBJECT, 13 bytes | `ICALL`, "independent object call", BYTES: 13 - status `00`/`ff`, x, y, z, pitch, bank, heading, definition address |
-| 20 | VECTOR: re-point the 2-D primitives at a second pair of routines | `SRES`, **set resolution**: 0 lo-res, 1 hi-res, and it "sets line traps by dynamically" patching |
-| 22 | ORIGIN for 23 and 25 | `SHRB`, **Set Hi-Res Bias** - where the 256-wide drawing field sits on the 280-wide screen |
-| 23, 25 | 2-D line and point relative to that origin | `HLIN2`, `HPNT2` |
-| 26 | SKIP: if operand 2 is zero, skip operand 1 bytes | `SKIP`, "size, skip=0=active" |
-| 27 | WAIT, **measured at about 0.2s per unit** | `PAUS`, "**time/5 seconds**" |
-| 28 | CAPTURE TO | `SET323`, sets the output array pointer; its default address is **`TDAT`** |
-| 29 | CAPTURE: 0 off, non-zero appends, 2 also stops drawing | `GN323`: 00 off, 01 on, **02 on and suppress final projection** |
+| op | this file called it | subLOGIC | |
+| --- | --- | --- | --- |
+| 0 | POINT, 3-D | `PNT` Pure Point 140x192 | `0,x,y,z` |
+| 1 | LINE: two 3-D points, 14 bytes | `SPNT` Start Point | `1,x,y,z` - **see below** |
+| 2 | DRAW ON: line from the previous point | Continue Point | `2,x,y,z` |
+| 3 | DRAW BACK: a hub with spokes | **Ray Point** | `3,x,y,z` |
+| 4 | set the mode byte `$7C` | **Clipper Control** | `4,on/off` |
+| 5 | VIEWER | Viewer Position | `5,x,y,z,p,b,h` |
+| 6 | 2-D LINE | Draw 2D Line on Screen | `6,x,y,x',y'` |
+| 7 | touch soft switch `$C0nn` | **Display Screen Select** | `7,code` |
+| 8 | clear a hires page | **Erase Screen / Fill Screen** | `8,code` |
+| 9 | select the page to draw on | **Write Screen Select** | `9,code` |
+| 10 | 2-D POINT | Plot a 2D White Point | `10,x,y` |
+| 11 | JUMP | Jump | `11,adrlsb,adrmsb` |
+| 12 | PLOTMODE | Set Line Drawing Mode | `12,mode` |
+| 13 | COMPILE | Turn on Output Array | `13,adrlsb,adrmsb` |
+| 14 | VIEWPORT: x scale, y scale, x centre, y centre | Screen Size Select | `14,w,h,cx,cy` |
+| 15 | six engine constants into `$6140`-`$6145` | **Field of View Select** | `15,axr,ayr,azr` |
+| 16 | the graphics-mode sequence in one byte | Easy Initialize | `16` |
+| 17 | no-op | No Operation | `17` |
+| 18 | COLOUR | `STCOL` Set Color Mode - 0 white, 1 green, 2 purple, 3 blue, 4 orange | `18,col` |
+| 19 | OBJECT, 13 bytes | `!CALL` Independent Object Call | `19,stat,loc,addr` |
+| 20 | VECTOR: a second pair of 2-D routines | **`SRES` Set Resolution**, 0 lo-res 1 hi-res | `20,res` |
+| 21 | 2-D LINE, x 16-bit | `HLIN` Hi-Res 280x192 Line | `21,xl,xh,y,xl,xh,y` |
+| 22 | ORIGIN for 23 and 25 | **`SHRB` Set Hi-Res Bias** | `22,xl,xh,y` |
+| 23 | 2-D LINE relative to it | `HLIN2` Hi-Res x=256 Limited Line | `23,x,y,x',y'` |
+| 24 | 2-D POINT, x 16-bit | `HPNT` Hi-Res 280x192 Point | `24,xl,xh,y` |
+| 25 | 2-D POINT relative to it | `HPNT2` Hi-Res x=256 Limited Point | `25,x,y` |
+| 26 | SKIP | `SKIP` Skip Segment | `26,size,status` |
+| 27 | WAIT, **measured at about 0.2s a unit** | `PAUS` Pause, **"n-fifths of a second"** | `27,time` |
+| 28 | CAPTURE TO | `SET323` 3D-to-3D array address | `28,adrlsb,adrmsb` |
+| 29 | CAPTURE, 2 also stops drawing | `GN323` 3D-to-3D array status, 02 = on and suppress | `29,status` |
+| 121 | END | `EOF` End of File | `121` |
 
-Opcode 27 is the one to notice. Its cost was measured in the machine at roughly a fifth of a
-second per unit, with no idea what the instruction was called; the manual says `time/5
-seconds`. Two of the readings are **improved** rather than confirmed: opcode 20 is not "a
-second pair of routines" but lo-res against hi-res, and 22 is a screen bias rather than an
-origin. Both are the same mechanism under a better name.
+Every length agrees and every meaning agrees, two of them better than this file had them.
+Opcode 15's six bytes were "six engine constants" here and are **three field-of-view ratios**;
+opcode 20 was "a second pair of routines" and is lo-res against hi-res; opcode 22 was an
+origin and is the bias that places the 256-wide drawing field on the 280-wide screen. Opcode 3
+is the one worth enjoying: derived here as "a line **to** the previous point, leaving it put -
+a hub with spokes", and subLOGIC calls it a **Ray Point**.
 
-**And the matrix builder's rounding is subLOGIC's, not this copy's.** `$666E` is recorded
-above as having rounding that puts the x scale up to 2.3% high, and as load-bearing. It sits
-in the `-21` region, so the retail build holds it at `$6683` - and over 160 bytes from there
-the two agree on **145**, with every one of the fifteen differences a `JSR` operand one byte
-apart, because the trig entries are. Same routine, same arithmetic, two builds. Whatever that
-rounding costs, it cost every program that ever used the package.
+Opcode 27 is the other. Its cost was counted in the machine at roughly a fifth of a second a
+unit, with no idea what the instruction was even called.
+
+#### The one that does not agree: opcode 1
+
+This file has it as a **14-byte** instruction carrying two 3-D points, and `engine.js` reads
+the second at `at + 7`. The manual has it as `SPNT`, a 7-byte **start point**, with the
+continue point following as its own opcode 2 - its example lists "continue point code and
+coords" at the next address.
+
+**Nothing in this game depends on which is right.** Walking `SV DATA` with this file's own
+lengths reaches `EOF` exactly, at byte 488 of 491, and the opcodes it uses are 4, 5, 6, 7, 8,
+9, 10, 14, 15, 17, 18 and 19. **It never uses 1, 2 or 3 at all** - every shape in Star
+Destroyer is drawn with 2-D lines and object calls.
+
+Two readings, and this file does not choose between them yet:
+
+1. the builds differ here, and this disk's engine fuses start and continue; or
+2. **the measurement is an artefact.** The length sweep runs each opcode with zero operands,
+   so after a 7-byte start point the next byte is a zero - which is opcode 0, another 7-byte
+   instruction. A reading taken as "the distance to the next fetch" can land on 14 either way.
+
+Settling it needs one targeted run: opcode 1 with distinctive operands, watching where the
+interpreter's fetch at `$611E` goes next. Until then it is **open question 19**.
 
 **The rule does not change.** Where the manual and the disk disagree, the disk wins - this
 is a manual for version 1.1 and the engine on this disk is not that build. It is a second
