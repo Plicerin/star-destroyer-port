@@ -78,14 +78,19 @@ const REDIRECTS = [11, 13, 28];
 // opcode's real length differed, the next fetch would land on a pad byte and the measured
 // distance would still be the true one - and would then disagree with the table, which is
 // the check.
+const NOP = 17;
 const OPERANDS = {
   0: [10, 0, 10, 0, 100, 0],
-  1: [10, 0, 10, 0, 100, 0, 2, 0xF6, 0xFF, 10, 0, 100, 0],
+  // Two points, one after the other, with **no opcode byte between them** - which is the
+  // thing being claimed. This used to carry a `2` at offset 7, which made the measurement
+  // look circular: it read as a start point followed by its own continue-point
+  // instruction, the way subLOGIC's manual describes the command. The check below settles
+  // which it is, so this no longer has to imply an answer.
+  1: [10, 0, 10, 0, 100, 0, 0xF6, 0xFF, 10, 0, 100, 0, NOP],
   2: [0xF6, 0xFF, 10, 0, 100, 0],
   3: [0xF6, 0xFF, 10, 0, 100, 0],
   6: [0xF6, 0, 10, 0],
 };
-const NOP = 17;
 const measured = {}, didNotReturn = [];
 for (let o = 0; o < OPCODES; o++) {
   if (REDIRECTS.includes(o)) continue;
@@ -114,6 +119,31 @@ const neverRun = [0, 3, 12, 16, 20, 21, 22, 23, 24, 25, 26, 27, 29];
 check('including all thirteen the disk never runs, which were read off the code only',
   neverRun.every((o) => measured[o] === OPS[o].len),
   neverRun.map((o) => `${o}=${measured[o]}`).join(' '));
+
+// --- opcode 1 is fourteen bytes, and that is not an artefact of how it was measured --------
+// subLOGIC's own manual, for **version 1.1 of the package**, has this command as `SPNT`:
+// a seven-byte start point, with the continue point following as its own opcode 2. The
+// engine on this disk is a different build, and it does not agree.
+//
+// The objection to the measurement above was that it could not tell the two apart: pad an
+// instruction with zeros and a zero is opcode 0, another seven-byte instruction, so "the
+// distance to the next fetch" lands on 14 either way. So this pads with the engine's own
+// one-byte no-op instead, where a seven-byte opcode 1 would have to fetch at +7 and then at
+// every byte after it - which is exactly what the control does.
+{
+  const base = LIST + HEAD.length;
+  const at = (r) => r.walk.map((a) => a - base).filter((d) => d >= 0);
+  const one = await run([1, 10, 0, 10, 0, 100, 0, ...new Array(12).fill(NOP), 121]);
+  const zero = await run([0, 10, 0, 10, 0, 100, 0, ...new Array(12).fill(NOP), 121]);
+  check('opcode 1 steps over fourteen bytes with nothing but no-ops behind it',
+    at(one)[0] === 0 && at(one)[1] === 14,
+    `fetched at +${at(one).slice(0, 4).join(', +')} - the seven no-ops at +7 to +13 were`
+      + ' never read, so they were operands');
+  check('control: opcode 0, which both readings agree is seven, fetches at +7',
+    at(zero)[0] === 0 && at(zero)[1] === 7 && at(zero)[2] === 8,
+    `fetched at +${at(zero).slice(0, 5).join(', +')} - every no-op after it, one at a time,`
+      + ' which is what a seven-byte opcode 1 would have done');
+}
 
 // --- the 3-D drawing opcodes ---------------------------------------------------------------
 console.log('\n=== opcodes 0 and 3: the two the shape format uses and the scene does not ===');

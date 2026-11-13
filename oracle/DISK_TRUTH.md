@@ -179,7 +179,7 @@ revisions exist. Which of the two is later is not established, and nothing here 
 other than subLOGIC made the one on this disk. Given that the same author shipped A2-3D1
 byte-for-byte a year earlier, the expectation is that he shipped this as supplied too.
 
-### The manual confirms the opcode table, 29 of 30
+### The manual confirms the opcode table, 29 of 30, and the thirtieth is a real difference
 
 `probe_opcodes.mjs` derived all thirty from the interpreter and from running them, with no
 documentation at all. Section 1.3 of the manual is a feature chart listing every command with
@@ -189,7 +189,7 @@ sheets are on the pages this scan is missing**. It agrees, and it names them:
 | op | this file called it | subLOGIC | |
 | --- | --- | --- | --- |
 | 0 | POINT, 3-D | `PNT` Pure Point 140x192 | `0,x,y,z` |
-| 1 | LINE: two 3-D points, 14 bytes | `SPNT` Start Point | `1,x,y,z` - **see below** |
+| 1 | LINE: two 3-D points, 14 bytes | `SPNT` Start Point | `1,x,y,z` - **differs, see below** |
 | 2 | DRAW ON: line from the previous point | Continue Point | `2,x,y,z` |
 | 3 | DRAW BACK: a hub with spokes | **Ray Point** | `3,x,y,z` |
 | 4 | set the mode byte `$7C` | **Clipper Control** | `4,on/off` |
@@ -230,27 +230,35 @@ a hub with spokes", and subLOGIC calls it a **Ray Point**.
 Opcode 27 is the other. Its cost was counted in the machine at roughly a fifth of a second a
 unit, with no idea what the instruction was even called.
 
-#### The one that does not agree: opcode 1
+#### The one that does not agree: opcode 1, and the disk wins
 
 This file has it as a **14-byte** instruction carrying two 3-D points, and `engine.js` reads
-the second at `at + 7`. The manual has it as `SPNT`, a 7-byte **start point**, with the
+the second at `at + 7`. The manual has it as `SPNT`, a seven-byte **start point**, with the
 continue point following as its own opcode 2 - its example lists "continue point code and
 coords" at the next address.
 
-**Nothing in this game depends on which is right.** Walking `SV DATA` with this file's own
-lengths reaches `EOF` exactly, at byte 488 of 491, and the opcodes it uses are 4, 5, 6, 7, 8,
-9, 10, 14, 15, 17, 18 and 19. **It never uses 1, 2 or 3 at all** - every shape in Star
-Destroyer is drawn with 2-D lines and object calls.
+The measurement was suspect for a reason worth keeping: the length sweep ran each opcode with
+zero operands, and a zero byte is opcode 0, another seven-byte instruction, so "the distance
+to the next fetch" lands on 14 under either reading. The sweep's operand set for opcode 1
+also carried an explicit `2` at offset 7, which quietly assumed the manual's answer.
 
-Two readings, and this file does not choose between them yet:
+**Settled, with no padding that can decode as anything.** Opcode 1 with one point behind it
+and nothing but the engine's own one-byte no-op after that:
 
-1. the builds differ here, and this disk's engine fuses start and continue; or
-2. **the measurement is an artefact.** The length sweep runs each opcode with zero operands,
-   so after a 7-byte start point the next byte is a zero - which is opcode 0, another 7-byte
-   instruction. A reading taken as "the distance to the next fetch" can land on 14 either way.
+| | fetches at |
+| --- | --- |
+| opcode 1 | **+0, +14, +15, +16** - the no-ops at +7 to +13 were never read |
+| opcode 0, the control | **+0, +7, +8, +9, +10** - every no-op after it, one at a time |
 
-Settling it needs one targeted run: opcode 1 with distinctive operands, watching where the
-interpreter's fetch at `$611E` goes next. Until then it is **open question 19**.
+A seven-byte opcode 1 would have done what the control does. It does not. **On this disk
+opcode 1 is fourteen bytes and carries two points with no opcode byte between them**, and the
+two builds' display files are not interchangeable at that command. Both checks are in
+`probe_opcodes.mjs`.
+
+Nothing in this game turns on it either way. Walking `SV DATA` with this file's lengths
+reaches `EOF` exactly, at byte 488 of 491, and the opcodes it uses are 4, 5, 6, 7, 8, 9, 10,
+14, 15, 17, 18 and 19 - **never 1, 2 or 3**. Every shape in Star Destroyer is 2-D lines and
+object calls.
 
 **The rule does not change.** Where the manual and the disk disagree, the disk wins - this
 is a manual for version 1.1 and the engine on this disk is not that build. It is a second
