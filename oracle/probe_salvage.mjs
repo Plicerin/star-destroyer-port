@@ -1,6 +1,6 @@
 // What else is missing from this disk, and is any of it still down there?
 //
-// The change overwrote the two title pages in place, and the standing question has been
+// The two title pages were overwritten in place, and the standing question has been
 // what else it touched. Before that can be answered properly by comparing against a clean
 // dump, there is something this image can be asked on its own: a DOS 3.3 disk keeps a
 // deleted file's catalog entry, and deleting a file frees its sectors without erasing

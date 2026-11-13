@@ -4,8 +4,8 @@
 // byte for byte. Unlike Space Vikings - which drew its opening with HPLOT and had to have
 // the arithmetic reconstructed - these are bitmaps, and porting them is a copy.
 //
-// They are also how we find out what on this disk is the game and what is the change: the
-// boot lands on a "the replacement art" screen, which is somebody's addition.
+// They are also how we find out what on this disk is the game and what is not: the two
+// title pictures are byte-identical to each other and neither of them is Robbins's.
 import { openDisk, DISK } from './dsk.mjs';
 import { decodeHgr, toPng } from './hgr.mjs';
 import fs from 'fs';

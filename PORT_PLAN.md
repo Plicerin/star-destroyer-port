@@ -39,11 +39,11 @@ happen to do can still be asked of the engine directly.
 
 ## The title pages
 
-**Owner's decision: the port does not reproduce the replacement art.** The only disk image we
-have is a modified copy, and the change overwrote the game's own two title pages in place —
-`SD.PIC1` and `SD.PIC2` are byte-identical to each other and both are this image's
-screen. The originals are not recoverable from this image: the disk has ten free sectors,
-2,560 bytes, against the 8,192 a hi-res page needs.
+**Owner's decision: the port does not reproduce the art that is on this image.** The only
+disk image we have has had the game's own two title pages overwritten in place — `SD.PIC1`
+and `SD.PIC2` are byte-identical to each other and neither is Robbins's. The originals are
+not recoverable from it: the disk has ten free sectors, 2,560 bytes, against the 8,192 a
+hi-res page needs.
 
 Build this as a **missing asset, not a removed feature.** `START` loads two pictures and
 shows them; keep that structure, keep the chain, and let the two picture files simply be
@@ -51,7 +51,7 @@ absent, with the opening falling through to what follows. If a clean dump turns 
 the two files restores the opening with no code change.
 
 Do not substitute invented art in their place. A hand-drawn replacement presented where
-Robbins's art was is the same fidelity problem as shipping the change, in better clothes.
+Robbins's art was is the same fidelity problem as shipping what is there, in better clothes.
 
 ---
 
@@ -706,9 +706,9 @@ Two things now, and the second is testable the moment one exists:
 The owner is looking for one. If it arrives:
 
 1. **Diff it against `disk/STAR_DESTROYER.dsk` before trusting either.** That diff is the
-   only honest answer to what else whoever modified it touched — still an open question.
+   only honest answer to what else was altered — still an open question.
 2. Re-run `node run_all.mjs`. It takes about a minute. Every measurement in DISK_TRUTH
-   came from the this image, and all of them are cheap to re-establish.
+   came from this image, and all of them are cheap to re-establish.
 3. If the title pages are intact, drop them in; Phase 1 of this plan is structured so that
    is all it takes.
 4. It may also carry `STAR DESTROYER.ASM` — Robbins's own 25-sector assembly source, which

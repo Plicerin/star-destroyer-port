@@ -96,10 +96,11 @@ already on this machine, and a floating range downloads a new one.
 
 ## Before porting anything, read this
 
-**The disk is a modified copy.** It boots to a the replacement art screen, and both
-of the game's own title pages have been overwritten with that art — not prefixed, replaced.
-The original title screens are not recoverable from this image. See the top of
-[DISK_TRUTH.md](oracle/DISK_TRUTH.md).
+**The two title pages on this image are not the game's.** `SD.PIC1` and `SD.PIC2` have been
+overwritten in place — not prefixed, replaced — and the originals are not recoverable from
+this image: it has ten free sectors against the 8,192 bytes a hi-res page needs. The port
+builds them as a **missing asset**, so a clean dump restores the opening with no code change.
+See the top of [DISK_TRUTH.md](oracle/DISK_TRUTH.md).
 
 ## The rules this inherits
 

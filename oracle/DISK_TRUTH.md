@@ -10,7 +10,7 @@ Status: **the port has started.** See `PORT_PLAN.md` at the repo root for the ph
 file remains the findings document: it records what the original disk does, and the port
 is held to it by the `parity_*.mjs` harnesses alongside the probes.
 
-**Owner's decision, 2026-11-03: the port does not reproduce the replacement art.** The two title
+**Owner's decision, 2026-11-03: the port does not reproduce the art that is on this image.** The two title
 pages are built as a missing asset rather than a removed feature, so a clean dump can
 restore them without a code change. The owner is looking for one; nothing else waits on it.
 
@@ -27,14 +27,12 @@ and is not settled until measured.
 
 ---
 
-## The headline: this disk is a change
+## The headline: the two title pages are not the game's
 
-`probe_boot.mjs` — the disk boots to a brick wall with a sign on it reading **the replacement art**, with two phone numbers. It is not the game's title screen.
-
-`probe_pics.mjs` — worse than an added screen. The game's own two title pages, `SD.PIC1` and
-`SD.PIC2`, are **byte-identical to each other and both are the replacement art** (11,672 lit pixels
-each). `START` BLOADs them at `$2000` and `$4000` and shows them, so whoever modified it did not
-bolt an intro on the front: they overwrote the originals in place.
+`probe_pics.mjs` — `SD.PIC1` and `SD.PIC2` are **byte-identical to each other** (11,672 lit
+pixels each) and neither of them is Star Destroyer's. `START` BLOADs them at `$2000` and
+`$4000` and shows them, so this is not an intro bolted on the front: the originals were
+overwritten in place.
 
 **The original Star Destroyer title screens are not on this disk.** No probe can recover
 them, because they are not there to read.
@@ -48,8 +46,8 @@ whole of the unused disk.
 
 What this does *not* appear to have touched: the other four pictures are game art, all 21
 Applesoft programs detokenise cleanly, and the game plays through to flight. The change is
-visible in two files and the boot. Whether it changed anything else is **not established** —
-see the open questions.
+visible in two files and in the boot. Whether anything else was altered is **not
+established** — see the open questions.
 
 ## Four files were deleted from this disk
 
@@ -2213,7 +2211,7 @@ lying in the sectors of this copy. It is not authorship, it is damage, and `BASE
 is the proof: same geometry, same overshoot, and its slack does nothing. Nothing in either
 file chose which. Left alone the binary reads a target of 217 against a flight counter already
 at 32, and `SD PART2` line 172 ends every run at the high scores - so the default was
-preserving a this image's accident at the cost of the author's game.
+preserving this image's accident at the cost of the author's game.
 
 **What did not change is the measurement.** `dos.js` still overshoots, `boot()` still reports
 in `actual` what the slack wrote, and `parity_overshoot.mjs` still holds the load model against
@@ -3064,7 +3062,7 @@ promoted to fact.
 1. **What the original title screens looked like.** Gone from this image, and now
    demonstrably so: there is not enough free space on the disk for them to be hiding in.
    Only a clean dump can answer it.
-2. **Whether the change changed anything else** — the RWTS, a protection check inside a
+2. **Whether anything else on this image was changed** — the RWTS, a protection check inside a
    binary, the contents of `INITIALS.DAT`. Comparing against a second image is the only
    honest way to answer it, and **there is no second image**. The archive.org item
    `a2_asimov_star_destroyer` was the standing lead; its `star_destroyer.dsk` is
@@ -3098,7 +3096,7 @@ promoted to fact.
    here as *not* an answer: tracks 0-2, which hold the DOS image, differ from a stock
    DOS 3.3 in 5,682 of 12,288 bytes. That sounds damning and proves nothing. DOS 3.3 ships
    in several releases, commercial disks routinely carry a patched or trimmed DOS, and the
-   author had every reason to modify his own. It is not evidence about whoever modified it. (The
+   author had every reason to modify his own. It is not evidence about who modified it. (The
    reference image used was `dos33.dsk` from the Space Vikings tree, which is not in this
    repository, so this is not a reproducible probe and is not one.)
 
@@ -3135,7 +3133,7 @@ promoted to fact.
 
    Reading sectors straight to the destination instead of buffering and copying is the
    classic **speed patch**. It is what a fast-DOS does, and it is what makes this one
-   overshoot. Who applied it is not established - a this image's loader and a commercial fast
+   overshoot. Who applied it is not established - a third-party loader and a commercial fast
    DOS such as Diversi-DOS or Pronto-DOS both look like this, and testing against those is
    the obvious next step for anyone who wants a name.
 
