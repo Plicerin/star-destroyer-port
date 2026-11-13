@@ -2,7 +2,8 @@
 
 *Star Destroyer*, Harvest Time Software Company, **© 1983 by Mitchell Robbins** — the same
 author as *Space Vikings*, one year later, built on subLOGIC's **A2-3D2** 3-D graphics
-package instead of hand-rolled `HPLOT`.
+package - the enhancement of the **A2-3D1** that the earlier game ran on, which that disk
+carries byte-for-byte as supplied.
 
 **The game plays, beginning to end.** Open `index.html` from a local server and the disk
 boots by itself: the attract mode with the story in it, the difficulty screen, the wireframe
