@@ -4,16 +4,22 @@
 author as *Space Vikings*, one year later, built on subLOGIC's **A2-3D2** 3-D graphics
 package instead of hand-rolled `HPLOT`.
 
-**The flight loop is ported and it runs.** Open `port/index.html` from a local server and
-you get the game: the wireframe view in colour, the instrument panel, the radar scope, the
-controls and the speaker, at the disk's own 2.57 frames a second. What is not ported yet is the
-presentation around it - the title, the difficulty screen, the starbase, the hyperdrive
-sequences, the high scores - and the final mission's binary.
+**The game plays, beginning to end.** Open `index.html` from a local server and the disk
+boots by itself: the attract mode with the story in it, the difficulty screen, the wireframe
+flight in colour with its instrument panel and radar scope, the hyperdrive, the starbase, the
+final mission and the high scores - at the disk's own 2.57 frames a second. Both endings are
+reachable.
+
+The presentation is **interpreted, not transliterated**: `applesoft.js` runs the disk's own
+twenty Applesoft programs as they are, `host.js` is DOS 3.3 underneath them, and only the four
+6502 overlays are rewritten by hand. What is missing is the two title pictures, which are not
+on this image - the port builds them as a missing asset, so a clean dump restores the opening
+with no code change.
 
 Everything under `port/src/game` and `port/src/a23d2` is held to the original by the
 oracle: the disk running under emulation, drivable from a script, so that anything the
 port claims is checked against the machine rather than against someone's notes.
-**45 harnesses**, `cd oracle && node run_all.mjs`.
+**61 harnesses**, `cd oracle && node run_all.mjs`.
 
 ---
 
@@ -21,8 +27,9 @@ port claims is checked against the machine rather than against someone's notes.
 
 ```
 disk/STAR_DESTROYER.dsk   the image everything is measured against
+index.html                the page - open this to play
 port/
-  index.html              the shell - open this to play
+  index.html              the workbench: two drivers, every control, no presentation
   src/a23d2/              subLOGIC's 3-D package, reimplemented
   src/game/               the flight loop, block by block
   src/platform/           disk, hi-res, input, audio - the host, not the game
@@ -51,10 +58,11 @@ happily run an edit-old copy of the port while the file on disk is correct. An h
 into a fix that was right, was served correctly when fetched by hand, and was still wrong on
 the page.
 
-Then open <http://localhost:8124/port/index.html>. Arrows turn, up or shift engages warp,
-space fires, P pauses.
+Then open <http://localhost:8124/>. Arrows turn, up or shift engages warp, space fires,
+P pauses. Leave it alone when it loads and the attract mode runs; press a key and you skip it,
+which is what the text screen invites you to do.
 
-Three switches on the page, all defaulting to the disk's behaviour:
+The controls on the page all default to the disk's behaviour:
 
 - **frames/sec**, which starts at 2.57 because that is what one game frame costs on an
   Apple II. Raising it speeds the whole game up rather than smoothing it: a pass is a full
@@ -62,9 +70,9 @@ Three switches on the page, all defaulting to the disk's behaviour:
 - **display**, which starts in colour, because the game is in colour — A2-3D2's COLOUR
   opcode, not Applesoft's `HCOLOR`. Green, amber and white screens are there for anyone who
   had that monitor.
-- **repair the interface**, which puts back the wave counters that
-  `BRUN STAR DESTROYER.OBJ0` runs over. The page explains it; the short version is that it
-  is this disk image's fault and not the game's.
+- **the high scores**, which are kept in this browser, because the port will not write to the
+  disk image. `CLEAR SCORES` - the two-line utility the author shipped and nothing on the disk
+  ever runs - is a button beside them.
 
 ## Running the oracle
 
