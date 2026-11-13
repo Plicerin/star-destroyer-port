@@ -207,6 +207,13 @@ seconds`. Two of the readings are **improved** rather than confirmed: opcode 20 
 second pair of routines" but lo-res against hi-res, and 22 is a screen bias rather than an
 origin. Both are the same mechanism under a better name.
 
+**And the matrix builder's rounding is subLOGIC's, not this copy's.** `$666E` is recorded
+above as having rounding that puts the x scale up to 2.3% high, and as load-bearing. It sits
+in the `-21` region, so the retail build holds it at `$6683` - and over 160 bytes from there
+the two agree on **145**, with every one of the fifteen differences a `JSR` operand one byte
+apart, because the trig entries are. Same routine, same arithmetic, two builds. Whatever that
+rounding costs, it cost every program that ever used the package.
+
 **The rule does not change.** Where the manual and the disk disagree, the disk wins - this
 is a manual for version 1.1 and the engine on this disk is not that build. It is a second
 witness, not the arbiter.
