@@ -675,23 +675,38 @@ Next for it: get the binary into a real mission in the oracle. Loading its files
 `$0957` runs only 140 of its 1,369 addresses, because the state `SD PART3` leaves behind is
 not reproduced - so there is no parity target yet.
 
-## Phase 7 — the switches
+## Phase 7 — enhancements, parked
 
-Only now, and all defaulting to off: save states, frame rate, gamepad. Each one measured
-against the fidelity baseline so the difference is a choice rather than a drift.
+Nothing here is needed for the port to be right, and none of it is started. **Every one
+defaults to off**, measured against the fidelity baseline, so the difference is a choice
+rather than a drift. Listed in the order they would be worth doing.
 
-Three are already in the shell, all defaulting to the disk: **frame rate** (a menu from the
-disk's 2.57 passes a second up to 60, and raising it speeds the whole game up rather than
-smoothing it, because a pass is a full tick of game state as well as a frame — there is no
-interpolation on offer and inventing one would draw positions the original never computed),
-**analogue steering** (`Input`'s `analogue`, which is the gamepad switch's
-groundwork), and **repair the interface** (`boot`'s `honest: false`), which is the odd one
-out - it does not improve on the original, it undoes what this disk image does to it, and
-on a clean dump it would be a no-op.
+**Touch controls.** The page is unplayable on a phone: it draws, the attract runs, and there
+is nothing to press. This is the one with no fidelity question attached - the machine had two
+paddles and a button, a phone has neither, so anything at all is an addition. Space Vikings
+builds its pad from the keys the current screen actually reads, which is the pattern to copy:
+`SELECT` wants 1, 2 or 3, a flight wants turn, warp and fire, and the rest of the chain wants
+any key. A fixed cluster would leave a phone unable to start a game.
 
-Still to do: save states.
+**Gamepad.** `Input.gamepadX()` and `gamepadFire()` are written and nothing calls them. This
+one is interesting rather than cosmetic: **paddle 0 was analogue**, and the port's arrow keys
+are not, so a stick hands the flight model a real deflection. It cannot change the heading
+rate - `$09A8`/`$09BE` give three units a frame at any deflection past the dead zone - but it
+can put the dead zone back, which the keyboard cannot. `Input`'s `analogue` flag is the
+groundwork and is also unused.
 
----
+**Save states.** The only thing the disk saves is the high-score table, and the port keeps
+that in the browser already. A game is five to fifteen flights at 2.57 frames a second, so
+this is the difference between finishing one and not.
+
+**Frame rate.** Already on the page, already defaulting to the disk's 2.57. Nothing to add
+except the warning that is already there: a pass is a full tick of game state as well as a
+frame, so raising it speeds the game up rather than smoothing it. There is no interpolation
+on offer and inventing one would draw positions the original never computed.
+
+**The interface repair** (`corruptInterface`) is the odd one out and is **not** an
+enhancement: it does not improve on the original, it undoes what this disk image does to it,
+and on a clean dump it would be a no-op. It defaults to repairing.
 
 ## What a clean dump would change
 
